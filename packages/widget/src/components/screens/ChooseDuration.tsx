@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { useWidgetStore } from "../../stores/widget-store";
-import { maturityIdsArray, maturities, type MaturityId } from "@pye/sdk";
+import { maturityIdsArray, type MaturityId } from "@pye/sdk";
 import { useMarketStore } from "@pye/sdk/react";
-import { c, font, displayFont, MARKET_RATE, yieldMap, pointsMap } from "../design-system";
-import { CTA, Tooltip, Spacer } from "../shared/Layout";
+import { c, font, displayFont, MARKET_RATE, yieldMap } from "../design-system";
+import { CTA, Tooltip } from "../shared/Layout";
 
 /** Map maturity IDs to Dan's quarter objects with full date labels */
 const QUARTER_MAP: Record<string, { id: string; label: string; pts: string | null }> = {

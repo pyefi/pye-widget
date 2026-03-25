@@ -1,16 +1,14 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useRef } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { useWidgetStore } from "../../stores/widget-store";
 import {
-  maturities,
   type MaturityId,
-  checkBuyLiquidity,
   executeStakeAccountDeposit,
   executeSwap,
 } from "@pye/sdk";
 import { useMarketStore } from "@pye/sdk/react";
 import { c, font, displayFont, MARKET_RATE, yieldMap, pointsMap } from "../design-system";
-import { StepTitle, CTA, Tooltip, Spacer } from "../shared/Layout";
+import { StepTitle, CTA, Tooltip } from "../shared/Layout";
 
 /* ═══════════════════════════════════════════════════════════════════════════
    DiscountSlider -- Dan's exact pointer-capture slider (lines 1296-1370)
@@ -138,7 +136,6 @@ export default function ReviewQuote() {
 
   const parsedAmount = parseFloat(depositAmount) || 0;
   const fullAmount = selectedStakeAccountBalance || 25.0111;
-  const maturity = selectedMaturityId ? maturities[selectedMaturityId] : null;
   const matures = selectedMaturityId ? (QUARTERS_MAP[selectedMaturityId] || "Sep 30, 2026") : "Sep 30, 2026";
   const quarterId = selectedMaturityId ? (QUARTER_ID_MAP[selectedMaturityId] || "Q3") : "Q3";
   const points = pointsMap[quarterId] || null;
