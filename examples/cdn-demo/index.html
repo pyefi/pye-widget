@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pye Widget — CDN Demo</title>
+  <style>
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #09090b;
+      font-family: sans-serif;
+    }
+  </style>
+</head>
+<body>
+  <div id="pye-widget"></div>
+  <script
+    data-pye-widget
+    data-validator="Helius"
+    data-theme="dark"
+    data-rpc-url="https://mainnet.helius-rpc.com/?api-key=1f92aa6d-a67f-4fca-8a5a-42b4347237a2"
+    data-api-url="https://app.pye.fi"
+    data-supabase-url="https://tfrickmnrfyjkvjhmuik.supabase.co"
+    data-supabase-anon-key="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRmcmlja21ucmZ5amt2amhtdWlrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDM0NDkyMDksImV4cCI6MjA1OTAyNTIwOX0.1wl2FWa5g0tkUn6yRcg1AyF6ixWN7SyoD89cFGxkQKM"
+    src="../../packages/widget/dist/pye-widget.iife.js"
+  ></script>
+</body>
+</html>
