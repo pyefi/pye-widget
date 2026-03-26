@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useWidgetStore } from "../../stores/widget-store";
 import { c, font } from "../design-system";
-import { StepTitle, RecapRow, CTA, InlineError } from "../shared/Layout";
+import { StepTitle, RecapRow, CTA, InlineError, Spacer } from "../shared/Layout";
 import { StakeIcon, SolIcon } from "../Icons";
 
 export default function ChooseAmount() {
@@ -106,6 +106,7 @@ export default function ChooseAmount() {
         </div>
       </div>
 
+      <Spacer />
       <CTA
         label="Continue"
         onClick={() => navigate("choose-duration")}

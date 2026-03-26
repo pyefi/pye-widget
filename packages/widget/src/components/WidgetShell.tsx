@@ -1,5 +1,5 @@
 import { useWidgetStore } from "../stores/widget-store";
-import { Widget, Body, Footer, StepHeader, Spacer } from "./shared/Layout";
+import { Widget, Body, Footer, StepHeader } from "./shared/Layout";
 import HomeScreen from "./screens/HomeScreen";
 import YieldForwardIntro from "./screens/YieldForwardIntro";
 import ConnectWallet from "./screens/ConnectWallet";
@@ -61,7 +61,6 @@ export default function WidgetShell({ validatorName }: WidgetShellProps) {
         {screen === "choose-amount" && <ChooseAmount />}
         {screen === "choose-duration" && <ChooseDuration />}
         {screen === "review-quote" && <ReviewQuote />}
-        <Spacer />
       </Body>
       <Footer />
     </Widget>
