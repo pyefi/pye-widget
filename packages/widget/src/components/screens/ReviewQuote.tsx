@@ -8,7 +8,7 @@ import {
 } from "@pye/sdk";
 import { useMarketStore } from "@pye/sdk/react";
 import { c, font, displayFont, MARKET_RATE, yieldMap, pointsMap } from "../design-system";
-import { StepTitle, CTA, Tooltip } from "../shared/Layout";
+import { StepTitle, CTA, Tooltip, Spacer } from "../shared/Layout";
 
 /* ═══════════════════════════════════════════════════════════════════════════
    DiscountSlider -- Dan's exact pointer-capture slider (lines 1296-1370)
@@ -316,7 +316,7 @@ export default function ReviewQuote() {
           style={{ color: c.secondary, textDecoration: "underline" }}>
           Pye orderbook
         </a>
-        . Fill time varies with market conditions. You receive {feePct}% less than estimated yield -- the cost of instant liquidity.
+        . Fill time varies with market conditions. You receive {feePct}% less than estimated yield — the cost of instant liquidity.
       </p>
 
       {/* Error */}
@@ -330,6 +330,7 @@ export default function ReviewQuote() {
         </div>
       )}
 
+      <Spacer />
       <CTA
         label={isLoading ? "Signing..." : "Sign transaction"}
         onClick={handleSign}

@@ -1,6 +1,5 @@
 import { useWidgetStore } from "../../stores/widget-store";
 import { useBalanceStore, useWalletStore } from "@pye/sdk/react";
-import { c, font } from "../design-system";
 import { StepTitle, RowGroup, Spacer, SelectableRow } from "../shared/Layout";
 import { StakeIcon, SolIcon } from "../Icons";
 
@@ -37,35 +36,21 @@ export default function SelectPosition() {
         {activeAccounts.map((account) => (
           <SelectableRow
             key={account.pubkey}
-            left={<StakeIcon />}
+            icon={<StakeIcon />}
+            label="Staked SOL"
+            sub={account.validatorName || `${account.pubkey.slice(0, 8)}...`}
+            amount={(account.lamports / LAMPORTS_PER_SOL).toFixed(4)}
             onClick={() => handleSelectStake(account.pubkey, account.lamports)}
-            right={
-              <span style={font(14, c.primary, 500)}>
-                {(account.lamports / LAMPORTS_PER_SOL).toFixed(4)}
-              </span>
-            }
-          >
-            <span style={font(14, c.primary, 500)}>Staked SOL</span>
-            <span style={font(12, c.secondary)}>
-              {account.validatorName
-                ? `Earning ${account.validatorName}`
-                : `${account.pubkey.slice(0, 8)}...`}
-            </span>
-          </SelectableRow>
+          />
         ))}
         {hasLiquidSol && (
           <SelectableRow
-            left={<SolIcon />}
+            icon={<SolIcon />}
+            label="Liquid SOL"
+            sub="Unstaked"
+            amount={(balanceLamports / LAMPORTS_PER_SOL).toFixed(4)}
             onClick={handleSelectLiquidSol}
-            right={
-              <span style={font(14, c.primary, 500)}>
-                {(balanceLamports / LAMPORTS_PER_SOL).toFixed(4)}
-              </span>
-            }
-          >
-            <span style={font(14, c.primary, 500)}>Liquid SOL</span>
-            <span style={font(12, c.secondary)}>Unstaked</span>
-          </SelectableRow>
+          />
         )}
       </RowGroup>
       <Spacer />

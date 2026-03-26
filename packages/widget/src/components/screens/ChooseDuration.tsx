@@ -3,7 +3,7 @@ import { useWidgetStore } from "../../stores/widget-store";
 import { maturityIdsArray, type MaturityId } from "@pye/sdk";
 import { useMarketStore } from "@pye/sdk/react";
 import { c, font, displayFont, MARKET_RATE, yieldMap } from "../design-system";
-import { CTA, Tooltip } from "../shared/Layout";
+import { CTA, Tooltip, Spacer } from "../shared/Layout";
 
 /** Map maturity IDs to Dan's quarter objects with full date labels */
 const QUARTER_MAP: Record<string, { id: string; label: string; pts: string | null }> = {
@@ -114,7 +114,7 @@ export default function ChooseDuration() {
             {sel.pts && (
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 <p style={font(12, c.purple)}>{sel.pts} multiplier</p>
-                <Tooltip text="Longer durations earn a points multiplier on your locked position -- 2x for Q3, 3x for Q4, and 4x for Q1. Points accumulate throughout your lockup period." />
+                <Tooltip text="Longer durations earn a points multiplier on your locked position — 2x for Q3, 3x for Q4, and 4x for Q1. Points accumulate throughout your lockup period." />
               </div>
             )}
           </div>
@@ -131,6 +131,7 @@ export default function ChooseDuration() {
         </p>
       </div>
 
+      <Spacer />
       <CTA
         label="Review"
         onClick={() => navigate("review-quote")}

@@ -52,6 +52,7 @@ export default function YieldForwardIntro() {
         <CTA
           label={isConnected ? "Continue" : "Connect Wallet"}
           onClick={() => navigate(isConnected ? "select-position" : "connect-wallet")}
+          purple
         />
       </div>
     </>
