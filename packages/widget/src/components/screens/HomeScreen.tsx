@@ -42,7 +42,7 @@ interface MockPosition {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const TODAY = new Date("2026-03-24");
+const TODAY = new Date();
 
 const MOCK_POSITIONS: MockPosition[] = [
   { id: "p1", maturity: new Date("2025-12-31"), size: "25.0111", received: "0.82",  points: null    },

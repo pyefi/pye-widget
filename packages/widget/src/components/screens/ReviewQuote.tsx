@@ -2,16 +2,18 @@ import { useCallback, useRef } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { useWidgetStore } from "../../stores/widget-store";
 import {
+  maturities,
   type MaturityId,
   executeStakeAccountDeposit,
   executeSwap,
+  allowedLockups,
 } from "@pye/sdk";
-import { useMarketStore } from "@pye/sdk/react";
-import { c, font, displayFont, MARKET_RATE, yieldMap, pointsMap } from "../design-system";
+import { useMarketStore, useBalanceStore } from "@pye/sdk/react";
+import { c, font, displayFont, MARKET_RATE, pointsMap } from "../design-system";
 import { StepTitle, CTA, Tooltip, Spacer } from "../shared/Layout";
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   DiscountSlider -- Dan's exact pointer-capture slider (lines 1296-1370)
+   DiscountSlider — Dan's exact pointer-capture slider
    ═══════════════════════════════════════════════════════════════════════════ */
 
 function DiscountSlider({
@@ -48,14 +50,12 @@ function DiscountSlider({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-      {/* Track */}
       <div
         ref={trackRef}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         style={{ position: "relative", height: 12, display: "flex", alignItems: "center", cursor: "pointer", userSelect: "none" }}
       >
-        {/* Filled track (left of thumb) */}
         <div style={{
           position: "absolute", left: 0, width: `${pct}%`, height: 8,
           background: filledColor,
@@ -64,7 +64,6 @@ function DiscountSlider({
           boxShadow: "inset 0 -1px 0 rgba(0,0,0,0.2)",
           minWidth: pct > 0 ? 4 : 0,
         }} />
-        {/* Unfilled track (right of thumb) */}
         <div style={{
           position: "absolute", left: `${pct}%`, right: 0, height: 8,
           background: c.bg,
@@ -72,7 +71,6 @@ function DiscountSlider({
           borderTop: `1px solid ${c.shadow}`,
           boxShadow: `inset 0 -1px 0 ${c.highlight}`,
         }} />
-        {/* Thumb */}
         <div style={{
           position: "absolute", left: `calc(${pct}% - 8px)`,
           width: 16, height: 16, borderRadius: "50%",
@@ -82,7 +80,6 @@ function DiscountSlider({
           zIndex: 1, flexShrink: 0,
         }} />
       </div>
-      {/* Scale labels */}
       <div style={{ display: "flex", justifyContent: "space-between" }}>
         {["0%", "1%", "2%", "3%", "4%", "5%"].map((l) => (
           <span key={l} style={{
@@ -97,22 +94,29 @@ function DiscountSlider({
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   ReviewQuote -- Dan's StepQuote (lines 1507-1637)
+   Helper: resolve bond data from lockups for a given market
    ═══════════════════════════════════════════════════════════════════════════ */
 
-const QUARTERS_MAP: Record<string, string> = {
-  "2025Q2": "Jun 30, 2026",
-  "2025Q3": "Sep 30, 2026",
-  "2025Q4": "Dec 31, 2026",
-  "2026Q1": "Mar 31, 2027",
-};
+function resolveBondParams(marketKey: string) {
+  // marketKey format: "validatorId-maturityId-PT"
+  const parts = marketKey.split("-");
+  if (parts.length < 3) return null;
+  const tokenType = parts.pop(); // "PT" or "RT"
+  const maturityId = parts.pop() as MaturityId;
+  const validatorId = parts.join("-"); // rejoin in case validator has hyphens
 
-const QUARTER_ID_MAP: Record<string, string> = {
-  "2025Q2": "Q2",
-  "2025Q3": "Q3",
-  "2025Q4": "Q4",
-  "2026Q1": "Q1",
-};
+  const lockups = allowedLockups();
+  const bond = lockups[validatorId as keyof typeof lockups]?.[maturityId as keyof (typeof lockups)[keyof typeof lockups]];
+  if (!bond) return null;
+
+  return {
+    validatorId,
+    maturityId,
+    bondPubkey: bond.pubkey,
+    principalTokenMint: bond.pt_address,
+    yieldTokenMint: bond.rt_address,
+  };
+}
 
 export default function ReviewQuote() {
   const { connection } = useConnection();
@@ -133,43 +137,61 @@ export default function ReviewQuote() {
   const selectedStakeAccountBalance = useWidgetStore((s) => s.selectedStakeAccountBalance);
 
   const markets = useMarketStore((s) => s.markets);
+  const userStakeAccounts = useBalanceStore((s) => s.userStakeAccounts);
 
   const parsedAmount = parseFloat(depositAmount) || 0;
-  const fullAmount = selectedStakeAccountBalance || 25.0111;
-  const matures = selectedMaturityId ? (QUARTERS_MAP[selectedMaturityId] || "Sep 30, 2026") : "Sep 30, 2026";
-  const quarterId = selectedMaturityId ? (QUARTER_ID_MAP[selectedMaturityId] || "Q3") : "Q3";
-  const points = pointsMap[quarterId] || null;
+  const maturity = selectedMaturityId ? maturities[selectedMaturityId] : null;
+  const matures = maturity?.human_readable ?? "Sep 30, 2026";
 
-  // Market data
+  // Find points label from maturity month
+  const monthToQuarter: Record<string, string> = { JUN: "Q3", SEP: "Q4", DEC: "Q1", MAR: "Q2" };
+  const quarterId = maturity ? (monthToQuarter[maturity.month] ?? null) : null;
+  const points = quarterId ? (pointsMap[quarterId] ?? null) : null;
+
+  // Market data — use real maturity ID for lookup
   const ptMarketKey = selectedMaturityId
     ? Object.keys(markets).find((k) => k.endsWith(`-${selectedMaturityId}-PT`))
     : null;
   const ptMarket = ptMarketKey ? markets[ptMarketKey] : null;
   const bestAsk = ptMarket?.bestAskPrice ?? 0;
 
+  // Real market rate from best ask, or fallback
+  const realMarketRate = bestAsk > 0 ? (1 - bestAsk) * 100 : MARKET_RATE;
+
   // Discount slider value as 0-5 float
   const discount = discountRateBps / 100;
 
-  // Gross yield: use real market data or fallback
+  // Gross yield from real market data or fallback
   const grossYield = bestAsk > 0
     ? (1 - bestAsk) * parsedAmount
-    : (yieldMap[quarterId] || MARKET_RATE) * (parsedAmount / fullAmount);
+    : parsedAmount * (MARKET_RATE / 100);
 
   // Net sell amount: Dan's formula
   const sellAmount = parseFloat((grossYield - grossYield * (discount / 100) - 0.0043).toFixed(4));
-  const feePct = ((1 - sellAmount / grossYield) * 100).toFixed(1);
+  const feePct = grossYield > 0 ? ((1 - sellAmount / grossYield) * 100).toFixed(1) : "0.0";
 
   const isLoading = txStatus === "loading";
-  const canSign = !!ptMarket && !!selectedStakeAccountPubkey && !!selectedMaturityId && !isLoading;
+  const canSign = !!selectedStakeAccountPubkey && !!selectedMaturityId && !isLoading;
+
+  // Resolve bond params for tx execution
+  const bondParams = ptMarketKey ? resolveBondParams(ptMarketKey) : null;
+
+  // Find the validator vote account from stake accounts
+  const selectedStakeAccount = selectedStakeAccountPubkey !== "liquid-sol"
+    ? userStakeAccounts.find((a) => a.pubkey === selectedStakeAccountPubkey)
+    : null;
 
   const handleSign = useCallback(async () => {
-    if (!ptMarket || !selectedStakeAccountPubkey || !selectedMaturityId) return;
+    if (!selectedStakeAccountPubkey || !selectedMaturityId) return;
 
     setTxStatus("loading");
 
     try {
+      let signature: string;
+
       if (selectedStakeAccountPubkey === "liquid-sol") {
-        await executeSwap({
+        if (!ptMarket) throw new Error("No market found for this maturity");
+        const result = await executeSwap({
           connection,
           wallet,
           marketPubkey: ptMarket.marketPubkey,
@@ -177,20 +199,24 @@ export default function ReviewQuote() {
           maxPayTokens: parsedAmount,
           slippageBps: 100,
         });
+        signature = result.signature;
       } else {
-        await executeStakeAccountDeposit({
+        if (!bondParams) throw new Error("Could not resolve bond data for this market");
+        const result = await executeStakeAccountDeposit({
           connection,
           wallet,
-          bondPubkey: ptMarket.bondPubkey,
-          principalTokenMint: "",
-          yieldTokenMint: "",
-          validatorVoteAccount: "",
+          bondPubkey: bondParams.bondPubkey,
+          principalTokenMint: bondParams.principalTokenMint,
+          yieldTokenMint: bondParams.yieldTokenMint,
+          validatorVoteAccount: selectedStakeAccount?.validatorVoteAccount ?? "",
           stakeAccountPubkey: selectedStakeAccountPubkey,
           amountSol: parsedAmount,
           stakeBalanceSol: selectedStakeAccountBalance,
         });
+        signature = result.signature;
       }
-      setTxStatus("success");
+
+      setTxStatus("success", signature);
       navigate("complete");
     } catch (err) {
       setTxStatus(
@@ -201,6 +227,8 @@ export default function ReviewQuote() {
     }
   }, [
     ptMarket,
+    bondParams,
+    selectedStakeAccount,
     selectedStakeAccountPubkey,
     selectedMaturityId,
     connection,
@@ -271,7 +299,7 @@ export default function ReviewQuote() {
         </svg>
       </div>
 
-      {/* Advanced panel -- discount rate */}
+      {/* Advanced panel — discount rate */}
       {advancedOpen && (
         <div style={{
           background: c.raised, borderRadius: 6, padding: 12,
@@ -282,7 +310,7 @@ export default function ReviewQuote() {
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             <div style={{ display: "flex", justifyContent: "space-between" }}>
               <span style={font(12, c.secondary)}>Your discount rate</span>
-              <span style={font(12, c.secondary)}>Market: {MARKET_RATE.toFixed(2)}%</span>
+              <span style={font(12, c.secondary)}>Market: {realMarketRate.toFixed(2)}%</span>
             </div>
             <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
               <span style={{ ...font(18, discount < MARKET_RATE ? c.red : c.primary), transition: "color 0.15s" }}>
