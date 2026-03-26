@@ -1,22 +1,8 @@
 import { useWidgetStore } from "../../stores/widget-store";
 import { useMarketStore } from "@pye/sdk/react";
-import { c, font, displayFont, MARKET_RATE, yieldMap } from "../design-system";
+import { maturities, type MaturityId } from "@pye/sdk";
+import { c, font, displayFont, MARKET_RATE, pointsMap } from "../design-system";
 import { Body, CTA, Tooltip, Spacer } from "../shared/Layout";
-
-/* ── Quarter maps (same as ReviewQuote) ──────────────────────────────────────── */
-const QUARTERS_MAP: Record<string, string> = {
-  "2025Q2": "Jun 30, 2026",
-  "2025Q3": "Sep 30, 2026",
-  "2025Q4": "Dec 31, 2026",
-  "2026Q1": "Mar 31, 2027",
-};
-
-const QUARTER_ID_MAP: Record<string, string> = {
-  "2025Q2": "Q2",
-  "2025Q3": "Q3",
-  "2025Q4": "Q4",
-  "2026Q1": "Q1",
-};
 
 export default function StepComplete() {
   const reset = useWidgetStore((s) => s.reset);
@@ -28,9 +14,14 @@ export default function StepComplete() {
   const markets = useMarketStore((s) => s.markets);
 
   const parsedAmount = parseFloat(depositAmount) || 0;
-  const fullAmount = selectedStakeAccountBalance || 25.0111;
-  const matures = selectedMaturityId ? (QUARTERS_MAP[selectedMaturityId] || "Sep 30, 2026") : "Sep 30, 2026";
-  const quarterId = selectedMaturityId ? (QUARTER_ID_MAP[selectedMaturityId] || "Q3") : "Q3";
+
+  // Resolve maturity from real SDK data
+  const maturity = selectedMaturityId ? maturities[selectedMaturityId] : null;
+  const matures = maturity?.human_readable ?? "Sep 30, 2026";
+
+  // Points label
+  const monthToQuarter: Record<string, string> = { JUN: "Q3", SEP: "Q4", DEC: "Q1", MAR: "Q2" };
+  const quarterId = maturity ? (monthToQuarter[maturity.month] ?? null) : null;
 
   // Market data
   const ptMarketKey = selectedMaturityId
@@ -42,7 +33,7 @@ export default function StepComplete() {
   const discount = discountRateBps / 100;
   const grossYield = bestAsk > 0
     ? (1 - bestAsk) * parsedAmount
-    : (yieldMap[quarterId] || MARKET_RATE) * (parsedAmount / fullAmount);
+    : parsedAmount * (MARKET_RATE / 100);
   const sellAmount = parseFloat((grossYield - grossYield * (discount / 100) - 0.0043).toFixed(4));
 
   const solscanUrl = txSignature
@@ -86,7 +77,7 @@ export default function StepComplete() {
       <Body>
         <p style={font(12, c.secondary)}>Your future staking rewards have been sold upfront.</p>
 
-        {/* Amount received -- mirrors StepQuote hero card */}
+        {/* Amount received — mirrors StepQuote hero card */}
         <div style={{ display: "flex", flexDirection: "column" }}>
           <div style={{
             background: c.lowered,
@@ -152,14 +143,12 @@ export default function StepComplete() {
             </a>
           </div>
           <div style={{ display: "flex", gap: 8, flexShrink: 0, alignSelf: "center" }}>
-            {/* Telegram */}
             <a href="https://t.me/pyefi" target="_blank" rel="noreferrer"
               style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, borderRadius: 6, background: c.highlight, borderTop: `1px solid ${c.highlight}`, boxShadow: `inset 0 -1px 0 ${c.shadow}`, textDecoration: "none" }}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill={c.secondary}>
                 <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
               </svg>
             </a>
-            {/* X / Twitter */}
             <a href="https://x.com/pye_fi" target="_blank" rel="noreferrer"
               style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, borderRadius: 6, background: c.highlight, borderTop: `1px solid ${c.highlight}`, boxShadow: `inset 0 -1px 0 ${c.shadow}`, textDecoration: "none" }}>
               <svg width="13" height="13" viewBox="0 0 24 24" fill={c.secondary}>

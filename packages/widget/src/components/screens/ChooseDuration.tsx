@@ -1,63 +1,53 @@
 import { useState } from "react";
 import { useWidgetStore } from "../../stores/widget-store";
-import { maturityIdsArray, type MaturityId } from "@pye/sdk";
+import { maturities, type MaturityId } from "@pye/sdk";
 import { useMarketStore } from "@pye/sdk/react";
-import { c, font, displayFont, MARKET_RATE, yieldMap } from "../design-system";
+import { c, font, displayFont, MARKET_RATE } from "../design-system";
 import { CTA, Tooltip, Spacer } from "../shared/Layout";
 
-/** Map maturity IDs to Dan's quarter objects with full date labels */
-const QUARTER_MAP: Record<string, { id: string; label: string; pts: string | null }> = {
-  "2025Q2": { id: "Q2", label: "30 Jun 2026", pts: null },
-  "2025Q3": { id: "Q3", label: "30 Sep 2026", pts: "2x points" },
-  "2025Q4": { id: "Q4", label: "31 Dec 2026", pts: "3x points" },
-  "2026Q1": { id: "Q1", label: "31 Mar 2027", pts: "4x points" },
+/** Map SDK maturity IDs to Dan's display format */
+const QUARTER_INFO: Record<MaturityId, { label: string; pts: string | null }> = {
+  q22026: { label: "30 Jun 2026", pts: null },
+  q32026: { label: "30 Sep 2026", pts: "2x points" },
+  q42026: { label: "31 Dec 2026", pts: "3x points" },
+  q12026: { label: "31 Mar 2026", pts: null },
 };
+
+/** Only show future maturities (skip q12026 which is Mar 2026 — already past) */
+const DISPLAY_MATURITIES: MaturityId[] = ["q22026", "q32026", "q42026"];
 
 export default function ChooseDuration() {
   const navigate = useWidgetStore((s) => s.navigate);
   const selectedMaturityId = useWidgetStore((s) => s.selectedMaturityId);
   const setSelectedMaturity = useWidgetStore((s) => s.setSelectedMaturity);
   const depositAmount = useWidgetStore((s) => s.depositAmount);
-  const selectedBalance = useWidgetStore((s) => s.selectedStakeAccountBalance);
   const markets = useMarketStore((s) => s.markets);
 
   const [hoveredPill, setHoveredPill] = useState<string | null>(null);
 
   const parsedAmount = parseFloat(depositAmount) || 0;
-  const fullAmount = selectedBalance || 25.0111;
 
-  // Build quarter options from maturityIdsArray
-  const quarters = maturityIdsArray
-    .map((matId) => {
-      const q = QUARTER_MAP[matId];
-      if (!q) return null;
-      return { matId, ...q };
-    })
-    .filter(Boolean) as Array<{ matId: string; id: string; label: string; pts: string | null }>;
+  // Build display quarters from real maturities
+  const quarters = DISPLAY_MATURITIES.map((matId) => {
+    const info = QUARTER_INFO[matId] ?? {
+      label: maturities[matId]?.human_readable ?? matId,
+      pts: null,
+    };
 
-  // If no maturityIdsArray entries match, use hardcoded fallback
-  const displayQuarters = quarters.length > 0 ? quarters : [
-    { matId: "2025Q2" as string, id: "Q2", label: "30 Jun 2026", pts: null },
-    { matId: "2025Q3" as string, id: "Q3", label: "30 Sep 2026", pts: "2x points" },
-    { matId: "2025Q4" as string, id: "Q4", label: "31 Dec 2026", pts: "3x points" },
-    { matId: "2026Q1" as string, id: "Q1", label: "31 Mar 2027", pts: "4x points" },
-  ];
+    // Look up real market data
+    const ptMarketKey = Object.keys(markets).find((k) => k.endsWith(`-${matId}-PT`));
+    const ptMarket = ptMarketKey ? markets[ptMarketKey] : null;
+    const bestAsk = ptMarket?.bestAskPrice ?? null;
 
-  // Find selected quarter info
-  const sel = displayQuarters.find((q) => q.matId === selectedMaturityId);
-
-  // Compute yield from real market data or fallback
-  const ptMarketKey = selectedMaturityId
-    ? Object.keys(markets).find((k) => k.endsWith(`-${selectedMaturityId}-PT`))
-    : null;
-  const ptMarket = ptMarketKey ? markets[ptMarketKey] : null;
-  const bestAsk = ptMarket?.bestAskPrice ?? null;
-
-  const grossYield = sel
-    ? bestAsk != null
+    // Yield: real market → discount rate applied to amount
+    const grossYield = bestAsk != null
       ? (1 - bestAsk) * parsedAmount
-      : ((yieldMap[sel.id] || MARKET_RATE) * (parsedAmount / fullAmount))
-    : 0;
+      : parsedAmount * (MARKET_RATE / 100); // fallback: ~0.85% of amount
+
+    return { matId, ...info, bestAsk, grossYield };
+  });
+
+  const sel = quarters.find((q) => q.matId === selectedMaturityId);
 
   return (
     <>
@@ -72,7 +62,7 @@ export default function ChooseDuration() {
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {/* Pill row */}
         <div style={{ display: "flex", gap: 8 }}>
-          {displayQuarters.map((q) => {
+          {quarters.map((q) => {
             const isSelected = selectedMaturityId === q.matId;
             const isHovered = hoveredPill === q.matId && !isSelected;
             return (
@@ -109,7 +99,7 @@ export default function ChooseDuration() {
           }}>
             <p style={font(12, c.secondary)}>You receive today</p>
             <p style={{ ...displayFont(32, c.green), lineHeight: 1.2, fontVariantNumeric: "lining-nums tabular-nums" }}>
-              +{grossYield.toFixed(3)} SOL
+              +{sel.grossYield.toFixed(3)} SOL
             </p>
             {sel.pts && (
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
