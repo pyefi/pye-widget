@@ -48,7 +48,10 @@ interface Position {
   validatorId: ValidatorId;
   maturityId: MaturityId;
   bond: Bond;
+  /** Display amount in SOL units */
   ptAmount: number;
+  /** Raw lamports for on-chain calls */
+  ptAmountLamports: number;
   maturityTimestamp: number;
   maturityLabel: string;
   isMatured: boolean;
@@ -229,7 +232,8 @@ function PositionsTab() {
         validatorId: entry.validatorId,
         maturityId: entry.maturityId,
         bond: entry.bond,
-        ptAmount: amount,
+        ptAmount: amount / LAMPORTS_PER_SOL,
+        ptAmountLamports: amount,
         maturityTimestamp: matTs,
         maturityLabel: maturity.human_readable,
         isMatured,
@@ -252,7 +256,7 @@ function PositionsTab() {
         bondPubkey: p.bond.pubkey,
         principalTokenMint: p.bond.pt_address,
         yieldTokenMint: p.bond.rt_address,
-        ptAmountLamports: Math.round(p.ptAmount * LAMPORTS_PER_SOL),
+        ptAmountLamports: p.ptAmountLamports,
         rtAmountLamports: 0,
       });
     } catch (err) {
