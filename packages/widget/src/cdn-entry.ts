@@ -1,6 +1,7 @@
 import { createElement } from "react";
 import { createRoot } from "react-dom/client";
 import PyeWidget from "./PyeWidget";
+import type { PyeWidgetProps } from "./types";
 
 function mount() {
   let container = document.getElementById("pye-widget");
@@ -13,17 +14,16 @@ function mount() {
   // Read config from data attributes on the script tag or container
   const script =
     document.querySelector<HTMLScriptElement>("script[data-pye-widget]") ??
-    document.currentScript as HTMLScriptElement | null;
+    (document.currentScript as HTMLScriptElement | null);
 
   const el = script ?? container;
 
   const props = {
     rpcUrl: el.dataset.rpcUrl ?? "https://api.mainnet-beta.solana.com",
-    apiBaseUrl: el.dataset.apiUrl ?? "https://app.pye.fi",
     supabaseUrl: el.dataset.supabaseUrl ?? "",
     supabaseAnonKey: el.dataset.supabaseAnonKey ?? "",
-    validatorName: el.dataset.validator ?? undefined,
-    theme: (el.dataset.theme as "dark" | "light") ?? "dark",
+    voteAccount: el.dataset.voteAccount ?? undefined,
+    theme: (el.dataset.theme ?? "pye-light") as PyeWidgetProps["theme"],
   };
 
   const root = createRoot(container);

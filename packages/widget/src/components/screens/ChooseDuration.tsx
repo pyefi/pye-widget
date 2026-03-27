@@ -1,29 +1,54 @@
-import { useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useWidgetStore } from "../../stores/widget-store";
-import { maturities, type MaturityId } from "@pye/sdk";
+import { maturities, type MaturityId, lookupBondByVoteAccount } from "@pye/sdk";
 import { useMarketStore } from "@pye/sdk/react";
-import { c, font, displayFont, MARKET_RATE } from "../design-system";
+import { c, font, displayFont, MARKET_RATE, formatSolAmount } from "../design-system";
 import { CTA, Tooltip, Spacer } from "../shared/Layout";
 
 /** Map SDK maturity IDs to Dan's display format */
-const QUARTER_INFO: Record<MaturityId, { label: string; pts: string | null }> = {
-  q22026: { label: "30 Jun 2026", pts: null },
-  q32026: { label: "30 Sep 2026", pts: "2x points" },
-  q42026: { label: "31 Dec 2026", pts: "3x points" },
-  q12026: { label: "31 Mar 2026", pts: null },
-};
+const QUARTER_INFO: Record<MaturityId, { label: string; pts: string | null }> =
+  {
+    q22026: { label: "30 Jun 2026", pts: null },
+    q32026: { label: "30 Sep 2026", pts: "2x points" },
+    q42026: { label: "31 Dec 2026", pts: "3x points" },
+    q12026: { label: "31 Mar 2026", pts: null },
+  };
 
 /** Only show future maturities (skip q12026 which is Mar 2026 — already past) */
-const DISPLAY_MATURITIES: MaturityId[] = ["q22026", "q32026", "q42026"];
+const DISPLAY_MATURITIES: MaturityId[] = [
+  "q12026",
+  "q22026",
+  "q32026",
+  "q42026",
+];
 
 export default function ChooseDuration() {
   const navigate = useWidgetStore((s) => s.navigate);
   const selectedMaturityId = useWidgetStore((s) => s.selectedMaturityId);
   const setSelectedMaturity = useWidgetStore((s) => s.setSelectedMaturity);
   const depositAmount = useWidgetStore((s) => s.depositAmount);
+  const selectedValidatorVoteAccount = useWidgetStore((s) => s.selectedValidatorVoteAccount);
   const markets = useMarketStore((s) => s.markets);
 
+  // Resolve the validator ID for validator-specific market lookup
+  const stakeValidatorId = useMemo(() => {
+    if (!selectedValidatorVoteAccount) return null;
+    // Use any maturity to resolve — validator ID is the same across maturities
+    for (const matId of DISPLAY_MATURITIES) {
+      const lookup = lookupBondByVoteAccount(selectedValidatorVoteAccount, matId);
+      if (lookup) return lookup.validatorId;
+    }
+    return null;
+  }, [selectedValidatorVoteAccount]);
+
   const [hoveredPill, setHoveredPill] = useState<string | null>(null);
+
+  // Default to first duration if none selected
+  useEffect(() => {
+    if (!selectedMaturityId && DISPLAY_MATURITIES.length > 0) {
+      setSelectedMaturity(DISPLAY_MATURITIES[0]);
+    }
+  }, [selectedMaturityId, setSelectedMaturity]);
 
   const parsedAmount = parseFloat(depositAmount) || 0;
 
@@ -34,17 +59,22 @@ export default function ChooseDuration() {
       pts: null,
     };
 
-    // Look up real market data
-    const ptMarketKey = Object.keys(markets).find((k) => k.endsWith(`-${matId}-PT`));
-    const ptMarket = ptMarketKey ? markets[ptMarketKey] : null;
-    const bestAsk = ptMarket?.bestAskPrice ?? null;
+    // Look up RT market data — bids represent what buyers will pay per RT
+    // Use validator-specific key when available; fall back to generic lookup
+    const rtMarketKey = stakeValidatorId
+      ? `${stakeValidatorId}-${matId}-RT`
+      : Object.keys(markets).find((k) => k.endsWith(`-${matId}-RT`));
+    const rtMarket = rtMarketKey ? markets[rtMarketKey] ?? null : null;
+    const bestBid = rtMarket?.bestBidPrice ?? null;
 
-    // Yield: real market → discount rate applied to amount
-    const grossYield = bestAsk != null
-      ? (1 - bestAsk) * parsedAmount
-      : parsedAmount * (MARKET_RATE / 100); // fallback: ~0.85% of amount
+    // Gross yield: RT amount (1:1 with deposit) × best bid price (SOL per RT)
+    // Fallback: MARKET_RATE is 0.85 (i.e. 0.85%), so divide by 100 once to get 0.0085
+    const grossYield =
+      bestBid != null
+        ? bestBid * parsedAmount
+        : parsedAmount * (MARKET_RATE / 100);
 
-    return { matId, ...info, bestAsk, grossYield };
+    return { matId, ...info, bestBid, grossYield };
   });
 
   const sel = quarters.find((q) => q.matId === selectedMaturityId);
@@ -56,7 +86,10 @@ export default function ChooseDuration() {
           <p style={font(14, c.primary)}>Choose a staking duration</p>
           <Tooltip text="Lock your stake until the chosen date. All staking rewards for the period are sold to you upfront today. Your full SOL stake is returned at maturity." />
         </div>
-        <p style={font(12, c.secondary)}>All rewards for the period are paid to you today. Your stake is returned in full at the end.</p>
+        <p style={font(12, c.secondary)}>
+          All rewards for the period are paid to you today. Your stake is
+          returned in full at the end.
+        </p>
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -72,10 +105,18 @@ export default function ChooseDuration() {
                 onMouseEnter={() => setHoveredPill(q.matId)}
                 onMouseLeave={() => setHoveredPill(null)}
                 style={{
-                  flex: 1, height: 32,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  borderRadius: 4, cursor: "pointer",
-                  background: isSelected ? c.bg : isHovered ? c.highlight : c.raised,
+                  flex: 1,
+                  height: 32,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  borderRadius: 4,
+                  cursor: "pointer",
+                  background: isSelected
+                    ? c.bg
+                    : isHovered
+                    ? c.highlight
+                    : c.raised,
                   borderTop: `1px solid ${isSelected ? c.shadow : c.highlight}`,
                   boxShadow: isSelected
                     ? `inset 0 -1px 0 ${c.highlight}`
@@ -83,7 +124,9 @@ export default function ChooseDuration() {
                   transition: "background 0.1s",
                 }}
               >
-                <span style={font(12, isSelected ? c.primary : c.secondary)}>{q.label}</span>
+                <span style={font(12, isSelected ? c.primary : c.secondary)}>
+                  {q.label}
+                </span>
               </div>
             );
           })}
@@ -91,15 +134,27 @@ export default function ChooseDuration() {
 
         {/* Yield card */}
         {sel && (
-          <div style={{
-            background: c.lowered, borderRadius: 6, padding: 12,
-            borderTop: `1px solid ${c.shadow}`,
-            boxShadow: `inset 0 -1px 0 ${c.highlight}`,
-            display: "flex", flexDirection: "column", gap: 4,
-          }}>
+          <div
+            style={{
+              background: c.lowered,
+              borderRadius: 6,
+              padding: 12,
+              borderTop: `1px solid ${c.shadow}`,
+              boxShadow: `inset 0 -1px 0 ${c.highlight}`,
+              display: "flex",
+              flexDirection: "column",
+              gap: 4,
+            }}
+          >
             <p style={font(12, c.secondary)}>You receive today</p>
-            <p style={{ ...displayFont(32, c.green), lineHeight: 1.2, fontVariantNumeric: "lining-nums tabular-nums" }}>
-              +{sel.grossYield.toFixed(3)} SOL
+            <p
+              style={{
+                ...displayFont(32, c.green),
+                lineHeight: 1.2,
+                fontVariantNumeric: "lining-nums tabular-nums",
+              }}
+            >
+              +{formatSolAmount(sel.grossYield, 3)} SOL
             </p>
             {sel.pts && (
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -113,8 +168,12 @@ export default function ChooseDuration() {
         {/* Early exit note */}
         <p style={font(12, c.secondary)}>
           Need to exit early? You can sell your locked position at{" "}
-          <a href="https://app.pye.fi/trade" target="_blank" rel="noreferrer"
-            style={{ color: c.secondary, textDecoration: "underline" }}>
+          <a
+            href="https://app.pye.fi/trade"
+            target="_blank"
+            rel="noreferrer"
+            style={{ color: c.secondary, textDecoration: "underline" }}
+          >
             app.pye.fi/trade
           </a>
           .

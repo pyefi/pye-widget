@@ -23,26 +23,36 @@ export interface WidgetState {
 
   selectedStakeAccountPubkey: string | null;
   selectedStakeAccountBalance: number;
+  selectedValidatorName: string | null;
+  selectedValidatorIcon: string | null;
+  selectedValidatorVoteAccount: string | null;
   depositAmount: string;
   selectedMaturityId: MaturityId | null;
 
   advancedOpen: boolean;
-  discountRateBps: number;
+  slippageBps: number;
 
   txStatus: "idle" | "loading" | "success" | "error";
+  txStep: "idle" | "depositing" | "selling" | "complete";
+  depositTxSignature: string | null;
+  sellTxSignature: string | null;
   txSignature: string | null;
   txError: string | null;
+  /** Actual SOL received from RT sell, set after transaction completes */
+  sellAmountSol: number | null;
 }
 
 export interface WidgetActions {
   navigate(screen: WidgetScreen): void;
   goBack(): void;
   setHomeTab(tab: HomeTab): void;
-  selectStakeAccount(pubkey: string, balance: number): void;
+  selectStakeAccount(pubkey: string, balance: number, validatorName?: string, validatorIcon?: string, validatorVoteAccount?: string): void;
   setDepositAmount(amount: string): void;
   setSelectedMaturity(id: MaturityId): void;
   setAdvancedOpen(open: boolean): void;
-  setDiscountRateBps(bps: number): void;
+  setSlippageBps(bps: number): void;
+  setSellAmountSol(amount: number): void;
+  setTxStep(step: WidgetState["txStep"]): void;
   setTxStatus(
     status: WidgetState["txStatus"],
     signature?: string | null,
@@ -60,15 +70,22 @@ const initialState: WidgetState = {
 
   selectedStakeAccountPubkey: null,
   selectedStakeAccountBalance: 0,
+  selectedValidatorName: null,
+  selectedValidatorIcon: null,
+  selectedValidatorVoteAccount: null,
   depositAmount: "",
   selectedMaturityId: null,
 
   advancedOpen: false,
-  discountRateBps: 100,
+  slippageBps: 100,
 
   txStatus: "idle",
+  txStep: "idle",
+  depositTxSignature: null,
+  sellTxSignature: null,
   txSignature: null,
   txError: null,
+  sellAmountSol: null,
 };
 
 export function createWidgetStore() {
@@ -96,10 +113,13 @@ export function createWidgetStore() {
         });
       },
 
-      selectStakeAccount(pubkey, balance) {
+      selectStakeAccount(pubkey, balance, validatorName, validatorIcon, validatorVoteAccount) {
         set((s) => {
           s.selectedStakeAccountPubkey = pubkey;
           s.selectedStakeAccountBalance = balance;
+          s.selectedValidatorName = validatorName ?? null;
+          s.selectedValidatorIcon = validatorIcon ?? null;
+          s.selectedValidatorVoteAccount = validatorVoteAccount ?? null;
         });
       },
 
@@ -121,9 +141,21 @@ export function createWidgetStore() {
         });
       },
 
-      setDiscountRateBps(bps) {
+      setSlippageBps(bps) {
         set((s) => {
-          s.discountRateBps = bps;
+          s.slippageBps = bps;
+        });
+      },
+
+      setSellAmountSol(amount) {
+        set((s) => {
+          s.sellAmountSol = amount;
+        });
+      },
+
+      setTxStep(step) {
+        set((s) => {
+          s.txStep = step;
         });
       },
 
@@ -132,6 +164,11 @@ export function createWidgetStore() {
           s.txStatus = status;
           s.txSignature = signature ?? null;
           s.txError = error ?? null;
+          if (status === "idle") {
+            s.txStep = "idle";
+            s.depositTxSignature = null;
+            s.sellTxSignature = null;
+          }
         });
       },
 

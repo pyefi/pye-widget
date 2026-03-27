@@ -10,10 +10,9 @@ export type WidgetTheme =
 
 export interface PyeWidgetProps {
   rpcUrl: string;
-  apiBaseUrl: string;
   supabaseUrl: string;
   supabaseAnonKey: string;
-  validatorName?: string;
+  voteAccount?: string;
   theme?: WidgetTheme;
   onClose?: () => void;
 }

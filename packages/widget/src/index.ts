@@ -1,2 +1,2 @@
 export { default as PyeWidget } from "./PyeWidget";
-export type { PyeWidgetProps } from "./types";
+export type { PyeWidgetProps, WidgetTheme } from "./types";

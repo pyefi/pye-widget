@@ -1,6 +1,5 @@
 export interface PyeSDKConfig {
   rpcUrl: string;
-  apiBaseUrl: string;
   supabaseUrl: string;
   supabaseAnonKey: string;
 }

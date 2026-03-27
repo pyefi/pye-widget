@@ -1,7 +1,6 @@
 import { useWidgetStore } from "../../stores/widget-store";
-import { useMarketStore } from "@pye/sdk/react";
-import { maturities, type MaturityId } from "@pye/sdk";
-import { c, font, displayFont, MARKET_RATE, pointsMap } from "../design-system";
+import { maturities } from "@pye/sdk";
+import { c, font, displayFont, pointsMap, formatSolAmount } from "../design-system";
 import { Body, CTA, Tooltip, Spacer } from "../shared/Layout";
 
 export default function StepComplete() {
@@ -9,11 +8,10 @@ export default function StepComplete() {
   const txSignature = useWidgetStore((s) => s.txSignature);
   const depositAmount = useWidgetStore((s) => s.depositAmount);
   const selectedMaturityId = useWidgetStore((s) => s.selectedMaturityId);
-  const selectedStakeAccountBalance = useWidgetStore((s) => s.selectedStakeAccountBalance);
-  const discountRateBps = useWidgetStore((s) => s.discountRateBps);
-  const markets = useMarketStore((s) => s.markets);
+  const sellAmountSol = useWidgetStore((s) => s.sellAmountSol);
 
   const parsedAmount = parseFloat(depositAmount) || 0;
+  const sellAmount = sellAmountSol ?? 0;
 
   // Resolve maturity from real SDK data
   const maturity = selectedMaturityId ? maturities[selectedMaturityId] : null;
@@ -22,19 +20,6 @@ export default function StepComplete() {
   // Points label
   const monthToQuarter: Record<string, string> = { JUN: "Q3", SEP: "Q4", DEC: "Q1", MAR: "Q2" };
   const quarterId = maturity ? (monthToQuarter[maturity.month] ?? null) : null;
-
-  // Market data
-  const ptMarketKey = selectedMaturityId
-    ? Object.keys(markets).find((k) => k.endsWith(`-${selectedMaturityId}-PT`))
-    : null;
-  const ptMarket = ptMarketKey ? markets[ptMarketKey] : null;
-  const bestAsk = ptMarket?.bestAskPrice ?? 0;
-
-  const discount = discountRateBps / 100;
-  const grossYield = bestAsk > 0
-    ? (1 - bestAsk) * parsedAmount
-    : parsedAmount * (MARKET_RATE / 100);
-  const sellAmount = parseFloat((grossYield - grossYield * (discount / 100) - 0.0043).toFixed(4));
 
   const solscanUrl = txSignature
     ? `https://solscan.io/tx/${txSignature}`
@@ -89,7 +74,7 @@ export default function StepComplete() {
           }}>
             <p style={font(12, c.secondary)}>Rewards sold upfront</p>
             <p style={{ ...displayFont(32, c.green), lineHeight: 1.2, fontVariantNumeric: "lining-nums tabular-nums" }}>
-              +{sellAmount} SOL
+              +{formatSolAmount(sellAmount)} SOL
             </p>
           </div>
           {/* PT + maturity */}

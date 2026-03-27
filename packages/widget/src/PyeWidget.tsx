@@ -9,7 +9,7 @@ import {
   TorusWalletAdapter,
   LedgerWalletAdapter,
 } from "@solana/wallet-adapter-wallets";
-import { configurePyeSDK } from "@pye/sdk";
+import { configurePyeSDK, validators } from "@pye/sdk";
 import {
   PyeSDKProvider,
   WalletSyncer,
@@ -25,20 +25,29 @@ import WidgetShell from "./components/WidgetShell";
 import type { PyeWidgetProps } from "./types";
 import "./styles/fonts.css";
 
+function resolveValidatorName(voteAccount?: string): string | undefined {
+  if (!voteAccount) return undefined;
+  for (const v of Object.values(validators)) {
+    if (v.vote_account === voteAccount) return v.name;
+  }
+  return undefined;
+}
+
 export default function PyeWidget({
   rpcUrl,
-  apiBaseUrl,
   supabaseUrl,
   supabaseAnonKey,
-  validatorName,
-  theme = "pye-dark",
+  voteAccount,
+  theme = "pye-light",
   onClose,
 }: PyeWidgetProps) {
   const configuredRef = useRef(false);
   if (!configuredRef.current) {
-    configurePyeSDK({ rpcUrl, apiBaseUrl, supabaseUrl, supabaseAnonKey });
+    configurePyeSDK({ rpcUrl, supabaseUrl, supabaseAnonKey });
     configuredRef.current = true;
   }
+
+  const validatorName = useMemo(() => resolveValidatorName(voteAccount), [voteAccount]);
 
   const wallets = useMemo(
     () => [

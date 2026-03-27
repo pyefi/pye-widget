@@ -7,7 +7,7 @@ export { validators, ALLOWED_VALIDATORS } from "./constants/validators";
 export type { Validator, ValidatorId } from "./constants/validators";
 export { maturities, maturitiesArray, maturityIdsArray, getMaturity } from "./constants/maturities";
 export type { Maturity, MaturityId } from "./constants/maturities";
-export { lockups, allowedLockups } from "./constants/lockups";
+export { lockups, allowedLockups, lookupBondByVoteAccount } from "./constants/lockups";
 export type { Bond } from "./constants/lockups";
 export { tokens, tokenIdsArray, allTokenAddresses } from "./constants/tokens";
 export type { Token, TokenId } from "./constants/tokens";
@@ -47,6 +47,8 @@ export type {
 } from "./lib/execute-stake-deposit";
 export { executeSwap } from "./lib/execute-swap";
 export type { ExecuteSwapParams, ExecuteSwapResult } from "./lib/execute-swap";
+export { executeRtSell } from "./lib/execute-rt-sell";
+export type { ExecuteRtSellParams, ExecuteRtSellResult } from "./lib/execute-rt-sell";
 export { executeLimitOrder } from "./lib/execute-limit-order";
 export type { ExecuteLimitOrderParams, ExecuteLimitOrderResult } from "./lib/execute-limit-order";
 export { executeCancelOrder } from "./lib/execute-cancel-order";

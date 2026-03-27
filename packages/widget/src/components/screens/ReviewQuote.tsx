@@ -3,13 +3,18 @@ import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { useWidgetStore } from "../../stores/widget-store";
 import {
   maturities,
+  validators,
   type MaturityId,
+  type ValidatorId,
   executeStakeAccountDeposit,
-  executeSwap,
+  executeStakeDeposit,
+  executeRtSell,
+  checkSellLiquidity,
   allowedLockups,
+  lookupBondByVoteAccount,
 } from "@pye/sdk";
 import { useMarketStore, useBalanceStore } from "@pye/sdk/react";
-import { c, font, displayFont, MARKET_RATE, pointsMap } from "../design-system";
+import { c, font, displayFont, MARKET_RATE, pointsMap, formatSolAmount } from "../design-system";
 import { StepTitle, CTA, Tooltip, Spacer } from "../shared/Layout";
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -45,8 +50,7 @@ function DiscountSlider({
     onChange(computeValue(e.clientX));
   };
 
-  const isBelowMarket = value < MARKET_RATE;
-  const filledColor = isBelowMarket ? "#D93B3B" : "#0d9c5e";
+  const filledColor = value > 3 ? "#D93B3B" : "#0d9c5e";
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
@@ -98,7 +102,7 @@ function DiscountSlider({
    ═══════════════════════════════════════════════════════════════════════════ */
 
 function resolveBondParams(marketKey: string) {
-  // marketKey format: "validatorId-maturityId-PT"
+  // marketKey format: "validatorId-maturityId-PT" or "validatorId-maturityId-RT"
   const parts = marketKey.split("-");
   if (parts.length < 3) return null;
   const tokenType = parts.pop(); // "PT" or "RT"
@@ -109,12 +113,14 @@ function resolveBondParams(marketKey: string) {
   const bond = lockups[validatorId as keyof typeof lockups]?.[maturityId as keyof (typeof lockups)[keyof typeof lockups]];
   if (!bond) return null;
 
+  const validator = validators[validatorId as ValidatorId];
   return {
     validatorId,
     maturityId,
     bondPubkey: bond.pubkey,
     principalTokenMint: bond.pt_address,
     yieldTokenMint: bond.rt_address,
+    voteAccount: validator?.vote_account ?? "",
   };
 }
 
@@ -124,12 +130,15 @@ export default function ReviewQuote() {
 
   const navigate = useWidgetStore((s) => s.navigate);
   const txStatus = useWidgetStore((s) => s.txStatus);
+  const txStep = useWidgetStore((s) => s.txStep);
   const txError = useWidgetStore((s) => s.txError);
   const setTxStatus = useWidgetStore((s) => s.setTxStatus);
+  const setTxStep = useWidgetStore((s) => s.setTxStep);
+  const setSellAmountSol = useWidgetStore((s) => s.setSellAmountSol);
   const advancedOpen = useWidgetStore((s) => s.advancedOpen);
   const setAdvancedOpen = useWidgetStore((s) => s.setAdvancedOpen);
-  const discountRateBps = useWidgetStore((s) => s.discountRateBps);
-  const setDiscountRateBps = useWidgetStore((s) => s.setDiscountRateBps);
+  const slippageBps = useWidgetStore((s) => s.slippageBps);
+  const setSlippageBps = useWidgetStore((s) => s.setSlippageBps);
 
   const depositAmount = useWidgetStore((s) => s.depositAmount);
   const selectedMaturityId = useWidgetStore((s) => s.selectedMaturityId);
@@ -148,75 +157,117 @@ export default function ReviewQuote() {
   const quarterId = maturity ? (monthToQuarter[maturity.month] ?? null) : null;
   const points = quarterId ? (pointsMap[quarterId] ?? null) : null;
 
-  // Market data — use real maturity ID for lookup
-  const ptMarketKey = selectedMaturityId
-    ? Object.keys(markets).find((k) => k.endsWith(`-${selectedMaturityId}-PT`))
-    : null;
-  const ptMarket = ptMarketKey ? markets[ptMarketKey] : null;
-  const bestAsk = ptMarket?.bestAskPrice ?? 0;
-
-  // Real market rate from best ask, or fallback
-  const realMarketRate = bestAsk > 0 ? (1 - bestAsk) * 100 : MARKET_RATE;
-
-  // Discount slider value as 0-5 float
-  const discount = discountRateBps / 100;
-
-  // Gross yield from real market data or fallback
-  const grossYield = bestAsk > 0
-    ? (1 - bestAsk) * parsedAmount
-    : parsedAmount * (MARKET_RATE / 100);
-
-  // Net sell amount: Dan's formula
-  const sellAmount = parseFloat((grossYield - grossYield * (discount / 100) - 0.0043).toFixed(4));
-  const feePct = grossYield > 0 ? ((1 - sellAmount / grossYield) * 100).toFixed(1) : "0.0";
-
-  const isLoading = txStatus === "loading";
-  const canSign = !!selectedStakeAccountPubkey && !!selectedMaturityId && !isLoading;
-
-  // Resolve bond params for tx execution
-  const bondParams = ptMarketKey ? resolveBondParams(ptMarketKey) : null;
-
   // Find the validator vote account from stake accounts
   const selectedStakeAccount = selectedStakeAccountPubkey !== "liquid-sol"
     ? userStakeAccounts.find((a) => a.pubkey === selectedStakeAccountPubkey)
     : null;
 
+  // Resolve the validator ID for market lookup
+  const stakeVoteAccount = selectedStakeAccount?.validatorVoteAccount;
+  const stakeBondLookup = stakeVoteAccount && selectedMaturityId
+    ? lookupBondByVoteAccount(stakeVoteAccount, selectedMaturityId)
+    : null;
+  const stakeValidatorId = stakeBondLookup?.validatorId;
+
+  // RT market data — must match the stake account's validator (each validator has its own RT token)
+  const rtMarketKey = selectedMaturityId
+    ? (stakeValidatorId
+        ? `${stakeValidatorId}-${selectedMaturityId}-RT`
+        : Object.keys(markets).find((k) => k.endsWith(`-${selectedMaturityId}-RT`)))
+    : null;
+  const rtMarket = rtMarketKey ? markets[rtMarketKey] ?? null : null;
+
+  // RT amount = deposit amount (1:1 from stake deposit)
+  const rtAmount = parsedAmount;
+
+  // Real liquidity check against RT order book bids
+  const liquidityCheck = rtMarket?.bids?.length
+    ? checkSellLiquidity(rtMarket.bids, rtAmount)
+    : null;
+
+  const hasLiquidity = liquidityCheck?.isSufficientLiquidity ?? false;
+  const orderBookSlippageBps = liquidityCheck?.slippageBps ?? 0;
+
+  // Quote: expected SOL from selling RT
+  const sellAmount = liquidityCheck?.expectedFillPrice != null
+    ? liquidityCheck.expectedFillPrice * rtAmount
+    : rtAmount * (MARKET_RATE / 100); // fallback
+
+  // Slippage tolerance from slider (0-5 float)
+  const slippage = slippageBps / 100;
+
+  const isLoading = txStatus === "loading";
+  const canSign = !!selectedStakeAccountPubkey && !!selectedMaturityId && !isLoading && hasLiquidity;
+
+  // Resolve bond from the stake account's actual validator (not from market key)
+  // Fall back to market-key-based resolution for liquid SOL (no stake account)
+  const anyMarketKey = !stakeBondLookup
+    ? (rtMarketKey ?? (selectedMaturityId ? Object.keys(markets).find((k) => k.endsWith(`-${selectedMaturityId}-PT`)) : null))
+    : null;
+  const marketBondParams = anyMarketKey ? resolveBondParams(anyMarketKey) : null;
+
+  const bondParams = stakeBondLookup
+    ? {
+        validatorId: stakeBondLookup.validatorId,
+        maturityId: selectedMaturityId!,
+        bondPubkey: stakeBondLookup.pubkey,
+        principalTokenMint: stakeBondLookup.pt_address,
+        yieldTokenMint: stakeBondLookup.rt_address,
+        voteAccount: stakeVoteAccount!,
+      }
+    : marketBondParams;
+
   const handleSign = useCallback(async () => {
     if (!selectedStakeAccountPubkey || !selectedMaturityId) return;
+    if (!bondParams) throw new Error("Could not resolve bond data for this market");
+    if (!rtMarket) throw new Error("No RT market found for this maturity");
 
     setTxStatus("loading");
 
     try {
-      let signature: string;
+      // Step 1: Deposit stake → receive PT + RT
+      setTxStep("depositing");
 
       if (selectedStakeAccountPubkey === "liquid-sol") {
-        if (!ptMarket) throw new Error("No market found for this maturity");
-        const result = await executeSwap({
-          connection,
-          wallet,
-          marketPubkey: ptMarket.marketPubkey,
-          orderSizeTokens: parsedAmount,
-          maxPayTokens: parsedAmount,
-          slippageBps: 100,
-        });
-        signature = result.signature;
-      } else {
-        if (!bondParams) throw new Error("Could not resolve bond data for this market");
-        const result = await executeStakeAccountDeposit({
+        await executeStakeDeposit({
           connection,
           wallet,
           bondPubkey: bondParams.bondPubkey,
           principalTokenMint: bondParams.principalTokenMint,
           yieldTokenMint: bondParams.yieldTokenMint,
-          validatorVoteAccount: selectedStakeAccount?.validatorVoteAccount ?? "",
+          validatorVoteAccount: bondParams.voteAccount,
+          amountSol: parsedAmount,
+        });
+      } else {
+        await executeStakeAccountDeposit({
+          connection,
+          wallet,
+          bondPubkey: bondParams.bondPubkey,
+          principalTokenMint: bondParams.principalTokenMint,
+          yieldTokenMint: bondParams.yieldTokenMint,
+          validatorVoteAccount: bondParams.voteAccount,
           stakeAccountPubkey: selectedStakeAccountPubkey,
           amountSol: parsedAmount,
           stakeBalanceSol: selectedStakeAccountBalance,
         });
-        signature = result.signature;
       }
 
-      setTxStatus("success", signature);
+      // Step 2: Sell RT on Manifest → receive SOL
+      setTxStep("selling");
+
+      const minReceive = sellAmount * (1 - slippage / 100);
+      const rtSellResult = await executeRtSell({
+        connection,
+        wallet,
+        marketPubkey: rtMarket.marketPubkey,
+        rtMint: bondParams.yieldTokenMint,
+        orderSizeTokens: parsedAmount,
+        minReceiveTokens: Math.max(minReceive, 0),
+      });
+
+      setTxStep("complete");
+      setSellAmountSol(sellAmount);
+      setTxStatus("success", rtSellResult.signature);
       navigate("complete");
     } catch (err) {
       setTxStatus(
@@ -226,7 +277,7 @@ export default function ReviewQuote() {
       );
     }
   }, [
-    ptMarket,
+    rtMarket,
     bondParams,
     selectedStakeAccount,
     selectedStakeAccountPubkey,
@@ -235,7 +286,11 @@ export default function ReviewQuote() {
     wallet,
     parsedAmount,
     selectedStakeAccountBalance,
+    sellAmount,
+    slippage,
     setTxStatus,
+    setTxStep,
+    setSellAmountSol,
     navigate,
   ]);
 
@@ -263,7 +318,7 @@ export default function ReviewQuote() {
             <Tooltip text="Estimated upfront payout based on current market rates, net of fees. The final amount is confirmed when your order fills on the Pye orderbook." />
           </div>
           <p style={{ ...displayFont(32, c.green), lineHeight: 1.2, fontVariantNumeric: "lining-nums tabular-nums" }}>
-            +{sellAmount} SOL
+            +{formatSolAmount(sellAmount)} SOL
           </p>
         </div>
         {/* Bottom: maturity + points */}
@@ -309,31 +364,36 @@ export default function ReviewQuote() {
         }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             <div style={{ display: "flex", justifyContent: "space-between" }}>
-              <span style={font(12, c.secondary)}>Your discount rate</span>
-              <span style={font(12, c.secondary)}>Market: {realMarketRate.toFixed(2)}%</span>
+              <span style={font(12, c.secondary)}>Max slippage tolerance</span>
+              {orderBookSlippageBps > 0 && (
+                <span style={font(12, c.secondary)}>Est. slippage: {(orderBookSlippageBps / 100).toFixed(2)}%</span>
+              )}
             </div>
             <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
-              <span style={{ ...font(18, discount < MARKET_RATE ? c.red : c.primary), transition: "color 0.15s" }}>
-                {discount.toFixed(2)}
+              <span style={{ ...font(18, c.primary), transition: "color 0.15s" }}>
+                {slippage.toFixed(2)}
               </span>
-              <span style={font(12, c.secondary)}>% discount</span>
+              <span style={font(12, c.secondary)}>% max slippage</span>
             </div>
-            <DiscountSlider value={discount} onChange={(v) => setDiscountRateBps(Math.round(v * 100))} />
+            <DiscountSlider value={slippage} onChange={(v) => setSlippageBps(Math.round(v * 100))} />
           </div>
+        </div>
+      )}
 
-          {/* Below-market warning */}
-          {discount < MARKET_RATE && (
-            <div style={{
-              background: "rgba(255,181,77,0.15)",
-              borderTop: "1px solid rgba(255,255,255,0.2)",
-              boxShadow: "inset 0 -1px 0 rgba(0,0,0,0.08)",
-              borderRadius: 4, padding: 12,
-              display: "flex", flexDirection: "column", gap: 2,
-            }}>
-              <p style={{ ...font(12, c.primary), fontWeight: 500 }}>Order unlikely to fill</p>
-              <p style={font(12, c.secondary)}>Your rate is above market. Expect slow or no order execution.</p>
-            </div>
-          )}
+      {/* Liquidity warning */}
+      {!hasLiquidity && rtAmount > 0 && (
+        <div style={{
+          background: "rgba(255,181,77,0.15)",
+          borderTop: "1px solid rgba(255,255,255,0.2)",
+          boxShadow: "inset 0 -1px 0 rgba(0,0,0,0.08)",
+          borderRadius: 4, padding: 12,
+          display: "flex", flexDirection: "column", gap: 2,
+        }}>
+          <p style={{ ...font(12, c.primary), fontWeight: 500 }}>Insufficient liquidity</p>
+          <p style={font(12, c.secondary)}>
+            Only {liquidityCheck?.totalAvailableSize?.toFixed(2) ?? "0"} RT available on the order book.
+            Your order may partially fill or not fill at all.
+          </p>
         </div>
       )}
 
@@ -344,7 +404,7 @@ export default function ReviewQuote() {
           style={{ color: c.secondary, textDecoration: "underline" }}>
           Pye orderbook
         </a>
-        . Fill time varies with market conditions. You receive {feePct}% less than estimated yield — the cost of instant liquidity.
+        . Fill time varies with market conditions.
       </p>
 
       {/* Error */}
@@ -360,7 +420,13 @@ export default function ReviewQuote() {
 
       <Spacer />
       <CTA
-        label={isLoading ? "Signing..." : "Sign transaction"}
+        label={
+          isLoading
+            ? txStep === "depositing" ? "Depositing stake..."
+            : txStep === "selling" ? "Selling rewards..."
+            : "Signing..."
+          : "Sign transaction"
+        }
         onClick={handleSign}
         disabled={!canSign}
         purple
