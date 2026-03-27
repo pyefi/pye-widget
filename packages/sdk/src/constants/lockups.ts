@@ -1432,6 +1432,33 @@ export function lookupBondByVoteAccount(
   return { ...bond, validatorId };
 }
 
+export interface PtLookupEntry {
+  validatorId: ValidatorId;
+  maturityId: MaturityId;
+  bond: Bond;
+}
+
+let _ptLookupCache: Map<string, PtLookupEntry> | null = null;
+
+/** Reverse-lookup map: PT mint address → { validatorId, maturityId, bond }. */
+export function buildPtLookup(): Map<string, PtLookupEntry> {
+  if (_ptLookupCache) return _ptLookupCache;
+  const map = new Map<string, PtLookupEntry>();
+  for (const [vid, matMap] of Object.entries(lockups)) {
+    if (!matMap) continue;
+    for (const [mid, bond] of Object.entries(matMap)) {
+      if (!bond) continue;
+      map.set(bond.pt_address, {
+        validatorId: vid as ValidatorId,
+        maturityId: mid as MaturityId,
+        bond,
+      });
+    }
+  }
+  _ptLookupCache = map;
+  return map;
+}
+
 export interface MarketRow {
   id: ValidatorId | string;
   name: string;

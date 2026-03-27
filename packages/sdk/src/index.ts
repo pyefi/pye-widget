@@ -7,8 +7,8 @@ export { validators, ALLOWED_VALIDATORS } from "./constants/validators";
 export type { Validator, ValidatorId } from "./constants/validators";
 export { maturities, maturitiesArray, maturityIdsArray, getMaturity } from "./constants/maturities";
 export type { Maturity, MaturityId } from "./constants/maturities";
-export { lockups, allowedLockups, lookupBondByVoteAccount } from "./constants/lockups";
-export type { Bond } from "./constants/lockups";
+export { lockups, allowedLockups, lookupBondByVoteAccount, buildPtLookup } from "./constants/lockups";
+export type { Bond, PtLookupEntry } from "./constants/lockups";
 export { tokens, tokenIdsArray, allTokenAddresses } from "./constants/tokens";
 export type { Token, TokenId } from "./constants/tokens";
 

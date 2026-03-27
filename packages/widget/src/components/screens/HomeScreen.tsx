@@ -1,10 +1,20 @@
-import { useState } from "react";
+import { useState, useMemo, useCallback } from "react";
+import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { useWidgetStore } from "../../stores/widget-store";
 import type { HomeTab } from "../../stores/widget-store";
+import {
+  buildPtLookup,
+  maturities,
+  validators,
+  executeRedeem,
+  type ValidatorId,
+  type MaturityId,
+  type Bond,
+} from "@pye/sdk";
+import { useBalanceStore, useWalletStore } from "@pye/sdk/react";
 import { Widget, Body, Footer, TabBar, StepHeader, Spacer, Tooltip } from "../shared/Layout";
 import { ProductIcon, IconYieldForward, IconYieldSwap, IconFixedYield } from "../Icons";
 import { c, font, displayFont } from "../design-system";
-import kilnPtLogo from "../../assets/tokens/Kiln PT.svg";
 
 // ─── Tab mapping ──────────────────────────────────────────────────────────────
 
@@ -32,24 +42,20 @@ interface LearnItem {
   body: string[];
 }
 
-interface MockPosition {
-  id: string;
-  maturity: Date;
-  size: string;
-  received: string;
-  points: string | null;
+interface Position {
+  /** PT mint address — unique key */
+  ptMint: string;
+  validatorId: ValidatorId;
+  maturityId: MaturityId;
+  bond: Bond;
+  ptAmount: number;
+  maturityTimestamp: number;
+  maturityLabel: string;
+  isMatured: boolean;
+  daysLeft: number;
+  validatorName: string;
+  validatorPtIcon: string;
 }
-
-// ─── Constants ────────────────────────────────────────────────────────────────
-
-const TODAY = new Date();
-
-const MOCK_POSITIONS: MockPosition[] = [
-  { id: "p1", maturity: new Date("2025-12-31"), size: "25.0111", received: "0.82",  points: null    },
-  { id: "p2", maturity: new Date("2026-01-31"), size: "8.2132",  received: "0.28",  points: null    },
-  { id: "p3", maturity: new Date("2026-06-30"), size: "10.0000", received: "0.43",  points: null    },
-  { id: "p4", maturity: new Date("2026-09-30"), size: "2.1201",  received: "0.07",  points: "2x pts" },
-];
 
 const LEARN_ITEMS: LearnItem[] = [
   {
@@ -119,10 +125,14 @@ const LEARN_ITEMS: LearnItem[] = [
 
 // ─── PositionRow ──────────────────────────────────────────────────────────────
 
-function PositionRow({ position }: { position: MockPosition }) {
+const LAMPORTS_PER_SOL = 1_000_000_000;
+
+function PositionRow({ position, onRedeem, isRedeeming }: {
+  position: Position;
+  onRedeem: (p: Position) => void;
+  isRedeeming: boolean;
+}) {
   const [redeemHovered, setRedeemHovered] = useState(false);
-  const isMatured = position.maturity <= TODAY;
-  const daysLeft  = Math.ceil((position.maturity.getTime() - TODAY.getTime()) / (1000 * 60 * 60 * 24));
 
   return (
     <div style={{
@@ -132,45 +142,39 @@ function PositionRow({ position }: { position: MockPosition }) {
       borderTop: `1px solid ${c.highlight}`,
       boxShadow: `inset 0 -1px 0 ${c.shadow}`,
     }}>
-      <img src={kilnPtLogo} alt="Kiln PT" style={{ width: 32, height: 32, borderRadius: 8, flexShrink: 0 }} />
+      <img
+        src={position.validatorPtIcon}
+        alt={`${position.validatorName} PT`}
+        style={{ width: 32, height: 32, borderRadius: 8, flexShrink: 0, objectFit: "cover" }}
+      />
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <p style={font(14, c.primary)}>{position.size} PT</p>
-          {!isMatured && position.points && (
-            <div style={{
-              borderRadius: 4, padding: "2px 6px",
-              background: "color-mix(in srgb, var(--c-brand) 25%, transparent)",
-              borderTop: `1px solid rgba(255,255,255,0.2)`,
-              boxShadow: `inset 0 -1px 0 rgba(0,0,0,0.2)`,
-            }}>
-              <p style={{ ...font(11, c.purple), whiteSpace: "nowrap" }}>{position.points}</p>
-            </div>
-          )}
-        </div>
-        <p style={font(12, c.secondary)}>+{position.received} SOL earned upfront</p>
+        <p style={font(14, c.primary)}>{position.ptAmount.toFixed(4)} PT</p>
+        <p style={font(12, c.secondary)}>{position.validatorName} · {position.maturityLabel}</p>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-        <p style={{ ...font(12, isMatured ? c.green : c.secondary), whiteSpace: "nowrap" }}>
-          {isMatured ? "Unlocked" : `${daysLeft}d left`}
+        <p style={{ ...font(12, position.isMatured ? c.green : c.secondary), whiteSpace: "nowrap" }}>
+          {position.isMatured ? "Unlocked" : `${position.daysLeft}d left`}
         </p>
-        {isMatured ? (
+        {position.isMatured ? (
           <button
             onMouseEnter={() => setRedeemHovered(true)}
             onMouseLeave={() => setRedeemHovered(false)}
-            onClick={() => alert(`Redeeming ${position.size} SOL`)}
+            onClick={() => onRedeem(position)}
+            disabled={isRedeeming}
             style={{
               height: 26, width: 72, borderRadius: 4, border: "none",
               padding: "0 10px",
               borderTop: `1px solid var(--c-brand-hi)`,
-              cursor: "pointer",
+              cursor: isRedeeming ? "wait" : "pointer",
               background: c.purple,
-              filter: redeemHovered ? "brightness(1.15)" : "none",
+              filter: redeemHovered && !isRedeeming ? "brightness(1.15)" : "none",
               ...font(12, "var(--c-brand-text)"),
               boxShadow: `inset 0 -1px 0 var(--c-brand-sh)`,
               transition: "filter 0.1s",
+              opacity: isRedeeming ? 0.7 : 1,
             }}
           >
-            Redeem
+            {isRedeeming ? "..." : "Redeem"}
           </button>
         ) : (
           <button
@@ -198,7 +202,68 @@ function PositionRow({ position }: { position: MockPosition }) {
 // ─── PositionsTab ─────────────────────────────────────────────────────────────
 
 function PositionsTab() {
-  const hasPositions = MOCK_POSITIONS.length > 0;
+  const { connection } = useConnection();
+  const wallet = useWallet();
+  const walletStatus = useWalletStore((s) => s.status);
+  const walletBalances = useBalanceStore((s) => s.walletBalances);
+
+  const [redeemingMint, setRedeemingMint] = useState<string | null>(null);
+  const [redeemError, setRedeemError] = useState<string | null>(null);
+
+  const ptLookup = useMemo(() => buildPtLookup(), []);
+
+  const positions: Position[] = useMemo(() => {
+    const now = Date.now() / 1000;
+    const result: Position[] = [];
+    for (const [mint, amount] of Object.entries(walletBalances)) {
+      if (amount <= 0) continue;
+      const entry = ptLookup.get(mint);
+      if (!entry) continue;
+      const maturity = maturities[entry.maturityId];
+      const matTs = Number(maturity.maturity_timestamp);
+      const isMatured = now >= matTs;
+      const daysLeft = isMatured ? 0 : Math.ceil((matTs * 1000 - Date.now()) / (1000 * 60 * 60 * 24));
+      const validator = validators[entry.validatorId];
+      result.push({
+        ptMint: mint,
+        validatorId: entry.validatorId,
+        maturityId: entry.maturityId,
+        bond: entry.bond,
+        ptAmount: amount,
+        maturityTimestamp: matTs,
+        maturityLabel: maturity.human_readable,
+        isMatured,
+        daysLeft,
+        validatorName: validator?.name ?? entry.validatorId,
+        validatorPtIcon: validator?.pt_sol ?? "",
+      });
+    }
+    result.sort((a, b) => a.maturityTimestamp - b.maturityTimestamp);
+    return result;
+  }, [walletBalances, ptLookup]);
+
+  const handleRedeem = useCallback(async (p: Position) => {
+    setRedeemError(null);
+    setRedeemingMint(p.ptMint);
+    try {
+      await executeRedeem({
+        connection,
+        wallet,
+        bondPubkey: p.bond.pubkey,
+        principalTokenMint: p.bond.pt_address,
+        yieldTokenMint: p.bond.rt_address,
+        ptAmountLamports: Math.round(p.ptAmount * LAMPORTS_PER_SOL),
+        rtAmountLamports: 0,
+      });
+    } catch (err) {
+      setRedeemError(err instanceof Error ? err.message : "Redeem failed");
+    } finally {
+      setRedeemingMint(null);
+    }
+  }, [connection, wallet]);
+
+  const isConnected = walletStatus === "connected";
+
   return (
     <Body padding={0}>
       <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
@@ -213,8 +278,35 @@ function PositionsTab() {
           </div>
           <p style={font(12, c.secondary)}>Each PT is 1:1 redeemable for your staked SOL at maturity.</p>
         </div>
-        {hasPositions ? (
-          MOCK_POSITIONS.map(p => <PositionRow key={p.id} position={p} />)
+
+        {redeemError && (
+          <div style={{
+            padding: "8px 16px",
+            background: `${c.red}12`,
+            ...font(12, c.red),
+          }}>
+            {redeemError}
+          </div>
+        )}
+
+        {!isConnected ? (
+          <div style={{
+            flex: 1, display: "flex", flexDirection: "column",
+            alignItems: "center", justifyContent: "center",
+            gap: 6, padding: 24, textAlign: "center",
+          }}>
+            <p style={font(14, c.primary)}>Connect your wallet</p>
+            <p style={font(12, c.secondary)}>Connect a wallet to view your PT positions.</p>
+          </div>
+        ) : positions.length > 0 ? (
+          positions.map(p => (
+            <PositionRow
+              key={p.ptMint}
+              position={p}
+              onRedeem={handleRedeem}
+              isRedeeming={redeemingMint === p.ptMint}
+            />
+          ))
         ) : (
           <div style={{
             flex: 1, display: "flex", flexDirection: "column",
