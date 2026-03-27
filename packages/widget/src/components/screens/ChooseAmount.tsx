@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useWidgetStore } from "../../stores/widget-store";
 import { c, font } from "../design-system";
 import { StepTitle, RecapRow, CTA, InlineError, Spacer } from "../shared/Layout";
-import { StakeIcon, SolIcon } from "../Icons";
+import { SolIcon } from "../Icons";
 
 export default function ChooseAmount() {
   const navigate = useWidgetStore((s) => s.navigate);
@@ -10,6 +10,8 @@ export default function ChooseAmount() {
   const setDepositAmount = useWidgetStore((s) => s.setDepositAmount);
   const selectedBalance = useWidgetStore((s) => s.selectedStakeAccountBalance);
   const selectedPubkey = useWidgetStore((s) => s.selectedStakeAccountPubkey);
+  const validatorIcon = useWidgetStore((s) => s.selectedValidatorIcon);
+  const validatorName = useWidgetStore((s) => s.selectedValidatorName);
 
   const [hoveredPct, setHoveredPct] = useState<number | null>(null);
 
@@ -24,12 +26,20 @@ export default function ChooseAmount() {
   const isValid = !!depositAmount && !error && parsed > 0;
 
   const isLiquidSol = selectedPubkey === "liquid-sol";
-  const icon = isLiquidSol ? <SolIcon /> : <StakeIcon />;
+  const icon = isLiquidSol ? <SolIcon /> : (
+    validatorIcon ? (
+      <img
+        src={validatorIcon}
+        alt={validatorName ?? "Validator"}
+        style={{ width: 36, height: 36, borderRadius: "50%", objectFit: "cover" }}
+      />
+    ) : <SolIcon />
+  );
   const label = isLiquidSol ? "Liquid SOL" : "Staked SOL";
   const sub =
-    selectedPubkey && !isLiquidSol
-      ? `${selectedPubkey.slice(0, 4)}...${selectedPubkey.slice(-4)}`
-      : "";
+    isLiquidSol ? "" :
+    validatorName ? validatorName :
+    selectedPubkey ? `${selectedPubkey.slice(0, 4)}...${selectedPubkey.slice(-4)}` : "";
 
   return (
     <>

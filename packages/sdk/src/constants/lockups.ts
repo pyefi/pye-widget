@@ -1414,6 +1414,24 @@ export function allowedLockups(): Partial<
   return result;
 }
 
+// Reverse lookup: vote_account → ValidatorId
+const voteAccountToValidatorId = new Map<string, ValidatorId>();
+for (const v of ALLOWED_VALIDATORS) {
+  voteAccountToValidatorId.set(v.vote_account, v.id);
+}
+
+/** Look up a bond by the stake account's validator vote account and maturity. */
+export function lookupBondByVoteAccount(
+  voteAccount: string,
+  maturityId: MaturityId,
+): (Bond & { validatorId: ValidatorId }) | null {
+  const validatorId = voteAccountToValidatorId.get(voteAccount);
+  if (!validatorId) return null;
+  const bond = lockups[validatorId]?.[maturityId];
+  if (!bond) return null;
+  return { ...bond, validatorId };
+}
+
 export interface MarketRow {
   id: ValidatorId | string;
   name: string;

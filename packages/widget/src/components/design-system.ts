@@ -17,6 +17,7 @@ export const c = {
 };
 
 export const THEME_CSS = `
+  [data-theme] *, [data-theme] *::before, [data-theme] *::after { box-sizing: border-box; }
   :root, [data-theme="pye-light"] {
     --c-bg:        #e6e3e0;
     --c-surface:   #f1efed;
@@ -168,5 +169,13 @@ export function brandTextColor(hex: string): string {
 }
 
 export const MARKET_RATE = 0.85;
+
+/** Format a SOL amount showing at least 2 significant digits, never scientific notation. */
+export function formatSolAmount(value: number, minDecimals = 4): string {
+  if (value === 0) return "0";
+  // Find how many decimals needed to show 2 significant digits
+  const digits = value < 1 ? Math.max(minDecimals, -Math.floor(Math.log10(Math.abs(value))) + 1) : minDecimals;
+  return value.toFixed(digits);
+}
 export const yieldMap: Record<string, number> = { Q2: 0.43, Q3: 0.85, Q4: 1.28, Q1: 1.70 };
 export const pointsMap: Record<string, string> = { Q3: "2x points multiplier", Q4: "3x points multiplier", Q1: "4x points multiplier" };
