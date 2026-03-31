@@ -165,19 +165,6 @@ export default function ChooseDuration() {
           </div>
         )}
 
-        {/* Early exit note */}
-        <p style={font(12, c.secondary)}>
-          Need to exit early? You can sell your locked position at{" "}
-          <a
-            href="https://app.pye.fi/trade"
-            target="_blank"
-            rel="noreferrer"
-            style={{ color: c.secondary, textDecoration: "underline" }}
-          >
-            app.pye.fi/trade
-          </a>
-          .
-        </p>
       </div>
 
       <Spacer />

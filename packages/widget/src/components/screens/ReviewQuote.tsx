@@ -311,7 +311,6 @@ export default function ReviewQuote() {
           borderRadius: "6px 6px 0 0",
           padding: 12,
           display: "flex", flexDirection: "column", gap: 12,
-          overflow: "hidden",
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <p style={font(12, c.secondary)}>You receive today</p>
