@@ -2,6 +2,8 @@ export interface PyeSDKConfig {
   rpcUrl: string;
   supabaseUrl: string;
   supabaseAnonKey: string;
+  /** If set, only detect stake accounts delegated to this vote account */
+  voteAccount?: string;
 }
 
 let _config: PyeSDKConfig | null = null;

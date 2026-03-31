@@ -1,5 +1,6 @@
 import { useWidgetStore } from "../../stores/widget-store";
 import { useBalanceStore, useWalletStore } from "@pye/sdk/react";
+import { getPyeConfig } from "@pye/sdk";
 import { StepTitle, RowGroup, Spacer, SelectableRow } from "../shared/Layout";
 import { SolIcon } from "../Icons";
 
@@ -13,7 +14,10 @@ export default function SelectPosition() {
   const balanceLamports = useWalletStore((s) => s.balanceLamports);
 
   const activeAccounts = userStakeAccounts.filter((a) => a.state === "active");
-  const hasLiquidSol = balanceLamports != null && balanceLamports > 0;
+
+  // Only show Liquid SOL option in single-validator mode (voteAccount configured)
+  const isSingleValidator = !!getPyeConfig().voteAccount;
+  const hasLiquidSol = isSingleValidator && balanceLamports != null && balanceLamports > 0;
 
   const handleSelectStake = (pubkey: string, lamports: number, validatorName?: string, validatorIcon?: string, validatorVoteAccount?: string) => {
     selectStakeAccount(pubkey, lamports / LAMPORTS_PER_SOL, validatorName, validatorIcon, validatorVoteAccount);

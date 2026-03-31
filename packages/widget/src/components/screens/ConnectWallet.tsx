@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useWidgetStore } from "../../stores/widget-store";
 import { useWalletStore } from "@pye/sdk/react";
@@ -16,19 +16,17 @@ interface WalletRowProps {
 }
 
 function WalletRow({ name, iconUrl, connecting, onConnect }: WalletRowProps) {
-  const [hovered, setHovered] = useState(false);
   const isConnecting = connecting === name;
   const isDimmed = connecting != null && !isConnecting;
 
   return (
     <div
+      className={!connecting ? "pye-hoverable" : undefined}
       onClick={() => !connecting && onConnect(name)}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
       style={{
         display: "flex", alignItems: "center", justifyContent: "space-between",
         padding: 12, borderRadius: 6,
-        background: hovered && !connecting ? c.highlight : c.raised,
+        background: c.raised,
         boxShadow: `inset 0 1px 0 ${c.highlight}, inset 0 -1px 0 ${c.shadow}`,
         cursor: connecting ? "default" : "pointer",
         opacity: isDimmed ? 0.4 : 1,
@@ -56,8 +54,8 @@ export default function ConnectWallet() {
   const { wallets, select, connect } = useWallet();
   const navigate = useWidgetStore((s) => s.navigate);
   const walletStatus = useWalletStore((s) => s.status);
-
-  const [connecting, setConnecting] = useState<string | null>(null);
+  const connecting = useWidgetStore((s) => s.connectingWallet);
+  const setConnecting = useWidgetStore((s) => s.setConnectingWallet);
 
   // Auto-advance when wallet connects
   useEffect(() => {

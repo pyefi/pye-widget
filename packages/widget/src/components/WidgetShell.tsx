@@ -1,3 +1,5 @@
+import { useEffect, useRef } from "react";
+import { useWalletStore } from "@pye/sdk/react";
 import { useWidgetStore } from "../stores/widget-store";
 import { Widget, Body, Footer, StepHeader } from "./shared/Layout";
 import HomeScreen from "./screens/HomeScreen";
@@ -26,6 +28,24 @@ export default function WidgetShell({ validatorName }: WidgetShellProps) {
   const screen = useWidgetStore((s) => s.screen);
   const goBack = useWidgetStore((s) => s.goBack);
   const reset = useWidgetStore((s) => s.reset);
+  const navigate = useWidgetStore((s) => s.navigate);
+  const walletPublicKey = useWalletStore((s) => s.publicKey);
+  const prevWalletRef = useRef<string | null>(null);
+
+  // Reset widget selections when wallet changes mid-flow
+  useEffect(() => {
+    if (!walletPublicKey) {
+      prevWalletRef.current = null;
+      return;
+    }
+    if (prevWalletRef.current && prevWalletRef.current !== walletPublicKey) {
+      console.log("[WidgetShell] wallet changed mid-flow:", prevWalletRef.current, "→", walletPublicKey, "| screen:", screen);
+      reset();
+      // Navigate back to select-position so the user picks from the new wallet's accounts
+      navigate("select-position");
+    }
+    prevWalletRef.current = walletPublicKey;
+  }, [walletPublicKey, reset, navigate, screen]);
 
   // Home has its own TabBar header — no StepHeader
   if (screen === "home") {

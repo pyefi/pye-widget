@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { useWidgetStore } from "../../stores/widget-store";
 import { c, font } from "../design-system";
 import { StepTitle, RecapRow, CTA, InlineError, Spacer } from "../shared/Layout";
@@ -12,8 +11,6 @@ export default function ChooseAmount() {
   const selectedPubkey = useWidgetStore((s) => s.selectedStakeAccountPubkey);
   const validatorIcon = useWidgetStore((s) => s.selectedValidatorIcon);
   const validatorName = useWidgetStore((s) => s.selectedValidatorName);
-
-  const [hoveredPct, setHoveredPct] = useState<number | null>(null);
 
   const available = selectedBalance;
   const parsed = parseFloat(depositAmount);
@@ -95,15 +92,14 @@ export default function ChooseAmount() {
             <button
               key={p}
               type="button"
+              className="pye-hoverable"
               onClick={() => setDepositAmount((available * p).toFixed(4))}
-              onMouseEnter={() => setHoveredPct(p)}
-              onMouseLeave={() => setHoveredPct(null)}
               style={{
                 flex: 1, height: 24, borderRadius: 4,
                 border: "none",
                 borderTop: `1px solid ${c.highlight}`,
                 cursor: "pointer",
-                background: hoveredPct === p ? c.highlight : c.raised,
+                background: c.raised,
                 ...font(12, c.secondary),
                 boxShadow: `inset 0 -1px 0 ${c.shadow}`,
                 padding: "2px 4px",
