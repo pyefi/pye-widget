@@ -110,7 +110,7 @@ function loadTheme(): WidgetTheme {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved && THEMES.some((t) => t.value === saved)) return saved as WidgetTheme;
   } catch {}
-  return "pye-dark";
+  return "pye-light";
 }
 
 function loadBrand(): string {
