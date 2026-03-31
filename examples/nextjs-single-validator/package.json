@@ -1,0 +1,28 @@
+{
+  "name": "nextjs-single-validator",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --port 5175",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "@cks-systems/manifest-sdk": ">=0.1.0",
+    "@pye/sdk": "workspace:*",
+    "@pye/widget": "workspace:*",
+    "@solana/kit": "^2.0.0",
+    "@solana/spl-token": "^0.4.0",
+    "@solana/wallet-adapter-react": "^0.15.0",
+    "@solana/wallet-adapter-react-ui": "^0.9.0",
+    "@solana/web3.js": "^1.90.0",
+    "@supabase/supabase-js": "^2.0.0",
+    "next": "^15.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "typescript": "^5.7.0"
+  }
+}
