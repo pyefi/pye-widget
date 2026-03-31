@@ -14,13 +14,19 @@ const QUARTER_INFO: Record<MaturityId, { label: string; pts: string | null }> =
     q12026: { label: "31 Mar 2026", pts: null },
   };
 
-/** Only show future maturities (skip q12026 which is Mar 2026 — already past) */
-const DISPLAY_MATURITIES: MaturityId[] = [
-  "q12026",
-  "q22026",
-  "q32026",
-  "q42026",
-];
+/** All maturity IDs in chronological order */
+const ALL_MATURITIES: MaturityId[] = ["q12026", "q22026", "q32026", "q42026"];
+
+const TWO_DAYS_S = 2 * 24 * 60 * 60;
+
+/** Filter out maturities within 2 days of maturity date */
+function getAvailableMaturities(): MaturityId[] {
+  const nowS = Date.now() / 1000;
+  return ALL_MATURITIES.filter((id) => {
+    const ts = Number(maturities[id].maturity_timestamp);
+    return ts - nowS > TWO_DAYS_S;
+  });
+}
 
 export default function ChooseDuration() {
   const navigate = useWidgetStore((s) => s.navigate);
@@ -30,28 +36,29 @@ export default function ChooseDuration() {
   const selectedValidatorVoteAccount = useWidgetStore((s) => s.selectedValidatorVoteAccount);
   const markets = useMarketStore((s) => s.markets);
 
+  const availableMaturities = useMemo(() => getAvailableMaturities(), []);
+
   // Resolve the validator ID for validator-specific market lookup
   const stakeValidatorId = useMemo(() => {
     if (!selectedValidatorVoteAccount) return null;
-    // Use any maturity to resolve — validator ID is the same across maturities
-    for (const matId of DISPLAY_MATURITIES) {
+    for (const matId of availableMaturities) {
       const lookup = lookupBondByVoteAccount(selectedValidatorVoteAccount, matId);
       if (lookup) return lookup.validatorId;
     }
     return null;
-  }, [selectedValidatorVoteAccount]);
+  }, [selectedValidatorVoteAccount, availableMaturities]);
 
-  // Default to first duration if none selected
+  // Default to first available duration if none selected
   useEffect(() => {
-    if (!selectedMaturityId && DISPLAY_MATURITIES.length > 0) {
-      setSelectedMaturity(DISPLAY_MATURITIES[0]);
+    if (!selectedMaturityId && availableMaturities.length > 0) {
+      setSelectedMaturity(availableMaturities[0]);
     }
-  }, [selectedMaturityId, setSelectedMaturity]);
+  }, [selectedMaturityId, setSelectedMaturity, availableMaturities]);
 
   const parsedAmount = parseFloat(depositAmount) || 0;
 
-  // Build display quarters from real maturities
-  const quarters = DISPLAY_MATURITIES.map((matId) => {
+  // Build display quarters from available maturities
+  const quarters = availableMaturities.map((matId) => {
     const info = QUARTER_INFO[matId] ?? {
       label: maturities[matId]?.human_readable ?? matId,
       pts: null,
@@ -139,15 +146,22 @@ export default function ChooseDuration() {
             }}
           >
             <p style={font(12, c.secondary)}>You receive today</p>
-            <p
-              style={{
-                ...displayFont(32, c.green),
-                lineHeight: 1.2,
-                fontVariantNumeric: "lining-nums tabular-nums",
-              }}
-            >
-              +{formatSolAmount(sel.grossYield, 3)} SOL
-            </p>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+              <p
+                style={{
+                  ...displayFont(32, c.green),
+                  lineHeight: 1.2,
+                  fontVariantNumeric: "lining-nums tabular-nums",
+                }}
+              >
+                +{formatSolAmount(sel.grossYield, 3)} SOL
+              </p>
+              {parsedAmount > 0 && (
+                <p style={font(14, c.green)}>
+                  +{((sel.grossYield / parsedAmount) * 100).toFixed(2)}%
+                </p>
+              )}
+            </div>
             {sel.pts && (
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 <p style={font(12, c.purple)}>{sel.pts} multiplier</p>

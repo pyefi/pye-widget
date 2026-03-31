@@ -15,6 +15,7 @@ import {
   WalletSyncer,
   BalanceSyncer,
   MarketSyncer,
+  ApySyncer,
 } from "@pye/sdk/react";
 import {
   createWidgetStore,
@@ -73,6 +74,7 @@ export default function PyeWidget({
             <WalletSyncer />
             <BalanceSyncer />
             <MarketSyncer />
+            <ApySyncer />
             <WidgetStoreContext.Provider value={widgetStoreRef.current}>
               <WidgetShell validatorName={validatorName} />
             </WidgetStoreContext.Provider>

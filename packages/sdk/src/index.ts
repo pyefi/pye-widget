@@ -22,6 +22,8 @@ export type {
 } from "./stores/balance-store";
 export { createMarketStore } from "./stores/market-store";
 export type { MarketStore, MarketState, MarketActions } from "./stores/market-store";
+export { createApyStore } from "./stores/apy-store";
+export type { ApyStore, ApyState, ApyActions } from "./stores/apy-store";
 
 // Lib — Data fetching
 export { fetchUserStakeAccounts } from "./lib/fetch-user-stake-accounts";
