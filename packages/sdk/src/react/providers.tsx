@@ -3,6 +3,7 @@ import { useStore } from "zustand";
 import { createWalletStore, type WalletStore } from "../stores/wallet-store";
 import { createBalanceStore, type BalanceStore } from "../stores/balance-store";
 import { createMarketStore, type MarketStore } from "../stores/market-store";
+import { createApyStore, type ApyStore } from "../stores/apy-store";
 
 // ── Wallet Store ──
 
@@ -79,6 +80,31 @@ export function useMarketStore<T>(selector: (state: MarketStore) => T): T {
   return useStore(store, selector);
 }
 
+// ── APY Store ──
+
+type ApyStoreApi = ReturnType<typeof createApyStore>;
+const ApyStoreContext = createContext<ApyStoreApi | null>(null);
+
+export function ApyStoreProvider({ children }: { children: ReactNode }) {
+  const storeRef = useRef<ApyStoreApi>(undefined);
+  if (!storeRef.current) {
+    storeRef.current = createApyStore();
+  }
+  return (
+    <ApyStoreContext.Provider value={storeRef.current}>
+      {children}
+    </ApyStoreContext.Provider>
+  );
+}
+
+export function useApyStore<T>(selector: (state: ApyStore) => T): T {
+  const store = useContext(ApyStoreContext);
+  if (!store) {
+    throw new Error("useApyStore must be used within ApyStoreProvider");
+  }
+  return useStore(store, selector);
+}
+
 // ── Composed Provider ──
 
 export function PyeSDKProvider({ children }: { children: ReactNode }) {
@@ -86,7 +112,9 @@ export function PyeSDKProvider({ children }: { children: ReactNode }) {
     <WalletStoreProvider>
       <BalanceStoreProvider>
         <MarketStoreProvider>
-          {children}
+          <ApyStoreProvider>
+            {children}
+          </ApyStoreProvider>
         </MarketStoreProvider>
       </BalanceStoreProvider>
     </WalletStoreProvider>
