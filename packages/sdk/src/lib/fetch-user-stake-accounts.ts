@@ -29,20 +29,36 @@ export async function fetchUserStakeAccounts(
 ): Promise<UserStakeAccount[]> {
   const config = getPyeConfig();
   const filterVoteAccount = config.voteAccount;
-  const [accounts, epochInfo] = await Promise.all([
+  const ownerBase58 = owner.toBase58();
+
+  // Query both staker (offset 12) and withdrawer (offset 44) authorities,
+  // since some staking setups use a PDA as the staker while the wallet is the withdrawer.
+  const [stakerAccounts, withdrawerAccounts, epochInfo] = await Promise.all([
     connection.getParsedProgramAccounts(STAKE_PROGRAM_ID, {
       filters: [
         { dataSize: 200 },
-        {
-          memcmp: {
-            offset: 12,
-            bytes: owner.toBase58(),
-          },
-        },
+        { memcmp: { offset: 12, bytes: ownerBase58 } },
+      ],
+    }),
+    connection.getParsedProgramAccounts(STAKE_PROGRAM_ID, {
+      filters: [
+        { dataSize: 200 },
+        { memcmp: { offset: 44, bytes: ownerBase58 } },
       ],
     }),
     connection.getEpochInfo(),
   ]);
+
+  // Deduplicate by pubkey
+  const seen = new Set<string>();
+  const accounts: typeof stakerAccounts = [];
+  for (const a of [...stakerAccounts, ...withdrawerAccounts]) {
+    const key = a.pubkey.toBase58();
+    if (!seen.has(key)) {
+      seen.add(key);
+      accounts.push(a);
+    }
+  }
 
   const currentEpoch = BigInt(epochInfo.epoch);
   const U64_MAX = BigInt("18446744073709551615");
