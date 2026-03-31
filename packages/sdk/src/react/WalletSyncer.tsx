@@ -46,6 +46,9 @@ export default function WalletSyncer() {
       setWalletStatus("connecting");
     } else if (connected && publicKey) {
       const base58 = publicKey.toBase58();
+      if (fetchedKeyRef.current && fetchedKeyRef.current !== base58) {
+        console.log("[WalletSyncer] wallet changed:", fetchedKeyRef.current, "→", base58);
+      }
       setWalletStatus("connected");
       setWalletPublicKey(toAddress(base58));
       setDisplayAddress(shortenAddress(base58));
