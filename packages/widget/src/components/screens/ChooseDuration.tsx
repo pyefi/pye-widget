@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { useWidgetStore } from "../../stores/widget-store";
 import { maturities, type MaturityId, lookupBondByVoteAccount } from "@pye/sdk";
 import { useMarketStore } from "@pye/sdk/react";
@@ -40,8 +40,6 @@ export default function ChooseDuration() {
     }
     return null;
   }, [selectedValidatorVoteAccount]);
-
-  const [hoveredPill, setHoveredPill] = useState<string | null>(null);
 
   // Default to first duration if none selected
   useEffect(() => {
@@ -97,13 +95,11 @@ export default function ChooseDuration() {
         <div style={{ display: "flex", gap: 8 }}>
           {quarters.map((q) => {
             const isSelected = selectedMaturityId === q.matId;
-            const isHovered = hoveredPill === q.matId && !isSelected;
             return (
               <div
                 key={q.matId}
+                className={isSelected ? "pye-pill pye-pill--selected" : "pye-pill"}
                 onClick={() => setSelectedMaturity(q.matId as MaturityId)}
-                onMouseEnter={() => setHoveredPill(q.matId)}
-                onMouseLeave={() => setHoveredPill(null)}
                 style={{
                   flex: 1,
                   height: 32,
@@ -112,11 +108,7 @@ export default function ChooseDuration() {
                   justifyContent: "center",
                   borderRadius: 4,
                   cursor: "pointer",
-                  background: isSelected
-                    ? c.bg
-                    : isHovered
-                    ? c.highlight
-                    : c.raised,
+                  background: isSelected ? c.bg : c.raised,
                   borderTop: `1px solid ${isSelected ? c.shadow : c.highlight}`,
                   boxShadow: isSelected
                     ? `inset 0 -1px 0 ${c.highlight}`

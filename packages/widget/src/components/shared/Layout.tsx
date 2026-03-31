@@ -1,4 +1,4 @@
-import { useState, type ReactNode, type CSSProperties } from "react";
+import { type ReactNode, type CSSProperties } from "react";
 import { c, font } from "../design-system";
 import { PyeWordmark } from "../Icons";
 
@@ -121,12 +121,9 @@ export function StepTitle({ title, subtitle }: { title: string; subtitle?: strin
 
 // Dan's Tooltip — self-contained "?" circle trigger with 210px popup and caret
 export function Tooltip({ text }: { text: string }) {
-  const [visible, setVisible] = useState(false);
   return (
-    <div style={{ position: "relative", display: "inline-flex", flexShrink: 0 }}>
+    <div className="pye-tooltip" style={{ position: "relative", display: "inline-flex", flexShrink: 0 }}>
       <div
-        onMouseEnter={() => setVisible(true)}
-        onMouseLeave={() => setVisible(false)}
         style={{
           width: 16, height: 16, borderRadius: "50%",
           background: c.raised,
@@ -138,32 +135,30 @@ export function Tooltip({ text }: { text: string }) {
       >
         <span style={{ ...font(9, c.muted), lineHeight: 1, userSelect: "none", fontWeight: 500 }}>?</span>
       </div>
-      {visible && (
+      <div className="pye-tooltip-popup" style={{
+        position: "absolute",
+        bottom: "calc(100% + 8px)",
+        left: "50%",
+        transform: "translateX(-50%)",
+        width: 210,
+        background: c.raised,
+        borderTop: `1px solid ${c.highlight}`,
+        boxShadow: `0 4px 16px rgba(0,0,0,0.15), inset 0 -1px 0 ${c.shadow}`,
+        borderRadius: 6,
+        padding: "8px 10px",
+        zIndex: 100,
+        pointerEvents: "none",
+      }}>
+        <p style={{ ...font(11, c.secondary), lineHeight: 1.5 }}>{text}</p>
         <div style={{
           position: "absolute",
-          bottom: "calc(100% + 8px)",
-          left: "50%",
-          transform: "translateX(-50%)",
-          width: 210,
+          bottom: -4, left: "50%",
+          transform: "translateX(-50%) rotate(45deg)",
+          width: 8, height: 8,
           background: c.raised,
-          borderTop: `1px solid ${c.highlight}`,
-          boxShadow: `0 4px 16px rgba(0,0,0,0.15), inset 0 -1px 0 ${c.shadow}`,
-          borderRadius: 6,
-          padding: "8px 10px",
-          zIndex: 100,
-          pointerEvents: "none",
-        }}>
-          <p style={{ ...font(11, c.secondary), lineHeight: 1.5 }}>{text}</p>
-          <div style={{
-            position: "absolute",
-            bottom: -4, left: "50%",
-            transform: "translateX(-50%) rotate(45deg)",
-            width: 8, height: 8,
-            background: c.raised,
-            boxShadow: `1px 1px 0 ${c.shadow}`,
-          }} />
-        </div>
-      )}
+          boxShadow: `1px 1px 0 ${c.shadow}`,
+        }} />
+      </div>
     </div>
   );
 }
@@ -182,16 +177,14 @@ export function SelectableRow({ icon, label, sub, amount, selected, onClick }: {
   selected?: boolean;
   onClick?: () => void;
 }) {
-  const [hovered, setHovered] = useState(false);
-  const bg = selected ? c.bg : hovered ? c.highlight : c.raised;
+  const bg = selected ? c.bg : c.raised;
   const shadow = selected
     ? `inset 0 1px 0 ${c.shadow}, inset 0 -1px 0 ${c.highlight}`
     : `inset 0 1px 0 ${c.highlight}, inset 0 -1px 0 ${c.shadow}`;
   return (
     <div
+      className={selected ? undefined : "pye-hoverable"}
       onClick={onClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
       style={{
         display: "flex", alignItems: "center", justifyContent: "space-between",
         padding: 12, borderRadius: 6,
@@ -253,20 +246,18 @@ export function CTA({ label, onClick, disabled, purple }: {
   disabled?: boolean;
   purple?: boolean;
 }) {
-  const [hovered, setHovered] = useState(false);
   if (purple) {
     return (
       <button
+        className="pye-cta-purple"
         onClick={disabled ? undefined : onClick}
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
+        disabled={disabled}
         style={{
           width: "100%", height: 40, borderRadius: 4,
           border: "none",
           borderTop: `1px solid var(--c-brand-hi)`,
           cursor: disabled ? "not-allowed" : "pointer",
           background: c.purple,
-          filter: hovered && !disabled ? "brightness(1.15)" : "none",
           ...font(14, "var(--c-brand-text)"),
           boxShadow: `inset 0 -1px 0 var(--c-brand-sh)`,
           opacity: disabled ? 0.5 : 1,
@@ -279,16 +270,15 @@ export function CTA({ label, onClick, disabled, purple }: {
   }
   return (
     <button
+      className="pye-cta-default"
       onClick={onClick}
       disabled={disabled}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
       style={{
         width: "100%", height: 40, borderRadius: 4,
         border: "none",
         borderTop: `1px solid ${c.highlight}`,
         cursor: disabled ? "not-allowed" : "pointer",
-        background: !disabled && hovered ? c.highlight : c.raised,
+        background: c.raised,
         ...font(14, c.primary),
         boxShadow: `inset 0 -1px 0 ${c.shadow}`,
         opacity: disabled ? 0.5 : 1,

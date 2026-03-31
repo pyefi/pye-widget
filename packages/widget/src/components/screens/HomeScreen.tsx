@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useMemo, useCallback } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { useWidgetStore } from "../../stores/widget-store";
 import type { HomeTab } from "../../stores/widget-store";
@@ -135,8 +135,6 @@ function PositionRow({ position, onRedeem, isRedeeming }: {
   onRedeem: (p: Position) => void;
   isRedeeming: boolean;
 }) {
-  const [redeemHovered, setRedeemHovered] = useState(false);
-
   return (
     <div style={{
       display: "flex", alignItems: "center", gap: 8,
@@ -160,8 +158,7 @@ function PositionRow({ position, onRedeem, isRedeeming }: {
         </p>
         {position.isMatured ? (
           <button
-            onMouseEnter={() => setRedeemHovered(true)}
-            onMouseLeave={() => setRedeemHovered(false)}
+            className="pye-redeem-btn"
             onClick={() => onRedeem(position)}
             disabled={isRedeeming}
             style={{
@@ -170,7 +167,6 @@ function PositionRow({ position, onRedeem, isRedeeming }: {
               borderTop: `1px solid var(--c-brand-hi)`,
               cursor: isRedeeming ? "wait" : "pointer",
               background: c.purple,
-              filter: redeemHovered && !isRedeeming ? "brightness(1.15)" : "none",
               ...font(12, "var(--c-brand-text)"),
               boxShadow: `inset 0 -1px 0 var(--c-brand-sh)`,
               transition: "filter 0.1s",
@@ -210,8 +206,10 @@ function PositionsTab() {
   const walletStatus = useWalletStore((s) => s.status);
   const walletBalances = useBalanceStore((s) => s.walletBalances);
 
-  const [redeemingMint, setRedeemingMint] = useState<string | null>(null);
-  const [redeemError, setRedeemError] = useState<string | null>(null);
+  const redeemingMint = useWidgetStore((s) => s.redeemingMint);
+  const setRedeemingMint = useWidgetStore((s) => s.setRedeemingMint);
+  const redeemError = useWidgetStore((s) => s.redeemError);
+  const setRedeemError = useWidgetStore((s) => s.setRedeemError);
 
   const ptLookup = useMemo(() => buildPtLookup(), []);
 
@@ -329,14 +327,12 @@ function PositionsTab() {
 // ─── LearnCard ────────────────────────────────────────────────────────────────
 
 function LearnCard({ title, teaser, onClick }: { title: string; teaser: string; onClick: () => void }) {
-  const [hovered, setHovered] = useState(false);
   return (
     <div
+      className="pye-hoverable"
       onClick={onClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
       style={{
-        background: hovered ? c.highlight : c.raised,
+        background: c.raised,
         borderTop: `1px solid ${c.highlight}`,
         boxShadow: `inset 0 -1px 0 ${c.shadow}`,
         borderRadius: 6, padding: 12,
@@ -398,14 +394,12 @@ function ProductRow({ icon, label, sub, badge, onClick, disabled }: {
   onClick?: () => void;
   disabled?: boolean;
 }) {
-  const [hovered, setHovered] = useState(false);
   return (
     <div
+      className={!disabled && onClick ? "pye-hoverable" : undefined}
       onClick={onClick}
-      onMouseEnter={() => onClick && !disabled ? setHovered(true) : undefined}
-      onMouseLeave={() => setHovered(false)}
       style={{
-        background: hovered ? c.highlight : c.raised,
+        background: c.raised,
         borderTop: `1px solid ${c.highlight}`,
         boxShadow: `inset 0 -1px 0 ${c.shadow}`,
         borderRadius: 6, padding: 12,
@@ -439,7 +433,8 @@ export default function HomeScreen({ validatorName }: HomeScreenProps) {
   const homeTab = useWidgetStore((s) => s.homeTab);
   const setHomeTab = useWidgetStore((s) => s.setHomeTab);
   const navigate = useWidgetStore((s) => s.navigate);
-  const [learnArticle, setLearnArticle] = useState<LearnItem | null>(null);
+  const learnArticle = useWidgetStore((s) => s.selectedLearnArticle);
+  const setLearnArticle = useWidgetStore((s) => s.setSelectedLearnArticle);
 
   const displayTab = REVERSE_TAB_MAP[homeTab];
 
