@@ -43,7 +43,7 @@ export default function PyeWidget({
 }: PyeWidgetProps) {
   const configuredRef = useRef(false);
   if (!configuredRef.current) {
-    configurePyeSDK({ rpcUrl, supabaseUrl, supabaseAnonKey });
+    configurePyeSDK({ rpcUrl, supabaseUrl, supabaseAnonKey, voteAccount });
     configuredRef.current = true;
   }
 
