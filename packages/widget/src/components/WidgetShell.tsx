@@ -39,11 +39,13 @@ export default function WidgetShell({ validatorName }: WidgetShellProps) {
       return;
     }
     if (prevWalletRef.current && prevWalletRef.current !== walletPublicKey) {
+      console.log("[WidgetShell] wallet changed mid-flow:", prevWalletRef.current, "→", walletPublicKey, "| screen:", screen);
       reset();
+      // Navigate back to select-position so the user picks from the new wallet's accounts
       navigate("select-position");
     }
     prevWalletRef.current = walletPublicKey;
-  }, [walletPublicKey, reset, navigate]);
+  }, [walletPublicKey, reset, navigate, screen]);
 
   // Home has its own TabBar header — no StepHeader
   if (screen === "home") {

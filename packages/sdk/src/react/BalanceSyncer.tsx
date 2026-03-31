@@ -44,6 +44,7 @@ export default function BalanceSyncer() {
 
     const walletChanged = prevPublicKeyRef.current !== publicKey;
     if (walletChanged) {
+      console.log("[BalanceSyncer] wallet changed:", prevPublicKeyRef.current, "→", publicKey);
       prevPublicKeyRef.current = publicKey;
       resetBalances();
     }
