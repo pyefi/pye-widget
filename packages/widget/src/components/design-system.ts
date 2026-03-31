@@ -134,6 +134,15 @@ export const THEME_CSS = `
     --c-brand-sh:   #8a5510;
     --c-brand-text: #ffffff;
   }
+
+  /* ─── Hover rules (replaces JS useState hover state) ─────────────── */
+  .pye-hoverable:hover { background: var(--c-highlight) !important; }
+  .pye-pill:not(.pye-pill--selected):hover { background: var(--c-highlight) !important; }
+  .pye-cta-purple:hover:not(:disabled) { filter: brightness(1.15); }
+  .pye-cta-default:hover:not(:disabled) { background: var(--c-highlight) !important; }
+  .pye-redeem-btn:hover:not(:disabled) { filter: brightness(1.15); }
+  .pye-tooltip-popup { display: none; }
+  .pye-tooltip:hover .pye-tooltip-popup { display: block; }
 `;
 
 export const DISPLAY_FONT = "'ITC Garamond Std', 'EB Garamond', 'Garamond', 'Georgia', serif";

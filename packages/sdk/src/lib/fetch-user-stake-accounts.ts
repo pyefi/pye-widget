@@ -1,5 +1,6 @@
 import { Connection, PublicKey } from "@solana/web3.js";
 import { validators, type ValidatorId } from "../constants/validators";
+import { getPyeConfig } from "../config";
 import type {
   UserStakeAccount,
   StakeAccountState,
@@ -26,20 +27,38 @@ export async function fetchUserStakeAccounts(
   connection: Connection,
   owner: PublicKey,
 ): Promise<UserStakeAccount[]> {
-  const [accounts, epochInfo] = await Promise.all([
+  const config = getPyeConfig();
+  const filterVoteAccount = config.voteAccount;
+  const ownerBase58 = owner.toBase58();
+
+  // Query both staker (offset 12) and withdrawer (offset 44) authorities,
+  // since some staking setups use a PDA as the staker while the wallet is the withdrawer.
+  const [stakerAccounts, withdrawerAccounts, epochInfo] = await Promise.all([
     connection.getParsedProgramAccounts(STAKE_PROGRAM_ID, {
       filters: [
         { dataSize: 200 },
-        {
-          memcmp: {
-            offset: 12,
-            bytes: owner.toBase58(),
-          },
-        },
+        { memcmp: { offset: 12, bytes: ownerBase58 } },
+      ],
+    }),
+    connection.getParsedProgramAccounts(STAKE_PROGRAM_ID, {
+      filters: [
+        { dataSize: 200 },
+        { memcmp: { offset: 44, bytes: ownerBase58 } },
       ],
     }),
     connection.getEpochInfo(),
   ]);
+
+  // Deduplicate by pubkey
+  const seen = new Set<string>();
+  const accounts: typeof stakerAccounts = [];
+  for (const a of [...stakerAccounts, ...withdrawerAccounts]) {
+    const key = a.pubkey.toBase58();
+    if (!seen.has(key)) {
+      seen.add(key);
+      accounts.push(a);
+    }
+  }
 
   const currentEpoch = BigInt(epochInfo.epoch);
   const U64_MAX = BigInt("18446744073709551615");
@@ -65,6 +84,9 @@ export async function fetchUserStakeAccounts(
     ).parsed;
     const delegation = parsed?.info?.stake?.delegation;
     if (!delegation?.voter) continue;
+
+    // If a specific vote account is configured, skip accounts delegated elsewhere
+    if (filterVoteAccount && delegation.voter !== filterVoteAccount) continue;
 
     const validatorInfo = voteAccountToValidator.get(delegation.voter);
 

@@ -40,6 +40,15 @@ export interface WidgetState {
   txError: string | null;
   /** Actual SOL received from RT sell, set after transaction completes */
   sellAmountSol: number | null;
+
+  /** Which PT mint is currently being redeemed (Manage tab) */
+  redeemingMint: string | null;
+  /** Redeem error message (Manage tab) */
+  redeemError: string | null;
+  /** Currently viewed learn article */
+  selectedLearnArticle: { title: string; teaser: string; body: string[] } | null;
+  /** Wallet name currently connecting */
+  connectingWallet: string | null;
 }
 
 export interface WidgetActions {
@@ -52,6 +61,10 @@ export interface WidgetActions {
   setAdvancedOpen(open: boolean): void;
   setSlippageBps(bps: number): void;
   setSellAmountSol(amount: number): void;
+  setRedeemingMint(mint: string | null): void;
+  setRedeemError(error: string | null): void;
+  setSelectedLearnArticle(article: WidgetState["selectedLearnArticle"]): void;
+  setConnectingWallet(name: string | null): void;
   setTxStep(step: WidgetState["txStep"]): void;
   setTxStatus(
     status: WidgetState["txStatus"],
@@ -86,6 +99,11 @@ const initialState: WidgetState = {
   txSignature: null,
   txError: null,
   sellAmountSol: null,
+
+  redeemingMint: null,
+  redeemError: null,
+  selectedLearnArticle: null,
+  connectingWallet: null,
 };
 
 export function createWidgetStore() {
@@ -150,6 +168,30 @@ export function createWidgetStore() {
       setSellAmountSol(amount) {
         set((s) => {
           s.sellAmountSol = amount;
+        });
+      },
+
+      setRedeemingMint(mint) {
+        set((s) => {
+          s.redeemingMint = mint;
+        });
+      },
+
+      setRedeemError(error) {
+        set((s) => {
+          s.redeemError = error;
+        });
+      },
+
+      setSelectedLearnArticle(article) {
+        set((s) => {
+          s.selectedLearnArticle = article;
+        });
+      },
+
+      setConnectingWallet(name) {
+        set((s) => {
+          s.connectingWallet = name;
         });
       },
 

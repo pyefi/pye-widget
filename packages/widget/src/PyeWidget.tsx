@@ -15,6 +15,7 @@ import {
   WalletSyncer,
   BalanceSyncer,
   MarketSyncer,
+  ApySyncer,
 } from "@pye/sdk/react";
 import {
   createWidgetStore,
@@ -43,7 +44,7 @@ export default function PyeWidget({
 }: PyeWidgetProps) {
   const configuredRef = useRef(false);
   if (!configuredRef.current) {
-    configurePyeSDK({ rpcUrl, supabaseUrl, supabaseAnonKey });
+    configurePyeSDK({ rpcUrl, supabaseUrl, supabaseAnonKey, voteAccount });
     configuredRef.current = true;
   }
 
@@ -73,6 +74,7 @@ export default function PyeWidget({
             <WalletSyncer />
             <BalanceSyncer />
             <MarketSyncer />
+            <ApySyncer />
             <WidgetStoreContext.Provider value={widgetStoreRef.current}>
               <WidgetShell validatorName={validatorName} />
             </WidgetStoreContext.Provider>
