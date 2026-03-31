@@ -1,5 +1,6 @@
 import { Connection, PublicKey } from "@solana/web3.js";
 import { validators, type ValidatorId } from "../constants/validators";
+import { getPyeConfig } from "../config";
 import type {
   UserStakeAccount,
   StakeAccountState,
@@ -26,6 +27,8 @@ export async function fetchUserStakeAccounts(
   connection: Connection,
   owner: PublicKey,
 ): Promise<UserStakeAccount[]> {
+  const config = getPyeConfig();
+  const filterVoteAccount = config.voteAccount;
   const [accounts, epochInfo] = await Promise.all([
     connection.getParsedProgramAccounts(STAKE_PROGRAM_ID, {
       filters: [
@@ -65,6 +68,9 @@ export async function fetchUserStakeAccounts(
     ).parsed;
     const delegation = parsed?.info?.stake?.delegation;
     if (!delegation?.voter) continue;
+
+    // If a specific vote account is configured, skip accounts delegated elsewhere
+    if (filterVoteAccount && delegation.voter !== filterVoteAccount) continue;
 
     const validatorInfo = voteAccountToValidator.get(delegation.voter);
 
