@@ -607,10 +607,10 @@ function App() {
           }}
         >
           <PyeWidget
-            rpcUrl="https://mainnet.helius-rpc.com/?api-key=REDACTED"
-            supabaseUrl="https://tfrickmnrfyjkvjhmuik.supabase.co"
-            supabaseAnonKey="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRmcmlja21ucmZ5amt2amhtdWlrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDM0NDkyMDksImV4cCI6MjA1OTAyNTIwOX0.1wl2FWa5g0tkUn6yRcg1AyF6ixWN7SyoD89cFGxkQKM"
-            voteAccount="he1iusunGwqrNtafDtLdhsUQDFvo13z9sUa36PauBtk"
+            rpcUrl={import.meta.env.VITE_RPC_URL}
+            supabaseUrl={import.meta.env.VITE_SUPABASE_URL}
+            supabaseAnonKey={import.meta.env.VITE_SUPABASE_ANON_KEY}
+            voteAccount={import.meta.env.VITE_VOTE_ACCOUNT}
             theme={theme}
             onClose={() => setOpen(false)}
           />
