@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { PyeWidget } from "@pye/widget";
 import type { WidgetTheme } from "@pye/widget";
 
@@ -78,7 +78,7 @@ function brandTextColor(hex: string): string {
   const g = parseInt(hex.slice(3, 5), 16) / 255;
   const b = parseInt(hex.slice(5, 7), 16) / 255;
   const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-  return lum > 0.4 ? "#000000" : "#ffffff";
+  return lum > 0.5 ? "#000000" : "#ffffff";
 }
 
 // ── Sub-components ──
@@ -130,6 +130,27 @@ export default function Home() {
   const [theme, _setTheme] = useState<WidgetTheme>(loadTheme);
   const [brandColor, _setBrandColor] = useState(loadBrand);
   const [brandHex, setBrandHex] = useState(loadBrand);
+
+  useEffect(() => {
+    if (!open) return;
+    const scrollY = window.scrollY;
+    const scrollbarW = window.innerWidth - document.documentElement.clientWidth;
+    document.body.style.position = "fixed";
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.left = "0";
+    document.body.style.right = "0";
+    document.body.style.overflowY = "scroll";
+    if (scrollbarW > 0) document.body.style.paddingRight = `${scrollbarW}px`;
+    return () => {
+      document.body.style.position = "";
+      document.body.style.top = "";
+      document.body.style.left = "";
+      document.body.style.right = "";
+      document.body.style.overflowY = "";
+      document.body.style.paddingRight = "";
+      window.scrollTo(0, scrollY);
+    };
+  }, [open]);
 
   const isNeutral = theme.startsWith("neutral");
   const t = PAGE_THEMES[theme];
@@ -256,8 +277,13 @@ export default function Home() {
       {/* Widget overlay */}
       {open && (
         <div
+          role="dialog"
+          aria-modal="true"
+          onKeyDown={(e) => { if (e.key === "Escape") setOpen(false); }}
           style={{
-            position: "fixed", inset: 0, display: "flex", alignItems: "center", justifyContent: "center",
+            position: "fixed", inset: 0, display: "flex", alignItems: "flex-start", justifyContent: "center",
+            paddingTop: "clamp(16px, calc(100dvh - 632px), 80px)", paddingBottom: 16,
+            overflowY: "auto", overscrollBehavior: "contain",
             background: t.scrim, backdropFilter: "blur(8px)", zIndex: 9999,
             ...(isNeutral ? ({
               "--c-brand": brandColor, "--c-brand-hi": "rgba(255,255,255,0.2)",
