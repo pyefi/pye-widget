@@ -1,12 +1,7 @@
 export type WidgetTheme =
   | "pye-light"
   | "pye-dark"
-  | "neutral-light"
-  | "neutral-dark"
-  | "midnight"
-  | "rose"
-  | "graphite"
-  | "sand";
+  | "graphite";
 
 export interface PyeWidgetProps {
   rpcUrl: string;
