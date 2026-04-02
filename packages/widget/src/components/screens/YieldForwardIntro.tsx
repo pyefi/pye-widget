@@ -81,9 +81,9 @@ export default function YieldForwardIntro() {
               borderTop: `1px solid ${c.highlight}`,
               boxShadow: `0 4px 8px rgba(0,0,0,0.07), inset 0 -1px 0 ${c.shadow}`,
             }}>
-              <p style={font(12, c.secondary)}>Sell today</p>
+              <p style={font(12, c.secondary)}>Sell rewards today</p>
               <p style={{ ...displayFont(24, c.green), fontVariantNumeric: "lining-nums tabular-nums", lineHeight: 1.2, margin: "4px 0 2px" }}>
-                +{formatSolAmount(sellToday)}
+                +{formatSolAmount(sellToday)} SOL
               </p>
               <p style={font(12, c.secondary)}>Yours now</p>
             </div>
@@ -101,12 +101,6 @@ export default function YieldForwardIntro() {
               <p style={font(12, c.secondary)}>Available {maturityLabel}</p>
             </div>
           </div>
-
-          {diff != null && diff > 0 && (
-            <p style={font(12, c.secondary)}>
-              {formatSolAmount(diff)} SOL less. Six months back.
-            </p>
-          )}
         </div>
 
         <CTA

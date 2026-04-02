@@ -5,7 +5,7 @@ import { PyeWordmark } from "../Icons";
 export function Widget({ children }: { children: ReactNode }) {
   return (
     <div style={{
-      width: "min(420px, calc(100vw - 32px))", minHeight: 600,
+      width: "min(420px, calc(100vw - 32px))", height: 600,
       borderRadius: 8,
       boxShadow: "0px 4px 8px rgba(0,0,0,0.07)",
       display: "flex", flexDirection: "column",
@@ -19,7 +19,7 @@ export function Widget({ children }: { children: ReactNode }) {
 export function Body({ children, padding = 16, style }: { children: ReactNode; padding?: number; style?: CSSProperties }) {
   return (
     <div style={{
-      flex: 1, display: "flex", flexDirection: "column", padding, gap: 16,
+      flex: 1, display: "flex", flexDirection: "column", padding, gap: 16, minHeight: 0, overflowY: "auto",
       background: c.surface,
       borderTop: `1px solid ${c.highlight}`,
       boxShadow: `inset 0 -1px 0 ${c.shadow}`,
@@ -120,13 +120,14 @@ export function StepTitle({ title, subtitle }: { title: string; subtitle?: strin
 }
 
 // Dan's Tooltip — self-contained "?" circle trigger with 210px popup and caret
-export function Tooltip({ text }: { text: string }) {
+export function Tooltip({ text, bg }: { text: string; bg?: string }) {
+  const fill = bg ?? c.raised;
   return (
     <div className="pye-tooltip" style={{ position: "relative", display: "inline-flex", flexShrink: 0 }}>
       <div
         style={{
           width: 16, height: 16, borderRadius: "50%",
-          background: c.raised,
+          background: fill,
           borderTop: `1px solid ${c.highlight}`,
           boxShadow: `inset 0 -1px 0 ${c.shadow}`,
           display: "flex", alignItems: "center", justifyContent: "center",
@@ -141,7 +142,7 @@ export function Tooltip({ text }: { text: string }) {
         left: "50%",
         transform: "translateX(-50%)",
         width: 210,
-        background: c.raised,
+        background: fill,
         borderTop: `1px solid ${c.highlight}`,
         boxShadow: `0 4px 16px rgba(0,0,0,0.15), inset 0 -1px 0 ${c.shadow}`,
         borderRadius: 6,
@@ -155,7 +156,7 @@ export function Tooltip({ text }: { text: string }) {
           bottom: -4, left: "50%",
           transform: "translateX(-50%) rotate(45deg)",
           width: 8, height: 8,
-          background: c.raised,
+          background: fill,
           boxShadow: `1px 1px 0 ${c.shadow}`,
         }} />
       </div>
@@ -300,8 +301,10 @@ export function Footer() {
       boxShadow: `inset 0 -1px 0 ${c.shadow}`,
       borderRadius: "0 0 8px 8px",
     }}>
-      <span style={font(14, c.secondary)}>Powered by</span>
-      <PyeWordmark />
+      <a href="https://pye.fi/" target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", gap: 8, textDecoration: "none" }}>
+        <span style={font(14, c.secondary)}>Powered by</span>
+        <PyeWordmark />
+      </a>
     </div>
   );
 }

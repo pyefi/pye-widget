@@ -156,11 +156,6 @@ export default function ChooseDuration() {
               >
                 +{formatSolAmount(sel.grossYield, 3)} SOL
               </p>
-              {parsedAmount > 0 && (
-                <p style={font(14, c.green)}>
-                  +{((sel.grossYield / parsedAmount) * 100).toFixed(2)}%
-                </p>
-              )}
             </div>
             {sel.pts && (
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>

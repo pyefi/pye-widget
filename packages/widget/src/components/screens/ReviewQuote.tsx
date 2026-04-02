@@ -316,9 +316,14 @@ export default function ReviewQuote() {
             <p style={font(12, c.secondary)}>You receive today</p>
             <Tooltip text="Estimated upfront payout based on current market rates, net of fees. The final amount is confirmed when your order fills on the Pye orderbook." />
           </div>
-          <p style={{ ...displayFont(32, c.green), lineHeight: 1.2, fontVariantNumeric: "lining-nums tabular-nums" }}>
+          <p style={{ ...displayFont(32, c.green), lineHeight: 1.2, fontVariantNumeric: "lining-nums tabular-nums", marginBottom: slippage > 0 ? -4 : 0 }}>
             +{formatSolAmount(sellAmount)} SOL
           </p>
+          {slippage > 0 && (
+            <p style={font(12, c.secondary)}>
+              Min. received: {formatSolAmount(sellAmount * (1 - slippage / 100))} SOL
+            </p>
+          )}
         </div>
         {/* Bottom: maturity + points */}
         <div style={{
@@ -360,10 +365,14 @@ export default function ReviewQuote() {
           borderTop: `1px solid ${c.highlight}`,
           boxShadow: `inset 0 -1px 0 ${c.shadow}`,
           display: "flex", flexDirection: "column", gap: 16,
+          overflow: "visible",
         }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             <div style={{ display: "flex", justifyContent: "space-between" }}>
-              <span style={font(12, c.secondary)}>Max slippage tolerance</span>
+              <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <span style={font(12, c.secondary)}>Max slippage tolerance</span>
+                <Tooltip bg={c.highlight} text="Slippage is the maximum difference between the quoted price and the price you actually receive. A higher tolerance means your order is more likely to fill, but you may receive slightly less SOL." />
+              </span>
               {orderBookSlippageBps > 0 && (
                 <span style={font(12, c.secondary)}>Est. slippage: {(orderBookSlippageBps / 100).toFixed(2)}%</span>
               )}
