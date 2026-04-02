@@ -9,12 +9,7 @@ import type { WidgetTheme } from "@pye/widget";
 const THEMES: { value: WidgetTheme; label: string }[] = [
   { value: "pye-light", label: "Pye Light" },
   { value: "pye-dark", label: "Pye Dark" },
-  { value: "neutral-light", label: "Neutral Light" },
-  { value: "neutral-dark", label: "Neutral Dark" },
-  { value: "midnight", label: "Midnight" },
   { value: "graphite", label: "Graphite" },
-  { value: "sand", label: "Sand" },
-  { value: "rose", label: "Rose" },
 ];
 
 // ── Page colors per widget theme ──
@@ -52,30 +47,6 @@ const PAGE_THEMES: Record<WidgetTheme, PageTheme> = {
     controlBg: "rgba(255,255,255,0.08)", controlText: "rgba(255,255,255,0.6)",
     scrim: "rgba(0,0,0,0.6)",
   },
-  "neutral-light": {
-    bg: "#f2f2f2", text: "#1a1a1a", muted: "rgba(26,26,26,0.45)", border: "rgba(26,26,26,0.08)",
-    accent: "#9a4dff", accentGlow: "rgba(154,77,255,0.08)",
-    glowTop: "rgba(154,77,255,0.14)", glowBottom: "rgba(154,77,255,0.06)",
-    statColor: "#1a1a1a", statBg: "rgba(0,0,0,0.03)",
-    controlBg: "rgba(0,0,0,0.05)", controlText: "#666666",
-    scrim: "rgba(0,0,0,0.35)",
-  },
-  "neutral-dark": {
-    bg: "#141210", text: "#f0ede9", muted: "rgba(240,237,233,0.45)", border: "rgba(255,255,255,0.08)",
-    accent: "#9a4dff", accentGlow: "rgba(154,77,255,0.12)",
-    glowTop: "rgba(154,77,255,0.18)", glowBottom: "rgba(154,77,255,0.08)",
-    statColor: "#f0ede9", statBg: "rgba(255,255,255,0.03)",
-    controlBg: "rgba(255,255,255,0.08)", controlText: "rgba(255,255,255,0.6)",
-    scrim: "rgba(0,0,0,0.6)",
-  },
-  midnight: {
-    bg: "#0a0818", text: "#eeeaf8", muted: "rgba(238,234,248,0.45)", border: "rgba(238,234,248,0.08)",
-    accent: "#7c6ef0", accentGlow: "rgba(124,110,240,0.15)",
-    glowTop: "rgba(124,110,240,0.22)", glowBottom: "rgba(124,110,240,0.1)",
-    statColor: "#eeeaf8", statBg: "rgba(124,110,240,0.04)",
-    controlBg: "rgba(255,255,255,0.08)", controlText: "rgba(238,234,248,0.6)",
-    scrim: "rgba(0,0,0,0.6)",
-  },
   graphite: {
     bg: "#1c1c1e", text: "#ffffff", muted: "rgba(255,255,255,0.45)", border: "rgba(255,255,255,0.08)",
     accent: "#a0a0a0", accentGlow: "rgba(255,255,255,0.06)",
@@ -83,22 +54,6 @@ const PAGE_THEMES: Record<WidgetTheme, PageTheme> = {
     statColor: "#ffffff", statBg: "rgba(255,255,255,0.03)",
     controlBg: "rgba(255,255,255,0.08)", controlText: "rgba(255,255,255,0.6)",
     scrim: "rgba(0,0,0,0.6)",
-  },
-  sand: {
-    bg: "#f7f1e6", text: "#2c1f0e", muted: "rgba(44,31,14,0.45)", border: "rgba(44,31,14,0.08)",
-    accent: "#c17a24", accentGlow: "rgba(193,122,36,0.1)",
-    glowTop: "rgba(193,122,36,0.15)", glowBottom: "rgba(193,122,36,0.06)",
-    statColor: "#2c1f0e", statBg: "rgba(193,122,36,0.04)",
-    controlBg: "rgba(0,0,0,0.05)", controlText: "#7a6248",
-    scrim: "rgba(0,0,0,0.35)",
-  },
-  rose: {
-    bg: "#faf3f5", text: "#2a1518", muted: "rgba(42,21,24,0.45)", border: "rgba(42,21,24,0.08)",
-    accent: "#d4607a", accentGlow: "rgba(212,96,122,0.1)",
-    glowTop: "rgba(212,96,122,0.16)", glowBottom: "rgba(212,96,122,0.06)",
-    statColor: "#2a1518", statBg: "rgba(212,96,122,0.04)",
-    controlBg: "rgba(0,0,0,0.05)", controlText: "#8a5c64",
-    scrim: "rgba(0,0,0,0.35)",
   },
 };
 
