@@ -61,7 +61,7 @@ export default function SelectPosition() {
           {hasLiquidSol && (
             <SelectableRow
               icon={<SolIcon />}
-              label="Liquid SOL"
+              label="SOL"
               sub="Unstaked"
               amount={(balanceLamports / LAMPORTS_PER_SOL).toFixed(4)}
               onClick={handleSelectLiquidSol}

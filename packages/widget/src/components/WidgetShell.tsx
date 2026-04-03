@@ -10,6 +10,7 @@ import ChooseAmount from "./screens/ChooseAmount";
 import ChooseDuration from "./screens/ChooseDuration";
 import ReviewQuote from "./screens/ReviewQuote";
 import StepComplete from "./screens/StepComplete";
+import RedeemComplete from "./screens/RedeemComplete";
 
 interface WidgetShellProps {
   validatorName?: string;
@@ -52,11 +53,20 @@ export default function WidgetShell({ validatorName }: WidgetShellProps) {
     return <HomeScreen validatorName={validatorName} />;
   }
 
-  // Complete has its own custom header
+  // Complete screens have their own custom headers
   if (screen === "complete") {
     return (
       <Widget>
         <StepComplete />
+        <Footer />
+      </Widget>
+    );
+  }
+
+  if (screen === "redeem-complete") {
+    return (
+      <Widget>
+        <RedeemComplete />
         <Footer />
       </Widget>
     );

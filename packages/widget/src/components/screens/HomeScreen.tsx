@@ -98,6 +98,24 @@ const getLearnItems = (validatorName: string): LearnItem[] => [
     ],
   },
   {
+    title: "What is a PT?",
+    teaser: "The token that represents your locked stake.",
+    body: [
+      "A PT (Principal Token) is a 1:1 tokenised claim on your staked SOL. When you enter a Yield Forward position, your stake is locked and you receive PT in return.",
+      "The PT accrues no staking rewards — those were sold upfront. It simply represents your right to reclaim the original SOL at maturity.",
+      "At the maturity date, you redeem your PT to get your full principal back. Until then, the PT sits in your wallet as proof of your locked position.",
+    ],
+  },
+  {
+    title: "Redemption & withdrawals",
+    teaser: "How and when you get your SOL back.",
+    body: [
+      "Your staked SOL is returned at the maturity date of your position. To reclaim it, you redeem the PT in your wallet using the Manage tab — this burns the PT and initiates the unstaking process.",
+      "After redemption, Solana's standard cooldown period applies (typically one epoch, or ~2 days). Once the cooldown completes, the SOL is deposited directly into your wallet.",
+      "You cannot redeem early. Your position is locked until the maturity date shown when you signed the transaction.",
+    ],
+  },
+  {
     title: "Fees",
     teaser: "The cost of receiving your yield today instead of later.",
     body: [
@@ -187,6 +205,7 @@ function PositionsTab() {
   const wallet = useWallet();
   const walletStatus = useWalletStore((s) => s.status);
   const walletBalances = useBalanceStore((s) => s.walletBalances);
+  const navigate = useWidgetStore((s) => s.navigate);
 
   const redeemingMint = useWidgetStore((s) => s.redeemingMint);
   const setRedeemingMint = useWidgetStore((s) => s.setRedeemingMint);
@@ -258,7 +277,7 @@ function PositionsTab() {
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <p style={font(14, c.primary)}>Your positions</p>
-            <Tooltip text="Each PT (Principal Token) is a 1:1 tokenised claim on your staked SOL. It accrues no rewards — those were sold upfront. Redeem at maturity to receive your full SOL stake back." />
+            <Tooltip position="below" text="Each PT (Principal Token) is a 1:1 tokenised claim on your staked SOL. It accrues no rewards — those were sold upfront. Redeem at maturity to receive your full SOL stake back." />
           </div>
           <p style={font(12, c.secondary)}>Each PT is 1:1 redeemable for your staked SOL at maturity.</p>
         </div>
@@ -270,6 +289,21 @@ function PositionsTab() {
             ...font(12, c.red),
           }}>
             {redeemError}
+          </div>
+        )}
+
+        {/* DEV PREVIEW — remove before merging */}
+        {process.env.NODE_ENV === "development" && (
+          <div style={{ padding: "8px 16px" }}>
+            <button
+              onClick={() => navigate("redeem-complete")}
+              style={{
+                width: "100%", height: 28, borderRadius: 4, border: `1px dashed ${c.muted}`,
+                background: "none", cursor: "pointer", ...font(11, c.muted),
+              }}
+            >
+              Preview: Redeem Success
+            </button>
           </div>
         )}
 
@@ -359,7 +393,7 @@ function LearnTab({ onSelect, validatorName }: { onSelect: (item: LearnItem) => 
   return (
     <Body padding={16}>
       <p style={{ ...displayFont(45, c.primary), letterSpacing: "-0.02em" }}>Learn</p>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8, flex: 1, overflowY: "auto", minHeight: 0 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {items.map(item => (
           <LearnCard key={item.title} title={item.title} teaser={item.teaser} onClick={() => onSelect(item)} />
         ))}
@@ -476,7 +510,7 @@ export default function HomeScreen({ validatorName }: HomeScreenProps) {
             boxShadow: `inset 0 -1px 0 ${c.highlight}`,
           }}>
             <p style={font(12, c.primary)}>
-              <strong style={{ fontWeight: 600 }}>Your SOL stays with {validatorName ?? "Kiln"}.</strong>{" "}
+              <strong style={{ fontWeight: 600 }}>Your SOL stays with {validatorName ?? "your validator"}.</strong>{" "}
               We lock your position into a quarterly Pye lockup. Your stake keeps earning. Your principal comes back at maturity.
             </p>
           </div>
