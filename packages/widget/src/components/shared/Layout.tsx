@@ -1,4 +1,4 @@
-import { type ReactNode, type CSSProperties, useRef, useState, useEffect, useCallback } from "react";
+import { type ReactNode, type CSSProperties, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { c, font } from "../design-system";
 import { PyeWordmark } from "../Icons";
@@ -130,10 +130,9 @@ export function Tooltip({ text, bg, position = "above" }: { text: string; bg?: s
   const fill = bg ?? c.raised;
   const isBelow = position === "below";
   const triggerRef = useRef<HTMLDivElement>(null);
-  const [show, setShow] = useState(false);
   const [coords, setCoords] = useState<{ top: number; left: number } | null>(null);
 
-  const updateCoords = useCallback(() => {
+  const handleEnter = () => {
     const el = triggerRef.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
@@ -141,14 +140,9 @@ export function Tooltip({ text, bg, position = "above" }: { text: string; bg?: s
       top: isBelow ? rect.bottom + 8 : rect.top - 8,
       left: rect.left + rect.width / 2,
     });
-  }, [isBelow]);
+  };
 
-  useEffect(() => {
-    if (!show) return;
-    updateCoords();
-  }, [show, updateCoords]);
-
-  const popup = show && coords ? createPortal(
+  const popup = coords ? createPortal(
     <div style={{
       position: "fixed",
       top: isBelow ? coords.top : undefined,
@@ -183,8 +177,8 @@ export function Tooltip({ text, bg, position = "above" }: { text: string; bg?: s
   return (
     <div
       ref={triggerRef}
-      onMouseEnter={() => setShow(true)}
-      onMouseLeave={() => setShow(false)}
+      onMouseEnter={handleEnter}
+      onMouseLeave={() => setCoords(null)}
       style={{ position: "relative", display: "inline-flex", flexShrink: 0 }}
     >
       <div
@@ -328,6 +322,41 @@ export function CTA({ label, onClick, disabled, purple }: {
     >
       {label}
     </button>
+  );
+}
+
+export function SuccessHeader({ label, onClose }: { label: string; onClose: () => void }) {
+  return (
+    <div style={{
+      height: 48, display: "flex", alignItems: "center",
+      padding: "0 16px",
+      flexShrink: 0, gap: 8,
+      background: c.surface,
+      borderRadius: "8px 8px 0 0",
+      borderTop: `1px solid ${c.highlight}`,
+      boxShadow: `inset 0 -1px 0 ${c.shadow}`,
+    }}>
+      <div style={{
+        width: 20, height: 20, borderRadius: "50%", flexShrink: 0,
+        background: "rgba(13, 156, 94, 0.15)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+      }}>
+        <svg width="10" height="10" viewBox="0 0 16 16" fill="none">
+          <path d="M3 8.5L6.5 12L13 5" stroke="#0d9c5e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </div>
+      <p style={{ ...font(14, c.primary), flex: 1 }}>{label}</p>
+      <button onClick={onClose} style={{
+        background: "none", border: "none", cursor: "pointer",
+        padding: 0, width: 28, height: 28, marginRight: -7,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        borderRadius: 6, flexShrink: 0,
+      }}>
+        <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+          <path d="M1 1L13 13M13 1L1 13" stroke={c.secondary} strokeWidth="1" strokeLinecap="round"/>
+        </svg>
+      </button>
+    </div>
   );
 }
 
