@@ -389,7 +389,7 @@ function LearnArticle({ article, onBack }: { article: LearnItem; onBack: () => v
 // ─── LearnTab ─────────────────────────────────────────────────────────────────
 
 function LearnTab({ onSelect, validatorName }: { onSelect: (item: LearnItem) => void; validatorName: string }) {
-  const items = getLearnItems(validatorName);
+  const items = useMemo(() => getLearnItems(validatorName), [validatorName]);
   return (
     <Body padding={16}>
       <p style={{ ...displayFont(45, c.primary), letterSpacing: "-0.02em" }}>Learn</p>

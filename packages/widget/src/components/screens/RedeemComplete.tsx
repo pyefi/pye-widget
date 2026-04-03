@@ -1,6 +1,6 @@
 import { useWidgetStore } from "../../stores/widget-store";
 import { c, font, displayFont, formatSolAmount } from "../design-system";
-import { Body, CTA, Spacer } from "../shared/Layout";
+import { Body, CTA, Spacer, SuccessHeader } from "../shared/Layout";
 
 export default function RedeemComplete() {
   const reset = useWidgetStore((s) => s.reset);
@@ -15,37 +15,7 @@ export default function RedeemComplete() {
 
   return (
     <>
-      {/* Success header */}
-      <div style={{
-        height: 48, display: "flex", alignItems: "center",
-        padding: "0 16px",
-        flexShrink: 0, gap: 8,
-        background: c.surface,
-        borderRadius: "8px 8px 0 0",
-        borderTop: `1px solid ${c.highlight}`,
-        boxShadow: `inset 0 -1px 0 ${c.shadow}`,
-      }}>
-        <div style={{
-          width: 20, height: 20, borderRadius: "50%", flexShrink: 0,
-          background: "rgba(13, 156, 94, 0.15)",
-          display: "flex", alignItems: "center", justifyContent: "center",
-        }}>
-          <svg width="10" height="10" viewBox="0 0 16 16" fill="none">
-            <path d="M3 8.5L6.5 12L13 5" stroke="#0d9c5e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        </div>
-        <p style={{ ...font(14, c.primary), flex: 1 }}>Redeem confirmed</p>
-        <button onClick={() => reset()} style={{
-          background: "none", border: "none", cursor: "pointer",
-          padding: 0, width: 28, height: 28, marginRight: -7,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          borderRadius: 6, flexShrink: 0,
-        }}>
-          <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
-            <path d="M1 1L13 13M13 1L1 13" stroke={c.secondary} strokeWidth="1" strokeLinecap="round"/>
-          </svg>
-        </button>
-      </div>
+      <SuccessHeader label="Redeem confirmed" onClose={() => reset()} />
 
       <Body>
         <p style={font(12, c.secondary)}>Your staked SOL has been returned to your wallet.</p>
