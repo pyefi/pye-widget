@@ -412,7 +412,7 @@ export default function ReviewQuote() {
           style={{ color: c.secondary, textDecoration: "underline" }}>
           Pye orderbook
         </a>
-        . Fill time varies with market conditions.
+        . If the market moves beyond your max slippage, this transaction will not execute.
       </p>
 
       {/* Error */}
