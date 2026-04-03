@@ -12,7 +12,8 @@ export type WidgetScreen =
   | "choose-amount"
   | "choose-duration"
   | "review-quote"
-  | "complete";
+  | "complete"
+  | "redeem-complete";
 
 export type HomeTab = "earn" | "positions" | "learn";
 
@@ -49,6 +50,10 @@ export interface WidgetState {
   selectedLearnArticle: { title: string; teaser: string; body: string[] } | null;
   /** Wallet name currently connecting */
   connectingWallet: string | null;
+  /** SOL amount received from redeem, set after transaction completes */
+  redeemAmountSol: number | null;
+  /** Redeem transaction signature */
+  redeemTxSignature: string | null;
 }
 
 export interface WidgetActions {
@@ -104,6 +109,8 @@ const initialState: WidgetState = {
   redeemError: null,
   selectedLearnArticle: null,
   connectingWallet: null,
+  redeemAmountSol: null,
+  redeemTxSignature: null,
 };
 
 export function createWidgetStore() {

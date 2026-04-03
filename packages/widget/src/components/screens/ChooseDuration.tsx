@@ -89,7 +89,7 @@ export default function ChooseDuration() {
       <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <p style={font(14, c.primary)}>Choose a staking duration</p>
-          <Tooltip text="Lock your stake until the chosen date. All staking rewards for the period are sold to you upfront today. Your full SOL stake is returned at maturity." />
+          <Tooltip position="below" text="Lock your stake until the chosen date. All staking rewards for the period are sold to you upfront today. Your full SOL stake is returned at maturity." />
         </div>
         <p style={font(12, c.secondary)}>
           All rewards for the period are paid to you today. Your stake is

@@ -1,4 +1,5 @@
-import { type ReactNode, type CSSProperties } from "react";
+import { type ReactNode, type CSSProperties, useRef, useState, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { c, font } from "../design-system";
 import { PyeWordmark } from "../Icons";
 
@@ -19,13 +20,18 @@ export function Widget({ children }: { children: ReactNode }) {
 export function Body({ children, padding = 16, style }: { children: ReactNode; padding?: number; style?: CSSProperties }) {
   return (
     <div style={{
-      flex: 1, display: "flex", flexDirection: "column", padding, gap: 16, minHeight: 0, overflowY: "auto",
+      flex: 1, display: "flex", flexDirection: "column", minHeight: 0,
       background: c.surface,
       borderTop: `1px solid ${c.highlight}`,
-      boxShadow: `inset 0 -1px 0 ${c.shadow}`,
       ...style,
     }}>
-      {children}
+      <div style={{
+        flex: 1, display: "flex", flexDirection: "column", padding, gap: 16,
+        minHeight: 0, overflowY: "auto",
+      }}>
+        {children}
+      </div>
+      <div style={{ height: 0, borderTop: `1px solid ${c.shadow}`, flexShrink: 0 }} />
     </div>
   );
 }
@@ -119,11 +125,68 @@ export function StepTitle({ title, subtitle }: { title: string; subtitle?: strin
   );
 }
 
-// Dan's Tooltip — self-contained "?" circle trigger with 210px popup and caret
-export function Tooltip({ text, bg }: { text: string; bg?: string }) {
+// Dan's Tooltip — self-contained "?" circle trigger with portalled popup to escape overflow clipping
+export function Tooltip({ text, bg, position = "above" }: { text: string; bg?: string; position?: "above" | "below" }) {
   const fill = bg ?? c.raised;
+  const isBelow = position === "below";
+  const triggerRef = useRef<HTMLDivElement>(null);
+  const [show, setShow] = useState(false);
+  const [coords, setCoords] = useState<{ top: number; left: number } | null>(null);
+
+  const updateCoords = useCallback(() => {
+    const el = triggerRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    setCoords({
+      top: isBelow ? rect.bottom + 8 : rect.top - 8,
+      left: rect.left + rect.width / 2,
+    });
+  }, [isBelow]);
+
+  useEffect(() => {
+    if (!show) return;
+    updateCoords();
+  }, [show, updateCoords]);
+
+  const popup = show && coords ? createPortal(
+    <div style={{
+      position: "fixed",
+      top: isBelow ? coords.top : undefined,
+      bottom: isBelow ? undefined : `calc(100vh - ${coords.top}px)`,
+      left: coords.left,
+      transform: "translateX(-50%)",
+      width: 210,
+      background: fill,
+      borderTop: `1px solid ${c.highlight}`,
+      boxShadow: `0 4px 16px rgba(0,0,0,0.15), inset 0 -1px 0 ${c.shadow}`,
+      borderRadius: 6,
+      padding: "8px 10px",
+      zIndex: 10000,
+      pointerEvents: "none",
+    }}>
+      <p style={{ ...font(11, c.secondary), lineHeight: 1.5 }}>{text}</p>
+      <div style={{
+        position: "absolute",
+        ...(isBelow
+          ? { top: -4 }
+          : { bottom: -4 }),
+        left: "50%",
+        transform: "translateX(-50%) rotate(45deg)",
+        width: 8, height: 8,
+        background: fill,
+        boxShadow: isBelow ? `-1px -1px 0 ${c.shadow}` : `1px 1px 0 ${c.shadow}`,
+      }} />
+    </div>,
+    document.body,
+  ) : null;
+
   return (
-    <div className="pye-tooltip" style={{ position: "relative", display: "inline-flex", flexShrink: 0 }}>
+    <div
+      ref={triggerRef}
+      onMouseEnter={() => setShow(true)}
+      onMouseLeave={() => setShow(false)}
+      style={{ position: "relative", display: "inline-flex", flexShrink: 0 }}
+    >
       <div
         style={{
           width: 16, height: 16, borderRadius: "50%",
@@ -136,30 +199,7 @@ export function Tooltip({ text, bg }: { text: string; bg?: string }) {
       >
         <span style={{ ...font(9, c.muted), lineHeight: 1, userSelect: "none", fontWeight: 500 }}>?</span>
       </div>
-      <div className="pye-tooltip-popup" style={{
-        position: "absolute",
-        bottom: "calc(100% + 8px)",
-        left: "50%",
-        transform: "translateX(-50%)",
-        width: 210,
-        background: fill,
-        borderTop: `1px solid ${c.highlight}`,
-        boxShadow: `0 4px 16px rgba(0,0,0,0.15), inset 0 -1px 0 ${c.shadow}`,
-        borderRadius: 6,
-        padding: "8px 10px",
-        zIndex: 100,
-        pointerEvents: "none",
-      }}>
-        <p style={{ ...font(11, c.secondary), lineHeight: 1.5 }}>{text}</p>
-        <div style={{
-          position: "absolute",
-          bottom: -4, left: "50%",
-          transform: "translateX(-50%) rotate(45deg)",
-          width: 8, height: 8,
-          background: fill,
-          boxShadow: `1px 1px 0 ${c.shadow}`,
-        }} />
-      </div>
+      {popup}
     </div>
   );
 }
