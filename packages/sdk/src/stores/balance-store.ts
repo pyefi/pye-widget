@@ -48,6 +48,7 @@ export interface BalanceState {
   /** User's native stake accounts */
   userStakeAccounts: UserStakeAccount[];
   userStakeAccountsLoading: boolean;
+  stakeRefreshKey: number;
 }
 
 export interface BalanceActions {
@@ -61,6 +62,7 @@ export interface BalanceActions {
   setUserStakeAccounts: (accounts: UserStakeAccount[]) => void;
   setUserStakeAccountsLoading: (loading: boolean) => void;
   resetBalances: () => void;
+  incrementStakeRefreshKey: () => void;
 }
 
 export type BalanceStore = BalanceState & BalanceActions;
@@ -87,6 +89,7 @@ export function createBalanceStore() {
       perMarketBaseBalances: {},
       userStakeAccounts: [],
       userStakeAccountsLoading: false,
+      stakeRefreshKey: 0,
 
       setWalletBalances(updates) {
         set((s) => {
@@ -161,6 +164,12 @@ export function createBalanceStore() {
           s.perMarketBaseBalances = {};
           s.userStakeAccounts = [];
           s.userStakeAccountsLoading = false;
+        });
+      },
+
+      incrementStakeRefreshKey() {
+        set((s) => {
+          s.stakeRefreshKey += 1;
         });
       },
     })),
