@@ -22,6 +22,7 @@ export default function BalanceSyncer() {
   const setUserStakeAccounts = useBalanceStore((s) => s.setUserStakeAccounts);
   const setUserStakeAccountsLoading = useBalanceStore((s) => s.setUserStakeAccountsLoading);
   const resetBalances = useBalanceStore((s) => s.resetBalances);
+  const stakeRefreshKey = useBalanceStore((s) => s.stakeRefreshKey);
   const marketsRecord = useMarketStore((s) => s.markets);
   const markets = Object.values(marketsRecord);
   const userStakeAccounts = useBalanceStore((s) => s.userStakeAccounts);
@@ -88,6 +89,7 @@ export default function BalanceSyncer() {
   }, [
     status,
     publicKey,
+    stakeRefreshKey,
     connection,
     marketsRecord,
     setWalletBalances,
