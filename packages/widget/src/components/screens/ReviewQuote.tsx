@@ -147,6 +147,7 @@ export default function ReviewQuote() {
 
   const markets = useMarketStore((s) => s.markets);
   const userStakeAccounts = useBalanceStore((s) => s.userStakeAccounts);
+  const incrementStakeRefreshKey = useBalanceStore((s) => s.incrementStakeRefreshKey);
 
   const parsedAmount = parseFloat(depositAmount) || 0;
   const maturity = selectedMaturityId ? maturities[selectedMaturityId] : null;
@@ -269,6 +270,7 @@ export default function ReviewQuote() {
       setSellAmountSol(sellAmount);
       setTxStatus("success", rtSellResult.signature);
       navigate("complete");
+      incrementStakeRefreshKey();
     } catch (err) {
       setTxStatus(
         "error",
@@ -292,6 +294,7 @@ export default function ReviewQuote() {
     setTxStep,
     setSellAmountSol,
     navigate,
+    incrementStakeRefreshKey,
   ]);
 
   return (
