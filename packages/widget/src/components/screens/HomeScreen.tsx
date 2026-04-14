@@ -260,7 +260,7 @@ function PositionsTab() {
         ptAmountLamports: p.ptAmountLamports,
         rtAmountLamports: 0,
       });
-      setRedeemAmountSol(p.ptAmountLamports / 1e9);
+      setRedeemAmountSol(p.ptAmountLamports / LAMPORTS_PER_SOL);
       setRedeemTxSignature(signature);
       navigate("redeem-complete");
     } catch (err) {
