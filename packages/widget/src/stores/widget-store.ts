@@ -70,6 +70,8 @@ export interface WidgetActions {
   setRedeemError(error: string | null): void;
   setSelectedLearnArticle(article: WidgetState["selectedLearnArticle"]): void;
   setConnectingWallet(name: string | null): void;
+  setRedeemAmountSol(amount: number): void;
+  setRedeemTxSignature(sig: string): void;
   setTxStep(step: WidgetState["txStep"]): void;
   setTxStatus(
     status: WidgetState["txStatus"],
@@ -199,6 +201,18 @@ export function createWidgetStore() {
       setConnectingWallet(name) {
         set((s) => {
           s.connectingWallet = name;
+        });
+      },
+
+      setRedeemAmountSol(amount) {
+        set((s) => {
+          s.redeemAmountSol = amount;
+        });
+      },
+
+      setRedeemTxSignature(sig) {
+        set((s) => {
+          s.redeemTxSignature = sig;
         });
       },
 
