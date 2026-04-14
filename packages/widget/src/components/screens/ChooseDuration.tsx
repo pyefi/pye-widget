@@ -156,7 +156,9 @@ export default function ChooseDuration() {
                   fontVariantNumeric: "lining-nums tabular-nums",
                 }}
               >
-                +{formatSolAmount(sel.grossYield, 3)} SOL
+                {sel.grossYield < 0.0001
+                  ? "< 0.0001 SOL"
+                  : `+${formatSolAmount(sel.grossYield, 3)} SOL`}
               </p>
             </div>
             {sel.pts && (
