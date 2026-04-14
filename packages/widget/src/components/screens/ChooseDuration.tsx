@@ -73,11 +73,13 @@ export default function ChooseDuration() {
     const bestBid = rtMarket?.bestBidPrice ?? null;
 
     // Gross yield: RT amount (1:1 with deposit) × best bid price (SOL per RT)
-    // Fallback: MARKET_RATE is 0.85 (i.e. 0.85%), so divide by 100 once to get 0.0085
+    // Fallback: MARKET_RATE is annual (0.85%), scaled by time remaining so Q2–Q4 differ
+    const maturityTs = Number(maturities[matId].maturity_timestamp);
+    const yearsRemaining = Math.max(0, (maturityTs - Date.now() / 1000) / (365.25 * 86400));
     const grossYield =
       bestBid != null
         ? bestBid * parsedAmount
-        : parsedAmount * (MARKET_RATE / 100);
+        : parsedAmount * (MARKET_RATE / 100) * yearsRemaining;
 
     return { matId, ...info, bestBid, grossYield };
   });
