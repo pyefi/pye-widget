@@ -211,6 +211,8 @@ function PositionsTab() {
   const setRedeemingMint = useWidgetStore((s) => s.setRedeemingMint);
   const redeemError = useWidgetStore((s) => s.redeemError);
   const setRedeemError = useWidgetStore((s) => s.setRedeemError);
+  const setRedeemAmountSol = useWidgetStore((s) => s.setRedeemAmountSol);
+  const setRedeemTxSignature = useWidgetStore((s) => s.setRedeemTxSignature);
 
   const ptLookup = useMemo(() => buildPtLookup(), []);
 
@@ -249,7 +251,7 @@ function PositionsTab() {
     setRedeemError(null);
     setRedeemingMint(p.ptMint);
     try {
-      await executeRedeem({
+      const { signature } = await executeRedeem({
         connection,
         wallet,
         bondPubkey: p.bond.pubkey,
@@ -258,12 +260,15 @@ function PositionsTab() {
         ptAmountLamports: p.ptAmountLamports,
         rtAmountLamports: 0,
       });
+      setRedeemAmountSol(p.ptAmountLamports / 1e9);
+      setRedeemTxSignature(signature);
+      navigate("redeem-complete");
     } catch (err) {
       setRedeemError(err instanceof Error ? err.message : "Redeem failed");
     } finally {
       setRedeemingMint(null);
     }
-  }, [connection, wallet]);
+  }, [connection, wallet, setRedeemError, setRedeemingMint, setRedeemAmountSol, setRedeemTxSignature, navigate]);
 
   const isConnected = walletStatus === "connected";
 
@@ -289,21 +294,6 @@ function PositionsTab() {
             ...font(12, c.red),
           }}>
             {redeemError}
-          </div>
-        )}
-
-        {/* DEV PREVIEW — remove before merging */}
-        {process.env.NODE_ENV === "development" && (
-          <div style={{ padding: "8px 16px" }}>
-            <button
-              onClick={() => navigate("redeem-complete")}
-              style={{
-                width: "100%", height: 28, borderRadius: 4, border: `1px dashed ${c.muted}`,
-                background: "none", cursor: "pointer", ...font(11, c.muted),
-              }}
-            >
-              Preview: Redeem Success
-            </button>
           </div>
         )}
 
