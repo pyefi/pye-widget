@@ -46,6 +46,7 @@ export default function SelectPosition() {
               onClick={() => handleSelectStake(account.pubkey, account.lamports, account.validatorName, account.validatorIcon, account.validatorVoteAccount)}
             />
           ))}
+          {/* TODO(SIMD-185): Re-enable liquid SOL deposit once transient account flow is fixed.
           {hasLiquidSol && (
             <SelectableRow
               icon={<SolIcon />}
@@ -54,7 +55,7 @@ export default function SelectPosition() {
               amount={(balanceLamports / LAMPORTS_PER_SOL).toFixed(4)}
               onClick={handleSelectLiquidSol}
             />
-          )}
+          )} */}
         </RowGroup>
       </div>
     </>
