@@ -12,7 +12,8 @@ export type WidgetScreen =
   | "choose-amount"
   | "choose-duration"
   | "review-quote"
-  | "complete";
+  | "complete"
+  | "redeem-complete";
 
 export type HomeTab = "earn" | "positions" | "learn";
 
@@ -49,6 +50,10 @@ export interface WidgetState {
   selectedLearnArticle: { title: string; teaser: string; body: string[] } | null;
   /** Wallet name currently connecting */
   connectingWallet: string | null;
+  /** SOL amount received from redeem, set after transaction completes */
+  redeemAmountSol: number | null;
+  /** Redeem transaction signature */
+  redeemTxSignature: string | null;
 }
 
 export interface WidgetActions {
@@ -65,6 +70,8 @@ export interface WidgetActions {
   setRedeemError(error: string | null): void;
   setSelectedLearnArticle(article: WidgetState["selectedLearnArticle"]): void;
   setConnectingWallet(name: string | null): void;
+  setRedeemAmountSol(amount: number): void;
+  setRedeemTxSignature(sig: string): void;
   setTxStep(step: WidgetState["txStep"]): void;
   setTxStatus(
     status: WidgetState["txStatus"],
@@ -104,6 +111,8 @@ const initialState: WidgetState = {
   redeemError: null,
   selectedLearnArticle: null,
   connectingWallet: null,
+  redeemAmountSol: null,
+  redeemTxSignature: null,
 };
 
 export function createWidgetStore() {
@@ -192,6 +201,18 @@ export function createWidgetStore() {
       setConnectingWallet(name) {
         set((s) => {
           s.connectingWallet = name;
+        });
+      },
+
+      setRedeemAmountSol(amount) {
+        set((s) => {
+          s.redeemAmountSol = amount;
+        });
+      },
+
+      setRedeemTxSignature(sig) {
+        set((s) => {
+          s.redeemTxSignature = sig;
         });
       },
 

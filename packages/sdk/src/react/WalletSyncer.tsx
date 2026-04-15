@@ -28,6 +28,7 @@ export default function WalletSyncer() {
     for (let i = 0; i < retries; i++) {
       try {
         const balance = await connection.getBalance(publicKey, "confirmed");
+        console.log("[WalletSyncer] balanceLamports:", balance);
         setBalanceLamports(balance);
         return;
       } catch {
@@ -36,6 +37,7 @@ export default function WalletSyncer() {
         }
       }
     }
+    console.warn("[WalletSyncer] balance fetch failed after all retries");
     setBalanceLamports(null);
   };
 

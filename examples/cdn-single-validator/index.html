@@ -98,12 +98,7 @@
     <select class="demo-select" id="theme-select">
       <option value="pye-light" selected>Pye Light</option>
       <option value="pye-dark">Pye Dark</option>
-      <option value="neutral-light">Neutral Light</option>
-      <option value="neutral-dark">Neutral Dark</option>
-      <option value="midnight">Midnight</option>
       <option value="graphite">Graphite</option>
-      <option value="sand">Sand</option>
-      <option value="rose">Rose</option>
     </select>
     <div class="demo-brand-picker" id="brand-picker">
       <input type="color" id="brand-color" value="#9a4dff" />
@@ -125,7 +120,7 @@
 
   <script>
     (function () {
-      var DARK_THEMES = { "pye-dark": 1, "neutral-dark": 1, "midnight": 1, "graphite": 1 };
+      var DARK_THEMES = { "pye-dark": 1, "graphite": 1 };
 
       var select = document.getElementById("theme-select");
       var picker = document.getElementById("brand-picker");
@@ -139,7 +134,7 @@
         var g = parseInt(hex.slice(3, 5), 16) / 255;
         var b = parseInt(hex.slice(5, 7), 16) / 255;
         var lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-        return lum > 0.4 ? "#000000" : "#ffffff";
+        return lum > 0.5 ? "#000000" : "#ffffff";
       }
 
       function applyTheme(theme) {

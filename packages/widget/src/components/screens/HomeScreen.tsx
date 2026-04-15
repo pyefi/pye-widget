@@ -62,7 +62,7 @@ interface Position {
   validatorPtIcon: string;
 }
 
-const LEARN_ITEMS: LearnItem[] = [
+const getLearnItems = (validatorName: string): LearnItem[] => [
   {
     title: "What is Yield Forward?",
     teaser: "Get paid for your staking rewards before they accrue.",
@@ -76,7 +76,7 @@ const LEARN_ITEMS: LearnItem[] = [
     title: "How it works",
     teaser: "Your SOL keeps staking. Only the yield changes hands.",
     body: [
-      "When you enter a Yield Forward position, your SOL stays with Figment and continues staking as normal. Nothing changes on the validator side.",
+      `When you enter a Yield Forward position, your SOL stays with ${validatorName} and continues staking as normal. Nothing changes on the validator side.`,
       "Pye locks your stake into a quarterly lockup period. At maturity, your full principal is returned to your wallet. The only thing you sell is the future yield — not the SOL itself.",
       "Think of it as a loan against your future rewards, repaid by the rewards themselves.",
     ],
@@ -96,7 +96,25 @@ const LEARN_ITEMS: LearnItem[] = [
     body: [
       "Positions are locked into quarterly maturity dates: Jun 30, Sep 30, Dec 31, or Mar 31. The further out the maturity, the more future rewards you're selling — so you receive a larger upfront payment.",
       "Longer durations also earn a points multiplier: 2x for Q3, 3x for Q4, and 4x for Q1. Points accumulate on your locked position for the duration of the lockup.",
-      "You cannot change your maturity date after signing, but you can exit early by selling your position on the secondary market.",
+      "You cannot change your maturity date after signing. Your position is locked until the maturity date.",
+    ],
+  },
+  {
+    title: "What is a PT?",
+    teaser: "The token that represents your locked stake.",
+    body: [
+      "A PT (Principal Token) is a 1:1 tokenised claim on your staked SOL. When you enter a Yield Forward position, your stake is locked and you receive PT in return.",
+      "The PT accrues no staking rewards — those were sold upfront. It simply represents your right to reclaim the original SOL at maturity.",
+      "At the maturity date, you redeem your PT to get your full principal back. Until then, the PT sits in your wallet as proof of your locked position.",
+    ],
+  },
+  {
+    title: "Redemption & withdrawals",
+    teaser: "How and when you get your SOL back.",
+    body: [
+      "Your staked SOL is returned at the maturity date of your position. To reclaim it, you redeem the PT in your wallet using the Manage tab — this burns the PT and initiates the unstaking process.",
+      "After redemption, Solana's standard cooldown period applies (typically one epoch, or ~2 days). Once the cooldown completes, the SOL is deposited directly into your wallet.",
+      "You cannot redeem early. Your position is locked until the maturity date shown when you signed the transaction.",
     ],
   },
   {
@@ -106,24 +124,6 @@ const LEARN_ITEMS: LearnItem[] = [
       "The fee represents the cost of instant liquidity. It's deducted from your estimated yield and shown as a percentage on the quote screen before you sign.",
       "You receive slightly less than the raw estimated yield — the difference goes to the buyer who is taking on the time risk of holding your rewards until maturity.",
       "The exact fee depends on your chosen discount rate and market conditions at the time of execution.",
-    ],
-  },
-  {
-    title: "Early exit",
-    teaser: "You can sell your locked position before maturity.",
-    body: [
-      "If you need to exit before your maturity date, you can sell your locked position on the Pye secondary market at app.pye.fi/trade.",
-      "The price you receive depends on what buyers are willing to pay at that moment — it may be more or less than what you'd receive at maturity.",
-      "Early exit liquidity is not guaranteed and depends entirely on market demand. Plan your position size accordingly.",
-    ],
-  },
-  {
-    title: "Coming soon",
-    teaser: "Yield Swap and Fixed Yield are on the way.",
-    body: [
-      "Yield Swap will let you stake SOL and receive BTC instead of SOL rewards — useful if you want exposure to a different asset without manually converting.",
-      "Fixed Yield will offer a guaranteed rate upfront, removing uncertainty about what your position will return over the lock-up period.",
-      "Both products will appear in the Earn tab when they launch. Points earned now will carry over to the full platform.",
     ],
   },
 ];
@@ -207,11 +207,14 @@ function PositionsTab() {
   const wallet = useWallet();
   const walletStatus = useWalletStore((s) => s.status);
   const walletBalances = useBalanceStore((s) => s.walletBalances);
+  const navigate = useWidgetStore((s) => s.navigate);
 
   const redeemingMint = useWidgetStore((s) => s.redeemingMint);
   const setRedeemingMint = useWidgetStore((s) => s.setRedeemingMint);
   const redeemError = useWidgetStore((s) => s.redeemError);
   const setRedeemError = useWidgetStore((s) => s.setRedeemError);
+  const setRedeemAmountSol = useWidgetStore((s) => s.setRedeemAmountSol);
+  const setRedeemTxSignature = useWidgetStore((s) => s.setRedeemTxSignature);
   const setWalletBalances = useBalanceStore((s) => s.setWalletBalances);
   const setUserStakeAccounts = useBalanceStore((s) => s.setUserStakeAccounts);
   const setBalanceLamports = useWalletStore((s) => s.setBalanceLamports);
@@ -253,7 +256,7 @@ function PositionsTab() {
     setRedeemError(null);
     setRedeemingMint(p.ptMint);
     try {
-      await executeRedeem({
+      const { signature } = await executeRedeem({
         connection,
         wallet,
         bondPubkey: p.bond.pubkey,
@@ -262,6 +265,9 @@ function PositionsTab() {
         ptAmountLamports: p.ptAmountLamports,
         rtAmountLamports: 0,
       });
+      setRedeemAmountSol(p.ptAmountLamports / LAMPORTS_PER_SOL);
+      setRedeemTxSignature(signature);
+      navigate("redeem-complete");
     } catch (err) {
       setRedeemError(err instanceof Error ? err.message : "Redeem failed");
     } finally {
@@ -278,7 +284,7 @@ function PositionsTab() {
         .then(setUserStakeAccounts)
         .catch(() => {});
     }
-  }, [connection, wallet, setBalanceLamports, setWalletBalances, setUserStakeAccounts]);
+  }, [connection, wallet, setRedeemError, setRedeemingMint, setRedeemAmountSol, setRedeemTxSignature, navigate, setBalanceLamports, setWalletBalances, setUserStakeAccounts]);
 
   const isConnected = walletStatus === "connected";
 
@@ -292,7 +298,7 @@ function PositionsTab() {
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <p style={font(14, c.primary)}>Your positions</p>
-            <Tooltip text="Each PT (Principal Token) is a 1:1 tokenised claim on your staked SOL. It accrues no rewards — those were sold upfront. Redeem at maturity to receive your full SOL stake back." />
+            <Tooltip position="below" text="Each PT (Principal Token) is a 1:1 tokenised claim on your staked SOL. It accrues no rewards — those were sold upfront. Redeem at maturity to receive your full SOL stake back." />
           </div>
           <p style={font(12, c.secondary)}>Each PT is 1:1 redeemable for your staked SOL at maturity.</p>
         </div>
@@ -317,14 +323,16 @@ function PositionsTab() {
             <p style={font(12, c.secondary)}>Connect a wallet to view your PT positions.</p>
           </div>
         ) : positions.length > 0 ? (
-          positions.map(p => (
-            <PositionRow
-              key={p.ptMint}
-              position={p}
-              onRedeem={handleRedeem}
-              isRedeeming={redeemingMint === p.ptMint}
-            />
-          ))
+          <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
+            {positions.map(p => (
+              <PositionRow
+                key={p.ptMint}
+                position={p}
+                onRedeem={handleRedeem}
+                isRedeeming={redeemingMint === p.ptMint}
+              />
+            ))}
+          </div>
         ) : (
           <div style={{
             flex: 1, display: "flex", flexDirection: "column",
@@ -374,12 +382,11 @@ function LearnArticle({ article, onBack }: { article: LearnItem; onBack: () => v
     <>
       <StepHeader label={article.title} onBack={onBack} onClose={onBack} />
       <Body padding={16}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 12, flex: 1, overflowY: "auto", minHeight: 0 }}>
           {article.body.map((para, i) => (
             <p key={i} style={font(14, i === 0 ? c.primary : c.secondary)}>{para}</p>
           ))}
         </div>
-        <Spacer />
       </Body>
     </>
   );
@@ -387,12 +394,13 @@ function LearnArticle({ article, onBack }: { article: LearnItem; onBack: () => v
 
 // ─── LearnTab ─────────────────────────────────────────────────────────────────
 
-function LearnTab({ onSelect }: { onSelect: (item: LearnItem) => void }) {
+function LearnTab({ onSelect, validatorName }: { onSelect: (item: LearnItem) => void; validatorName: string }) {
+  const items = useMemo(() => getLearnItems(validatorName), [validatorName]);
   return (
     <Body padding={16}>
       <p style={{ ...displayFont(45, c.primary), letterSpacing: "-0.02em" }}>Learn</p>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {LEARN_ITEMS.map(item => (
+        {items.map(item => (
           <LearnCard key={item.title} title={item.title} teaser={item.teaser} onClick={() => onSelect(item)} />
         ))}
       </div>
@@ -468,7 +476,7 @@ export default function HomeScreen({ validatorName }: HomeScreenProps) {
       ) : homeTab === "learn" ? (
         learnArticle
           ? <LearnArticle article={learnArticle} onBack={() => setLearnArticle(null)} />
-          : <LearnTab onSelect={setLearnArticle} />
+          : <LearnTab onSelect={setLearnArticle} validatorName={validatorName ?? "your validator"} />
       ) : (
         <Body padding={16}>
           <p style={{ ...displayFont(45, c.primary), letterSpacing: "-0.02em" }}>
@@ -508,7 +516,7 @@ export default function HomeScreen({ validatorName }: HomeScreenProps) {
             boxShadow: `inset 0 -1px 0 ${c.highlight}`,
           }}>
             <p style={font(12, c.primary)}>
-              <strong style={{ fontWeight: 600 }}>Your SOL stays with {validatorName ?? "Kiln"}.</strong>{" "}
+              <strong style={{ fontWeight: 600 }}>Your SOL stays with {validatorName ?? "your validator"}.</strong>{" "}
               We lock your position into a quarterly Pye lockup. Your stake keeps earning. Your principal comes back at maturity.
             </p>
           </div>
