@@ -1,8 +1,7 @@
 import { useWidgetStore } from "../../stores/widget-store";
-import { useBalanceStore, useWalletStore } from "@pye/sdk/react";
-import { getPyeConfig } from "@pye/sdk";
+import { useBalanceStore } from "@pye/sdk/react";
+// TODO(SIMD-185): restore getPyeConfig, SolIcon, useWalletStore imports when re-enabling liquid SOL deposit
 import { StepTitle, RowGroup, Spacer, SelectableRow } from "../shared/Layout";
-import { SolIcon } from "../Icons";
 
 const LAMPORTS_PER_SOL = 1_000_000_000;
 
@@ -11,22 +10,11 @@ export default function SelectPosition() {
   const selectStakeAccount = useWidgetStore((s) => s.selectStakeAccount);
 
   const userStakeAccounts = useBalanceStore((s) => s.userStakeAccounts);
-  const balanceLamports = useWalletStore((s) => s.balanceLamports);
 
   const activeAccounts = userStakeAccounts.filter((a) => a.state === "active");
 
-  // Only show Liquid SOL option in single-validator mode (voteAccount configured)
-  const isSingleValidator = !!getPyeConfig().voteAccount;
-  const hasLiquidSol = isSingleValidator && balanceLamports != null && balanceLamports > 0;
-
   const handleSelectStake = (pubkey: string, lamports: number, validatorName?: string, validatorIcon?: string, validatorVoteAccount?: string) => {
     selectStakeAccount(pubkey, lamports / LAMPORTS_PER_SOL, validatorName, validatorIcon, validatorVoteAccount);
-    navigate("choose-amount");
-  };
-
-  const handleSelectLiquidSol = () => {
-    if (balanceLamports == null) return;
-    selectStakeAccount("liquid-sol", balanceLamports / LAMPORTS_PER_SOL);
     navigate("choose-amount");
   };
 
@@ -57,7 +45,10 @@ export default function SelectPosition() {
             onClick={() => handleSelectStake(account.pubkey, account.lamports, account.validatorName, account.validatorIcon, account.validatorVoteAccount)}
           />
         ))}
-        {hasLiquidSol && (
+        {/* TODO(SIMD-185): Re-enable liquid SOL deposit once transient account flow is fixed.
+            Restore: getPyeConfig, SolIcon imports; hasLiquidSol, handleSelectLiquidSol,
+            balanceLamports declarations; and the SelectableRow block below.
+        hasLiquidSol && (
           <SelectableRow
             icon={<SolIcon />}
             label="Liquid SOL"
@@ -65,7 +56,7 @@ export default function SelectPosition() {
             amount={(balanceLamports / LAMPORTS_PER_SOL).toFixed(4)}
             onClick={handleSelectLiquidSol}
           />
-        )}
+        ) */}
       </RowGroup>
       <Spacer />
     </>
