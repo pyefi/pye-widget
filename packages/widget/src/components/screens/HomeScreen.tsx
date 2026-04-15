@@ -7,6 +7,8 @@ import {
   maturities,
   validators,
   executeRedeem,
+  fetchBalances,
+  fetchUserStakeAccounts,
   type ValidatorId,
   type MaturityId,
   type Bond,
@@ -210,7 +212,8 @@ function PositionsTab() {
   const setRedeemingMint = useWidgetStore((s) => s.setRedeemingMint);
   const redeemError = useWidgetStore((s) => s.redeemError);
   const setRedeemError = useWidgetStore((s) => s.setRedeemError);
-  const requestRefresh = useBalanceStore((s) => s.requestRefresh);
+  const setWalletBalances = useBalanceStore((s) => s.setWalletBalances);
+  const setUserStakeAccounts = useBalanceStore((s) => s.setUserStakeAccounts);
   const setBalanceLamports = useWalletStore((s) => s.setBalanceLamports);
 
   const ptLookup = useMemo(() => buildPtLookup(), []);
@@ -263,13 +266,19 @@ function PositionsTab() {
       setRedeemError(err instanceof Error ? err.message : "Redeem failed");
     } finally {
       setRedeemingMint(null);
-      requestRefresh();
-      try {
-        const balance = await connection.getBalance(wallet.publicKey!, "confirmed");
-        setBalanceLamports(balance);
-      } catch { /* ignore — syncer will pick it up */ }
+      // Refresh all balances regardless of success/failure
+      const owner = wallet.publicKey!;
+      connection.getBalance(owner, "confirmed")
+        .then(setBalanceLamports)
+        .catch(() => {});
+      fetchBalances(connection, owner)
+        .then(setWalletBalances)
+        .catch(() => {});
+      fetchUserStakeAccounts(connection, owner)
+        .then(setUserStakeAccounts)
+        .catch(() => {});
     }
-  }, [connection, wallet, requestRefresh, setBalanceLamports]);
+  }, [connection, wallet, setBalanceLamports, setWalletBalances, setUserStakeAccounts]);
 
   const isConnected = walletStatus === "connected";
 
