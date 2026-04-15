@@ -73,11 +73,13 @@ export default function ChooseDuration() {
     const bestBid = rtMarket?.bestBidPrice ?? null;
 
     // Gross yield: RT amount (1:1 with deposit) × best bid price (SOL per RT)
-    // Fallback: MARKET_RATE is 0.85 (i.e. 0.85%), so divide by 100 once to get 0.0085
+    // Fallback: MARKET_RATE is annual (0.85%), scaled by time remaining so Q2–Q4 differ
+    const maturityTs = Number(maturities[matId].maturity_timestamp);
+    const yearsRemaining = Math.max(0, (maturityTs - Date.now() / 1000) / (365.25 * 86400));
     const grossYield =
       bestBid != null
         ? bestBid * parsedAmount
-        : parsedAmount * (MARKET_RATE / 100);
+        : parsedAmount * (MARKET_RATE / 100) * yearsRemaining;
 
     return { matId, ...info, bestBid, grossYield };
   });
@@ -89,7 +91,7 @@ export default function ChooseDuration() {
       <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <p style={font(14, c.primary)}>Choose a staking duration</p>
-          <Tooltip text="Lock your stake until the chosen date. All staking rewards for the period are sold to you upfront today. Your full SOL stake is returned at maturity." />
+          <Tooltip position="below" text="Lock your stake until the chosen date. All staking rewards for the period are sold to you upfront today. Your full SOL stake is returned at maturity." />
         </div>
         <p style={font(12, c.secondary)}>
           All rewards for the period are paid to you today. Your stake is
@@ -154,13 +156,10 @@ export default function ChooseDuration() {
                   fontVariantNumeric: "lining-nums tabular-nums",
                 }}
               >
-                +{formatSolAmount(sel.grossYield, 3)} SOL
+                {sel.grossYield < 0.0001
+                  ? "< 0.0001 SOL"
+                  : `+${formatSolAmount(sel.grossYield, 3)} SOL`}
               </p>
-              {parsedAmount > 0 && (
-                <p style={font(14, c.green)}>
-                  +{((sel.grossYield / parsedAmount) * 100).toFixed(2)}%
-                </p>
-              )}
             </div>
             {sel.pts && (
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>

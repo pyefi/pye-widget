@@ -16,13 +16,18 @@ export default function ChooseAmount() {
   const parsed = parseFloat(depositAmount);
   const pcts = [0.25, 0.5, 0.75, 1];
 
+  const isLiquidSol = selectedPubkey === "liquid-sol";
+  const GAS_RESERVE = 0.01;
+
   let error: string | null = null;
+  let warning: string | null = null;
   if (depositAmount && parsed <= 0) error = "Amount must be greater than 0";
   if (depositAmount && parsed > available) error = `Maximum available is ${available} SOL`;
+  if (!error && isLiquidSol && parsed > 0 && parsed >= available - GAS_RESERVE)
+    warning = "This leaves very little SOL for transaction fees";
 
   const isValid = !!depositAmount && !error && parsed > 0;
 
-  const isLiquidSol = selectedPubkey === "liquid-sol";
   const icon = isLiquidSol ? <SolIcon /> : (
     validatorIcon ? (
       <img
@@ -32,7 +37,7 @@ export default function ChooseAmount() {
       />
     ) : <SolIcon />
   );
-  const label = isLiquidSol ? "Liquid SOL" : "Staked SOL";
+  const label = isLiquidSol ? "SOL" : "Staked SOL";
   const sub =
     isLiquidSol ? "" :
     validatorName ? validatorName :
@@ -85,6 +90,7 @@ export default function ChooseAmount() {
         </div>
 
         <InlineError message={error ?? ""} />
+        {!error && warning && <p style={{ ...font(12, c.red), marginTop: 4 }}>{warning}</p>}
 
         {/* % badges */}
         <div style={{ display: "flex", gap: 8 }}>
@@ -93,7 +99,15 @@ export default function ChooseAmount() {
               key={p}
               type="button"
               className="pye-hoverable"
-              onClick={() => setDepositAmount((available * p).toFixed(4))}
+              onClick={() => {
+                if (p === 1) {
+                  setDepositAmount(isLiquidSol
+                    ? Math.max(0, available - GAS_RESERVE).toFixed(4)
+                    : String(available));
+                } else {
+                  setDepositAmount((available * p).toFixed(4));
+                }
+              }}
               style={{
                 flex: 1, height: 24, borderRadius: 4,
                 border: "none",

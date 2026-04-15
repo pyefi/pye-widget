@@ -24,41 +24,39 @@ export default function SelectPosition() {
         title="Select a position"
         subtitle="We'll sell the future rewards from this position upfront."
       />
-      <RowGroup>
-        {activeAccounts.map((account) => (
-          <SelectableRow
-            key={account.pubkey}
-            icon={
-              <img
-                src={account.validatorIcon}
-                alt={account.validatorName}
-                style={{
-                  width: 36, height: 36, borderRadius: "50%", flexShrink: 0,
-                  objectFit: "cover",
-                  boxShadow: "0px 4px 8px 0px rgba(0,0,0,0.07)",
-                }}
-              />
-            }
-            label="Staked SOL"
-            sub={account.validatorName || `${account.pubkey.slice(0, 8)}...`}
-            amount={(account.lamports / LAMPORTS_PER_SOL).toFixed(4)}
-            onClick={() => handleSelectStake(account.pubkey, account.lamports, account.validatorName, account.validatorIcon, account.validatorVoteAccount)}
-          />
-        ))}
-        {/* TODO(SIMD-185): Re-enable liquid SOL deposit once transient account flow is fixed.
-            Restore: getPyeConfig, SolIcon imports; hasLiquidSol, handleSelectLiquidSol,
-            balanceLamports declarations; and the SelectableRow block below.
-        hasLiquidSol && (
-          <SelectableRow
-            icon={<SolIcon />}
-            label="Liquid SOL"
-            sub="Unstaked"
-            amount={(balanceLamports / LAMPORTS_PER_SOL).toFixed(4)}
-            onClick={handleSelectLiquidSol}
-          />
-        ) */}
-      </RowGroup>
-      <Spacer />
+      <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
+        <RowGroup>
+          {activeAccounts.map((account) => (
+            <SelectableRow
+              key={account.pubkey}
+              icon={
+                <img
+                  src={account.validatorIcon}
+                  alt={account.validatorName}
+                  style={{
+                    width: 36, height: 36, borderRadius: "50%", flexShrink: 0,
+                    objectFit: "cover",
+                    boxShadow: "0px 4px 8px 0px rgba(0,0,0,0.07)",
+                  }}
+                />
+              }
+              label="Staked SOL"
+              sub={account.validatorName || `${account.pubkey.slice(0, 8)}...`}
+              amount={(account.lamports / LAMPORTS_PER_SOL).toFixed(4)}
+              onClick={() => handleSelectStake(account.pubkey, account.lamports, account.validatorName, account.validatorIcon, account.validatorVoteAccount)}
+            />
+          ))}
+          {hasLiquidSol && (
+            <SelectableRow
+              icon={<SolIcon />}
+              label="SOL"
+              sub="Unstaked"
+              amount={(balanceLamports / LAMPORTS_PER_SOL).toFixed(4)}
+              onClick={handleSelectLiquidSol}
+            />
+          )}
+        </RowGroup>
+      </div>
     </>
   );
 }
