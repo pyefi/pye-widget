@@ -48,6 +48,8 @@ export interface BalanceState {
   /** User's native stake accounts */
   userStakeAccounts: UserStakeAccount[];
   userStakeAccountsLoading: boolean;
+  /** Bumped to trigger a balance refresh in BalanceSyncer */
+  refreshNonce: number;
 }
 
 export interface BalanceActions {
@@ -61,6 +63,7 @@ export interface BalanceActions {
   setUserStakeAccounts: (accounts: UserStakeAccount[]) => void;
   setUserStakeAccountsLoading: (loading: boolean) => void;
   resetBalances: () => void;
+  requestRefresh: () => void;
 }
 
 export type BalanceStore = BalanceState & BalanceActions;
@@ -87,6 +90,7 @@ export function createBalanceStore() {
       perMarketBaseBalances: {},
       userStakeAccounts: [],
       userStakeAccountsLoading: false,
+      refreshNonce: 0,
 
       setWalletBalances(updates) {
         set((s) => {
@@ -161,6 +165,12 @@ export function createBalanceStore() {
           s.perMarketBaseBalances = {};
           s.userStakeAccounts = [];
           s.userStakeAccountsLoading = false;
+        });
+      },
+
+      requestRefresh() {
+        set((s) => {
+          s.refreshNonce += 1;
         });
       },
     })),

@@ -13,7 +13,7 @@ import {
   allowedLockups,
   lookupBondByVoteAccount,
 } from "@pye/sdk";
-import { useMarketStore, useBalanceStore } from "@pye/sdk/react";
+import { useMarketStore, useBalanceStore, useWalletStore } from "@pye/sdk/react";
 import { c, font, displayFont, MARKET_RATE, pointsMap, formatSolAmount } from "../design-system";
 import { StepTitle, CTA, Tooltip, Spacer } from "../shared/Layout";
 
@@ -147,6 +147,8 @@ export default function ReviewQuote() {
 
   const markets = useMarketStore((s) => s.markets);
   const userStakeAccounts = useBalanceStore((s) => s.userStakeAccounts);
+  const requestRefresh = useBalanceStore((s) => s.requestRefresh);
+  const setBalanceLamports = useWalletStore((s) => s.setBalanceLamports);
 
   const parsedAmount = parseFloat(depositAmount) || 0;
   const maturity = selectedMaturityId ? maturities[selectedMaturityId] : null;
@@ -275,6 +277,13 @@ export default function ReviewQuote() {
         null,
         err instanceof Error ? err.message : "Transaction failed",
       );
+    } finally {
+      requestRefresh();
+      // Also refresh SOL balance immediately
+      try {
+        const balance = await connection.getBalance(wallet.publicKey!, "confirmed");
+        setBalanceLamports(balance);
+      } catch { /* ignore — syncer will pick it up */ }
     }
   }, [
     rtMarket,
@@ -292,6 +301,8 @@ export default function ReviewQuote() {
     setTxStep,
     setSellAmountSol,
     navigate,
+    requestRefresh,
+    setBalanceLamports,
   ]);
 
   return (

@@ -210,6 +210,8 @@ function PositionsTab() {
   const setRedeemingMint = useWidgetStore((s) => s.setRedeemingMint);
   const redeemError = useWidgetStore((s) => s.redeemError);
   const setRedeemError = useWidgetStore((s) => s.setRedeemError);
+  const requestRefresh = useBalanceStore((s) => s.requestRefresh);
+  const setBalanceLamports = useWalletStore((s) => s.setBalanceLamports);
 
   const ptLookup = useMemo(() => buildPtLookup(), []);
 
@@ -261,8 +263,13 @@ function PositionsTab() {
       setRedeemError(err instanceof Error ? err.message : "Redeem failed");
     } finally {
       setRedeemingMint(null);
+      requestRefresh();
+      try {
+        const balance = await connection.getBalance(wallet.publicKey!, "confirmed");
+        setBalanceLamports(balance);
+      } catch { /* ignore — syncer will pick it up */ }
     }
-  }, [connection, wallet]);
+  }, [connection, wallet, requestRefresh, setBalanceLamports]);
 
   const isConnected = walletStatus === "connected";
 
