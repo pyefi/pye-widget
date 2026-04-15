@@ -12,8 +12,10 @@ import {
   checkSellLiquidity,
   allowedLockups,
   lookupBondByVoteAccount,
+  fetchBalances,
+  fetchUserStakeAccounts,
 } from "@pye/sdk";
-import { useMarketStore, useBalanceStore } from "@pye/sdk/react";
+import { useMarketStore, useBalanceStore, useWalletStore } from "@pye/sdk/react";
 import { c, font, displayFont, MARKET_RATE, pointsMap, formatSolAmount } from "../design-system";
 import { StepTitle, CTA, Tooltip, Spacer } from "../shared/Layout";
 
@@ -147,6 +149,9 @@ export default function ReviewQuote() {
 
   const markets = useMarketStore((s) => s.markets);
   const userStakeAccounts = useBalanceStore((s) => s.userStakeAccounts);
+  const setWalletBalances = useBalanceStore((s) => s.setWalletBalances);
+  const setUserStakeAccounts = useBalanceStore((s) => s.setUserStakeAccounts);
+  const setBalanceLamports = useWalletStore((s) => s.setBalanceLamports);
 
   const parsedAmount = parseFloat(depositAmount) || 0;
   const maturity = selectedMaturityId ? maturities[selectedMaturityId] : null;
@@ -275,6 +280,18 @@ export default function ReviewQuote() {
         null,
         err instanceof Error ? err.message : "Transaction failed",
       );
+    } finally {
+      // Refresh all balances regardless of success/failure
+      const owner = wallet.publicKey!;
+      connection.getBalance(owner, "confirmed")
+        .then(setBalanceLamports)
+        .catch(() => {});
+      fetchBalances(connection, owner)
+        .then(setWalletBalances)
+        .catch(() => {});
+      fetchUserStakeAccounts(connection, owner)
+        .then(setUserStakeAccounts)
+        .catch(() => {});
     }
   }, [
     rtMarket,
@@ -292,6 +309,9 @@ export default function ReviewQuote() {
     setTxStep,
     setSellAmountSol,
     navigate,
+    setBalanceLamports,
+    setWalletBalances,
+    setUserStakeAccounts,
   ]);
 
   return (
