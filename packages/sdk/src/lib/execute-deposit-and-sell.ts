@@ -1,0 +1,274 @@
+import "./manifest-parser"; // BigInt Buffer polyfills
+import { ManifestClient } from "@cks-systems/manifest-sdk";
+import {
+  ComputeBudgetProgram,
+  Connection,
+  Keypair,
+  PublicKey,
+  StakeProgram,
+  Transaction,
+  TransactionInstruction,
+} from "@solana/web3.js";
+import {
+  ASSOCIATED_TOKEN_PROGRAM_ID,
+  NATIVE_MINT,
+  TOKEN_PROGRAM_ID,
+  createAssociatedTokenAccountIdempotentInstruction,
+  createCloseAccountInstruction,
+  getAssociatedTokenAddressSync,
+} from "@solana/spl-token";
+import type { WalletContextState } from "@solana/wallet-adapter-react";
+
+// ─── Shared constants (mirrors execute-stake-deposit.ts) ──────────────────────
+
+const BONDS_PROGRAM_ID = new PublicKey(
+  "PYEQZ2qYHPQapnw8Ms8MSPMNzoq59NHHfNwAtuV26wx",
+);
+
+const DEPOSIT_STAKE_DISCRIMINATOR = new Uint8Array([
+  21, 14, 117, 220, 1, 60, 23, 13,
+]);
+
+const SYSVAR_CLOCK = new PublicKey("SysvarC1ock11111111111111111111111111111111");
+const STAKE_PROGRAM = new PublicKey("Stake11111111111111111111111111111111111111");
+const SYSVAR_STAKE_HISTORY = new PublicKey("SysvarStakeHistory1111111111111111111111111");
+
+function deriveGlobalSettings(): PublicKey {
+  const [pda] = PublicKey.findProgramAddressSync(
+    [Buffer.from("global_settings")],
+    BONDS_PROGRAM_ID,
+  );
+  return pda;
+}
+
+function deriveStakeAccount(bond: PublicKey): PublicKey {
+  const [pda] = PublicKey.findProgramAddressSync(
+    [Buffer.from("stake"), bond.toBuffer()],
+    BONDS_PROGRAM_ID,
+  );
+  return pda;
+}
+
+async function fetchProtocolFeeWallet(
+  connection: Connection,
+  globalSettingsPda: PublicKey,
+): Promise<PublicKey> {
+  const info = await connection.getAccountInfo(globalSettingsPda);
+  if (!info?.data) throw new Error("GlobalSettings account not found");
+  return new PublicKey(info.data.subarray(40, 72));
+}
+
+async function fetchTransientStakeAccount(
+  connection: Connection,
+  bond: PublicKey,
+): Promise<PublicKey> {
+  const info = await connection.getAccountInfo(bond);
+  if (!info?.data) throw new Error("Bond account not found");
+  return new PublicKey(info.data.subarray(72, 104));
+}
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+export interface ExecuteDepositAndSellParams {
+  connection: Connection;
+  wallet: WalletContextState;
+  // deposit
+  bondPubkey: string;
+  principalTokenMint: string;
+  yieldTokenMint: string;
+  validatorVoteAccount: string;
+  stakeAccountPubkey: string;
+  amountSol: number;
+  stakeBalanceSol: number;
+  // sell
+  marketPubkey: string;
+  minReceiveTokens: number;
+}
+
+export interface ExecuteDepositAndSellResult {
+  signature: string;
+}
+
+// ─── Bundled transaction ──────────────────────────────────────────────────────
+
+/**
+ * Deposits a stake account into the Pye lockup and immediately sells the
+ * resulting RT tokens on Manifest — all in a single atomic transaction.
+ *
+ * Instruction order:
+ *   1. ComputeBudget (limit + price)
+ *   2. StakeProgram.split (only if partial deposit)
+ *   3. createATA: ownerPt, ownerYt (RT), feeWalletPt, feeWalletYt, wSOL
+ *   4. Bonds deposit → mints PT + RT into ownerPt / ownerYt
+ *   5. Manifest swapIx → sells RT for wSOL
+ *   6. closeAccount → unwraps wSOL to native SOL
+ */
+export async function executeDepositAndSell({
+  connection,
+  wallet,
+  bondPubkey,
+  principalTokenMint,
+  yieldTokenMint,
+  validatorVoteAccount,
+  stakeAccountPubkey,
+  amountSol,
+  stakeBalanceSol,
+  marketPubkey,
+  minReceiveTokens,
+}: ExecuteDepositAndSellParams): Promise<ExecuteDepositAndSellResult> {
+  if (!wallet.publicKey || !wallet.sendTransaction) {
+    throw new Error("Wallet not connected");
+  }
+
+  const owner = wallet.publicKey;
+  const bond = new PublicKey(bondPubkey);
+  const ptMint = new PublicKey(principalTokenMint);
+  const ytMint = new PublicKey(yieldTokenMint);
+  const voteAccount = new PublicKey(validatorVoteAccount);
+  const userStake = new PublicKey(stakeAccountPubkey);
+  const marketPk = new PublicKey(marketPubkey);
+
+  const globalSettingsPda = deriveGlobalSettings();
+  const stakeAccountPda = deriveStakeAccount(bond);
+
+  // Fetch all on-chain prerequisites in parallel
+  const [
+    protocolFeeWallet,
+    transientStakeAccount,
+    rentExemptReserve,
+    latestBlockhash,
+    manifestClient,
+  ] = await Promise.all([
+    fetchProtocolFeeWallet(connection, globalSettingsPda),
+    fetchTransientStakeAccount(connection, bond),
+    connection.getMinimumBalanceForRentExemption(StakeProgram.space),
+    connection.getLatestBlockhash("confirmed"),
+    ManifestClient.getClientReadOnly(connection, marketPk),
+  ]);
+
+  // Derive ATAs
+  const ownerPt   = getAssociatedTokenAddressSync(ptMint, owner);
+  const ownerYt   = getAssociatedTokenAddressSync(ytMint, owner);
+  const feeWalletPt = getAssociatedTokenAddressSync(ptMint, protocolFeeWallet, true);
+  const feeWalletYt = getAssociatedTokenAddressSync(ytMint, protocolFeeWallet, true);
+  const wsolAta   = getAssociatedTokenAddressSync(NATIVE_MINT, owner, false, TOKEN_PROGRAM_ID);
+
+  const amountLamports = Math.round(amountSol * 1e9);
+  const totalLamports  = Math.round(stakeBalanceSol * 1e9);
+  const isPartial      = amountLamports < totalLamports;
+
+  // Swap parameters — RT is 1:1 with deposited SOL
+  const baseDecimals  = manifestClient.market.baseDecimals();
+  const quoteDecimals = manifestClient.market.quoteDecimals();
+  const inAtoms  = BigInt(Math.round(amountSol * 10 ** baseDecimals));
+  const outAtoms = BigInt(Math.round(minReceiveTokens * 10 ** quoteDecimals));
+
+  // ── Build transaction ──────────────────────────────────────────────────────
+
+  const tx = new Transaction();
+  tx.recentBlockhash = latestBlockhash.blockhash;
+  tx.feePayer = owner;
+
+  // Combined compute budget for deposit (~400k) + Manifest swap (~150k)
+  tx.add(ComputeBudgetProgram.setComputeUnitLimit({ units: 550_000 }));
+  tx.add(ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 1_000 }));
+
+  // Optional stake split for partial deposits
+  let depositStakeAccount: PublicKey;
+  let splitKeypair: Keypair | null = null;
+
+  if (isPartial) {
+    splitKeypair = Keypair.generate();
+    tx.add(
+      StakeProgram.split(
+        {
+          stakePubkey: userStake,
+          authorizedPubkey: owner,
+          splitStakePubkey: splitKeypair.publicKey,
+          lamports: amountLamports,
+        },
+        rentExemptReserve,
+      ),
+    );
+    depositStakeAccount = splitKeypair.publicKey;
+  } else {
+    depositStakeAccount = userStake;
+  }
+
+  // Create all token accounts needed by both legs (idempotent)
+  tx.add(createAssociatedTokenAccountIdempotentInstruction(owner, ownerPt,     owner,             ptMint));
+  tx.add(createAssociatedTokenAccountIdempotentInstruction(owner, ownerYt,     owner,             ytMint));
+  tx.add(createAssociatedTokenAccountIdempotentInstruction(owner, feeWalletPt, protocolFeeWallet, ptMint));
+  tx.add(createAssociatedTokenAccountIdempotentInstruction(owner, feeWalletYt, protocolFeeWallet, ytMint));
+  tx.add(createAssociatedTokenAccountIdempotentInstruction(owner, wsolAta,     owner,             NATIVE_MINT));
+
+  // Bonds deposit instruction — mints PT + RT into ownerPt / ownerYt
+  const isTransientSet = !transientStakeAccount.equals(PublicKey.default);
+  const remainingAccounts = isTransientSet
+    ? [{ pubkey: transientStakeAccount, isSigner: false, isWritable: true }]
+    : [];
+
+  tx.add(
+    new TransactionInstruction({
+      programId: BONDS_PROGRAM_ID,
+      keys: [
+        { pubkey: owner,             isSigner: true,  isWritable: true  },
+        { pubkey: depositStakeAccount, isSigner: false, isWritable: true },
+        { pubkey: ownerPt,           isSigner: false, isWritable: true  },
+        { pubkey: ownerYt,           isSigner: false, isWritable: true  },
+        { pubkey: bond,              isSigner: false, isWritable: false },
+        { pubkey: voteAccount,       isSigner: false, isWritable: false },
+        { pubkey: stakeAccountPda,   isSigner: false, isWritable: true  },
+        { pubkey: ptMint,            isSigner: false, isWritable: true  },
+        { pubkey: ytMint,            isSigner: false, isWritable: true  },
+        { pubkey: globalSettingsPda, isSigner: false, isWritable: false },
+        { pubkey: protocolFeeWallet, isSigner: false, isWritable: false },
+        { pubkey: feeWalletPt,       isSigner: false, isWritable: true  },
+        { pubkey: feeWalletYt,       isSigner: false, isWritable: true  },
+        { pubkey: ASSOCIATED_TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+        { pubkey: TOKEN_PROGRAM_ID,  isSigner: false, isWritable: false },
+        { pubkey: PublicKey.default, isSigner: false, isWritable: false },
+        { pubkey: SYSVAR_CLOCK,      isSigner: false, isWritable: false },
+        { pubkey: STAKE_PROGRAM,     isSigner: false, isWritable: false },
+        { pubkey: SYSVAR_STAKE_HISTORY, isSigner: false, isWritable: false },
+        ...remainingAccounts,
+      ],
+      data: Buffer.from(DEPOSIT_STAKE_DISCRIMINATOR),
+    }),
+  );
+
+  // Manifest swap — sells RT (ownerYt) for wSOL
+  tx.add(
+    manifestClient.swapIx(owner, {
+      inAtoms,
+      outAtoms,
+      isBaseIn: true,
+      isExactIn: true,
+    }),
+  );
+
+  // Unwrap wSOL → native SOL
+  tx.add(createCloseAccountInstruction(wsolAta, owner, owner));
+
+  // ── Send & confirm ─────────────────────────────────────────────────────────
+
+  const signers = splitKeypair ? [splitKeypair] : [];
+  const signature = await wallet.sendTransaction(tx, connection, { signers });
+
+  const confirmation = await connection.confirmTransaction(
+    {
+      signature,
+      blockhash: latestBlockhash.blockhash,
+      lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
+    },
+    "confirmed",
+  );
+
+  if (confirmation.value.err) {
+    throw new Error(
+      `Transaction failed on-chain: ${JSON.stringify(confirmation.value.err)}`,
+    );
+  }
+
+  return { signature };
+}

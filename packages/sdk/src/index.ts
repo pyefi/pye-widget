@@ -43,6 +43,8 @@ export type { LiquidityCheck } from "./lib/liquidity";
 
 // Lib — Transaction execution
 export { executeStakeDeposit, executeStakeAccountDeposit } from "./lib/execute-stake-deposit";
+export { executeDepositAndSell } from "./lib/execute-deposit-and-sell";
+export type { ExecuteDepositAndSellParams, ExecuteDepositAndSellResult } from "./lib/execute-deposit-and-sell";
 export type {
   ExecuteStakeDepositParams, ExecuteStakeDepositResult,
   ExecuteStakeAccountDepositParams,
