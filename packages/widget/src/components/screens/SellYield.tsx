@@ -146,6 +146,7 @@ export default function SellYield() {
       </div>
 
       {/* ── Position selector ── */}
+      <span style={font(12, c.secondary)}>Your available stake</span>
       {activeAccounts.length === 0 ? (
         <p style={{ ...font(13, c.secondary), textAlign: "center", padding: "4px 0" }}>
           No staked SOL found in your wallet.
