@@ -340,8 +340,8 @@ export default function ReviewQuote() {
             <Tooltip text="Estimated upfront payout based on current market rates, net of fees. The final amount is confirmed when your order fills on the Pye orderbook." />
           </div>
           <p style={{
-            ...displayFont(36, NEON),
-            lineHeight: 1.2,
+            ...font(36, NEON, 700),
+            letterSpacing: "-0.02em",
             fontVariantNumeric: "lining-nums tabular-nums",
             textShadow: "0 0 20px rgba(0,201,122,0.4)",
             marginBottom: slippage > 0 ? -4 : 0,

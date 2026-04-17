@@ -15,7 +15,7 @@ import {
 } from "@pye/sdk";
 import { useBalanceStore, useWalletStore, useMarketStore, useApyStore } from "@pye/sdk/react";
 import { Widget, Body, Footer, TabBar, StepHeader, Spacer } from "../shared/Layout";
-import { ProductIcon, IconYieldForward, IconYieldSwap, IconFixedYield } from "../Icons";
+import { ProductIcon, IconYieldForward } from "../Icons";
 import { c, font, displayFont, formatSolAmount } from "../design-system";
 
 const NEON = "#00c97a";
@@ -409,49 +409,6 @@ function LearnTab({ onSelect, validatorName }: { onSelect: (item: LearnItem) => 
   );
 }
 
-// ─── ProductRow ───────────────────────────────────────────────────────────────
-
-function ProductRow({ icon, label, sub, badge, onClick, disabled }: {
-  icon: React.ReactNode;
-  label: string;
-  sub: string;
-  badge?: string;
-  onClick?: () => void;
-  disabled?: boolean;
-}) {
-  return (
-    <div
-      className={!disabled && onClick ? "pye-hoverable" : undefined}
-      onClick={onClick}
-      style={{
-        background: c.raised,
-        borderTop: `1px solid ${c.highlight}`,
-        boxShadow: `inset 0 -1px 0 ${c.shadow}`,
-        borderRadius: 6, padding: 12,
-        display: "flex", alignItems: "center", gap: 12,
-        cursor: disabled ? "not-allowed" : onClick ? "pointer" : "default",
-        opacity: disabled ? 0.7 : 1,
-      }}
-    >
-      {icon}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 2 }}>
-        <p style={font(14, c.primary)}>{label}</p>
-        <p style={font(12, c.secondary)}>{sub}</p>
-      </div>
-      {badge && (
-        <div style={{
-          background: c.raised,
-          borderTop: `1px solid ${c.highlight}`,
-          boxShadow: `inset 0 -1px 0 ${c.shadow}`,
-          borderRadius: 4, padding: "2px 8px",
-        }}>
-          <p style={font(12, c.secondary)}>{badge}</p>
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ─── HomeScreen ───────────────────────────────────────────────────────────────
 
 export default function HomeScreen({ validatorName }: HomeScreenProps) {
@@ -526,33 +483,16 @@ export default function HomeScreen({ validatorName }: HomeScreenProps) {
               </svg>
             </div>
             <p style={font(12, c.secondary)}>Get your staking rewards upfront — today.</p>
-            <div style={{ marginTop: 10, display: "flex", alignItems: "baseline", gap: 8 }}>
+            <div style={{ marginTop: 10 }}>
               <p style={{
-                ...displayFont(28, NEON),
+                ...font(28, NEON, 700),
+                letterSpacing: "-0.02em",
                 fontVariantNumeric: "lining-nums tabular-nums",
                 textShadow: "0 0 16px rgba(0,201,122,0.3)",
               }}>
                 +{formatSolAmount(exampleYield, 3)} SOL
               </p>
-              <p style={font(12, c.secondary)}>for 100 SOL, 6mo</p>
             </div>
-          </div>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <ProductRow
-              disabled
-              icon={<ProductIcon><IconYieldSwap /></ProductIcon>}
-              label="Yield Swap"
-              sub="Stake SOL, earn BTC"
-              badge="Soon"
-            />
-            <ProductRow
-              disabled
-              icon={<ProductIcon><IconFixedYield /></ProductIcon>}
-              label="Fixed Yield"
-              sub="Lock in a fixed yield"
-              badge="Soon"
-            />
           </div>
 
           <Spacer />
