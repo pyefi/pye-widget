@@ -6,12 +6,27 @@ import { PyeWordmark } from "../Icons";
 export function Widget({ children }: { children: ReactNode }) {
   return (
     <div style={{
+      position: "relative",
       width: "min(420px, calc(100vw - 32px))", height: 600,
       borderRadius: 8,
-      boxShadow: "0px 4px 8px rgba(0,0,0,0.07)",
+      boxShadow: "0 0 0 1px rgba(154,77,255,0.18), 0 0 48px rgba(154,77,255,0.12), 0 4px 24px rgba(0,0,0,0.25)",
       display: "flex", flexDirection: "column",
       background: c.surface,
+      overflow: "hidden",
     }}>
+      {/* Aurora blobs */}
+      <div aria-hidden style={{
+        position: "absolute", top: -80, right: -80,
+        width: 240, height: 240, borderRadius: "50%",
+        background: "radial-gradient(circle, rgba(154,77,255,0.14) 0%, transparent 65%)",
+        pointerEvents: "none",
+      }} />
+      <div aria-hidden style={{
+        position: "absolute", bottom: -60, left: -60,
+        width: 200, height: 200, borderRadius: "50%",
+        background: "radial-gradient(circle, rgba(0,200,255,0.09) 0%, transparent 65%)",
+        pointerEvents: "none",
+      }} />
       {children}
     </div>
   );
@@ -91,7 +106,7 @@ export function StepHeader({ step, total, onBack, onClose, hideStep, label }: {
 
 // Dan's TabBar — gap:1 separator, each tab full elevation, corner radii
 export function TabBar({ active, onChange }: { active: string; onChange: (tab: string) => void }) {
-  const tabs = ["Yield Recipes", "Manage", "Learn"];
+  const tabs = ["Earn", "Positions", "Learn"];
   return (
     <div style={{
       display: "flex", flexShrink: 0,

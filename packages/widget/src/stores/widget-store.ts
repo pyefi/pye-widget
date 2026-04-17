@@ -8,6 +8,7 @@ export type WidgetScreen =
   | "home"
   | "yield-forward-intro"
   | "connect-wallet"
+  | "sell-yield"
   | "select-position"
   | "choose-amount"
   | "choose-duration"
