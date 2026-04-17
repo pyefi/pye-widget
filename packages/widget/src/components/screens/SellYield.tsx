@@ -1,4 +1,4 @@
-import { useMemo, useEffect } from "react";
+import { useMemo, useEffect, useRef } from "react";
 import { useWidgetStore } from "../../stores/widget-store";
 import { maturities, type MaturityId, lookupBondByVoteAccount } from "@pye/sdk";
 import { useMarketStore, useBalanceStore } from "@pye/sdk/react";
@@ -61,6 +61,16 @@ export default function SellYield() {
       );
     }
   }, [selectedStakeAccountPubkey, activeAccounts, selectStakeAccount]);
+
+  // Auto-fill amount with full balance on first arrival so the quote is immediately visible.
+  // The ref guard means we only fire once per mount — if the user clears the input we don't fight them.
+  const autoFilled = useRef(false);
+  useEffect(() => {
+    if (!autoFilled.current && !depositAmount && selectedBalance > 0) {
+      setDepositAmount(String(selectedBalance));
+      autoFilled.current = true;
+    }
+  }, [selectedBalance, depositAmount, setDepositAmount]);
 
   // Auto-select first available maturity
   useEffect(() => {
