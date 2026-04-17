@@ -7,7 +7,7 @@ export function Widget({ children }: { children: ReactNode }) {
   return (
     <div style={{
       position: "relative",
-      width: "min(420px, calc(100vw - 32px))", height: 600,
+      width: "min(420px, calc(100vw - 32px))",
       borderRadius: 8,
       boxShadow: "0 0 0 1px rgba(154,77,255,0.18), 0 0 48px rgba(154,77,255,0.12), 0 4px 24px rgba(0,0,0,0.25)",
       display: "flex", flexDirection: "column",
@@ -35,14 +35,13 @@ export function Widget({ children }: { children: ReactNode }) {
 export function Body({ children, padding = 16, style }: { children: ReactNode; padding?: number; style?: CSSProperties }) {
   return (
     <div style={{
-      flex: 1, display: "flex", flexDirection: "column", minHeight: 0,
+      display: "flex", flexDirection: "column",
       background: c.surface,
       borderTop: `1px solid ${c.highlight}`,
       ...style,
     }}>
       <div style={{
-        flex: 1, display: "flex", flexDirection: "column", padding, gap: 16,
-        minHeight: 0, overflowY: "auto",
+        display: "flex", flexDirection: "column", padding, gap: 16,
       }}>
         {children}
       </div>

@@ -14,8 +14,8 @@ import {
   type Bond,
 } from "@pye/sdk";
 import { useBalanceStore, useWalletStore, useMarketStore, useApyStore } from "@pye/sdk/react";
-import { Widget, Body, Footer, TabBar, StepHeader, Spacer } from "../shared/Layout";
-import { ProductIcon, IconYieldForward } from "../Icons";
+import { Widget, Body, Footer, TabBar, StepHeader } from "../shared/Layout";
+import { ProductIcon, IconYieldForward, IconYieldSwap, IconFixedYield } from "../Icons";
 import { c, font, displayFont, formatSolAmount } from "../design-system";
 
 const NEON = "#00c97a";
@@ -324,7 +324,7 @@ function PositionsTab() {
             <p style={font(12, c.secondary)}>Connect a wallet to view your positions.</p>
           </div>
         ) : positions.length > 0 ? (
-          <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
+          <div>
             {positions.map(p => (
               <PositionRow
                 key={p.ptMint}
@@ -383,7 +383,7 @@ function LearnArticle({ article, onBack }: { article: LearnItem; onBack: () => v
     <>
       <StepHeader label={article.title} onBack={onBack} onClose={onBack} />
       <Body padding={16}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 12, flex: 1, overflowY: "auto", minHeight: 0 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {article.body.map((para, i) => (
             <p key={i} style={font(14, i === 0 ? c.primary : c.secondary)}>{para}</p>
           ))}
@@ -495,7 +495,42 @@ export default function HomeScreen({ validatorName }: HomeScreenProps) {
             </div>
           </div>
 
-          <Spacer />
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <div style={{
+              background: c.raised,
+              borderTop: `1px solid ${c.highlight}`,
+              boxShadow: `inset 0 -1px 0 ${c.shadow}`,
+              borderRadius: 6, padding: 12,
+              display: "flex", alignItems: "center", gap: 12,
+              opacity: 0.6,
+            }}>
+              <ProductIcon><IconYieldSwap /></ProductIcon>
+              <div style={{ flex: 1 }}>
+                <p style={font(14, c.primary)}>Yield Swap</p>
+                <p style={font(12, c.secondary)}>Stake SOL, earn BTC</p>
+              </div>
+              <div style={{ background: c.bg, borderRadius: 4, padding: "2px 8px", boxShadow: `inset 0 -1px 0 ${c.highlight}` }}>
+                <p style={font(12, c.secondary)}>Soon</p>
+              </div>
+            </div>
+            <div style={{
+              background: c.raised,
+              borderTop: `1px solid ${c.highlight}`,
+              boxShadow: `inset 0 -1px 0 ${c.shadow}`,
+              borderRadius: 6, padding: 12,
+              display: "flex", alignItems: "center", gap: 12,
+              opacity: 0.6,
+            }}>
+              <ProductIcon><IconFixedYield /></ProductIcon>
+              <div style={{ flex: 1 }}>
+                <p style={font(14, c.primary)}>Fixed Yield</p>
+                <p style={font(12, c.secondary)}>Lock in a fixed yield</p>
+              </div>
+              <div style={{ background: c.bg, borderRadius: 4, padding: "2px 8px", boxShadow: `inset 0 -1px 0 ${c.highlight}` }}>
+                <p style={font(12, c.secondary)}>Soon</p>
+              </div>
+            </div>
+          </div>
 
           <div style={{
             background: c.bg,
