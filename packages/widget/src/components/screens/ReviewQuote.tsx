@@ -6,9 +6,9 @@ import {
   validators,
   type MaturityId,
   type ValidatorId,
-  executeStakeAccountDeposit,
   executeStakeDeposit,
   executeRtSell,
+  executeDepositAndSell,
   checkSellLiquidity,
   allowedLockups,
   lookupBondByVoteAccount,
@@ -112,7 +112,7 @@ function resolveBondParams(marketKey: string) {
   const validatorId = parts.join("-"); // rejoin in case validator has hyphens
 
   const lockups = allowedLockups();
-  const bond = lockups[validatorId as keyof typeof lockups]?.[maturityId as keyof (typeof lockups)[keyof typeof lockups]];
+  const bond = (lockups as Record<string, Record<string, { pubkey: string; pt_address: string; rt_address: string }>>)[validatorId]?.[maturityId];
   if (!bond) return null;
 
   const validator = validators[validatorId as ValidatorId];
@@ -228,12 +228,13 @@ export default function ReviewQuote() {
     if (!rtMarket) throw new Error("No RT market found for this maturity");
 
     setTxStatus("loading");
+    setTxStep("depositing");
+
+    const minReceive = Math.max(sellAmount * (1 - slippage / 100), 0);
 
     try {
-      // Step 1: Deposit stake → receive PT + RT
-      setTxStep("depositing");
-
       if (selectedStakeAccountPubkey === "liquid-sol") {
+        // Liquid SOL path — kept as two transactions (SIMD-185: disabled in UI)
         await executeStakeDeposit({
           connection,
           wallet,
@@ -243,8 +244,22 @@ export default function ReviewQuote() {
           validatorVoteAccount: bondParams.voteAccount,
           amountSol: parsedAmount,
         });
+        setTxStep("selling");
+        const rtSellResult = await executeRtSell({
+          connection,
+          wallet,
+          marketPubkey: rtMarket.marketPubkey,
+          rtMint: bondParams.yieldTokenMint,
+          orderSizeTokens: parsedAmount,
+          minReceiveTokens: minReceive,
+        });
+        setTxStep("complete");
+        setSellAmountSol(sellAmount);
+        setTxStatus("success", rtSellResult.signature);
+        navigate("complete");
       } else {
-        await executeStakeAccountDeposit({
+        // Stake account path — single bundled transaction
+        const result = await executeDepositAndSell({
           connection,
           wallet,
           bondPubkey: bondParams.bondPubkey,
@@ -254,27 +269,14 @@ export default function ReviewQuote() {
           stakeAccountPubkey: selectedStakeAccountPubkey,
           amountSol: parsedAmount,
           stakeBalanceSol: selectedStakeAccountBalance,
+          marketPubkey: rtMarket.marketPubkey,
+          minReceiveTokens: minReceive,
         });
+        setTxStep("complete");
+        setSellAmountSol(sellAmount);
+        setTxStatus("success", result.signature);
+        navigate("complete");
       }
-
-      // Step 2: Sell RT on Manifest → receive SOL
-      setTxStep("selling");
-
-      const minReceive = sellAmount * (1 - slippage / 100);
-      const rtSellResult = await executeRtSell({
-        connection,
-        wallet,
-        marketPubkey: rtMarket.marketPubkey,
-        rtMint: bondParams.yieldTokenMint,
-        orderSizeTokens: parsedAmount,
-        minReceiveTokens: Math.max(minReceive, 0),
-      });
-
-      setTxStep("complete");
-      setSellAmountSol(sellAmount);
-      setTxStatus("success", rtSellResult.signature);
-      navigate("complete");
-      incrementStakeRefreshKey();
     } catch (err) {
       setTxStatus(
         "error",
@@ -282,17 +284,10 @@ export default function ReviewQuote() {
         err instanceof Error ? err.message : "Transaction failed",
       );
     } finally {
-      // Refresh all balances regardless of success/failure
       const owner = wallet.publicKey!;
-      connection.getBalance(owner, "confirmed")
-        .then(setBalanceLamports)
-        .catch(() => {});
-      fetchBalances(connection, owner)
-        .then(setWalletBalances)
-        .catch(() => {});
-      fetchUserStakeAccounts(connection, owner)
-        .then(setUserStakeAccounts)
-        .catch(() => {});
+      connection.getBalance(owner, "confirmed").then(setBalanceLamports).catch(() => {});
+      fetchBalances(connection, owner).then(setWalletBalances).catch(() => {});
+      fetchUserStakeAccounts(connection, owner).then(setUserStakeAccounts).catch(() => {});
     }
   }, [
     rtMarket,
@@ -451,10 +446,9 @@ export default function ReviewQuote() {
       <CTA
         label={
           isLoading
-            ? txStep === "depositing" ? "Depositing stake..."
-            : txStep === "selling" ? "Selling rewards..."
-            : "Signing..."
-          : "Sign transaction"
+            ? txStep === "selling" ? "Selling yield..."
+            : "Confirming..."
+          : `Sell yield — get ${formatSolAmount(sellAmount, 3)} SOL`
         }
         onClick={handleSign}
         disabled={!canSign}
