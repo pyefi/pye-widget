@@ -129,7 +129,8 @@ export default function SellYield() {
       }}>
         <p style={font(11, c.secondary)}>You receive today</p>
         <p style={{
-          ...displayFont(hasYield ? 36 : 30, hasYield ? NEON : c.muted),
+          ...font(hasYield ? 36 : 30, hasYield ? NEON : c.muted, 700),
+          letterSpacing: "-0.02em",
           fontVariantNumeric: "lining-nums tabular-nums",
           transition: "color 0.3s",
           textShadow: hasYield ? "0 0 20px rgba(0,201,122,0.35)" : "none",

@@ -42,8 +42,8 @@ export default function StepComplete() {
           }}>
             <p style={font(12, c.secondary)}>Yield received</p>
             <p style={{
-              ...displayFont(36, NEON),
-              lineHeight: 1.2,
+              ...font(36, NEON, 700),
+              letterSpacing: "-0.02em",
               fontVariantNumeric: "lining-nums tabular-nums",
               textShadow: "0 0 24px rgba(0,201,122,0.45)",
             }}>
