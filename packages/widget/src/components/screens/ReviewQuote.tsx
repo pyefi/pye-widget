@@ -112,7 +112,7 @@ function resolveBondParams(marketKey: string) {
   const validatorId = parts.join("-"); // rejoin in case validator has hyphens
 
   const lockups = allowedLockups();
-  const bond = lockups[validatorId as keyof typeof lockups]?.[maturityId as keyof (typeof lockups)[keyof typeof lockups]];
+  const bond = (lockups as Record<string, Record<string, { pubkey: string; pt_address: string; rt_address: string }>>)[validatorId]?.[maturityId];
   if (!bond) return null;
 
   const validator = validators[validatorId as ValidatorId];
@@ -274,7 +274,6 @@ export default function ReviewQuote() {
       setSellAmountSol(sellAmount);
       setTxStatus("success", rtSellResult.signature);
       navigate("complete");
-      incrementStakeRefreshKey();
     } catch (err) {
       setTxStatus(
         "error",
@@ -315,29 +314,38 @@ export default function ReviewQuote() {
     setUserStakeAccounts,
   ]);
 
+  const NEON = "#00c97a";
+
   return (
     <>
       <StepTitle
-        title="Your quote"
-        subtitle="Estimated rewards sold upfront, net of fees."
+        title="You receive"
+        subtitle="Estimated upfront payout, net of fees."
       />
 
       {/* Hero quote card */}
       <div style={{ display: "flex", flexDirection: "column" }}>
         {/* Top: yield */}
         <div style={{
-          background: c.lowered,
-          borderTop: `1px solid ${c.shadow}`,
-          boxShadow: `inset 0 -1px 0 ${c.highlight}`,
+          background: "linear-gradient(135deg, rgba(0,201,122,0.07) 0%, rgba(154,77,255,0.07) 100%)",
+          border: "1px solid rgba(0,201,122,0.2)",
+          borderBottom: "none",
           borderRadius: "6px 6px 0 0",
-          padding: 12,
-          display: "flex", flexDirection: "column", gap: 12,
+          padding: 14,
+          display: "flex", flexDirection: "column", gap: 8,
+          boxShadow: "0 0 20px rgba(0,201,122,0.08)",
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <p style={font(12, c.secondary)}>You receive today</p>
+            <p style={font(12, c.secondary)}>Today</p>
             <Tooltip text="Estimated upfront payout based on current market rates, net of fees. The final amount is confirmed when your order fills on the Pye orderbook." />
           </div>
-          <p style={{ ...displayFont(32, c.green), lineHeight: 1.2, fontVariantNumeric: "lining-nums tabular-nums", marginBottom: slippage > 0 ? -4 : 0 }}>
+          <p style={{
+            ...displayFont(36, NEON),
+            lineHeight: 1.2,
+            fontVariantNumeric: "lining-nums tabular-nums",
+            textShadow: "0 0 20px rgba(0,201,122,0.4)",
+            marginBottom: slippage > 0 ? -4 : 0,
+          }}>
             +{formatSolAmount(sellAmount)} SOL
           </p>
           {slippage > 0 && (
@@ -357,7 +365,7 @@ export default function ReviewQuote() {
           overflow: "hidden",
         }}>
           <p style={font(12, c.secondary)}>
-            <span style={{ color: c.primary }}>{parsedAmount} SOL</span>{` back ${matures}`}
+            <span style={{ color: c.primary }}>{parsedAmount} SOL</span>{" returns "}{matures}
           </p>
           {points && <p style={font(12, c.purple)}>{points}</p>}
         </div>
@@ -451,10 +459,10 @@ export default function ReviewQuote() {
       <CTA
         label={
           isLoading
-            ? txStep === "depositing" ? "Depositing stake..."
-            : txStep === "selling" ? "Selling rewards..."
+            ? txStep === "depositing" ? "Setting up position..."
+            : txStep === "selling" ? "Selling yield..."
             : "Signing..."
-          : "Sign transaction"
+          : `Sell yield — get ${formatSolAmount(sellAmount, 3)} SOL`
         }
         onClick={handleSign}
         disabled={!canSign}

@@ -13,22 +13,26 @@ import {
   type MaturityId,
   type Bond,
 } from "@pye/sdk";
-import { useBalanceStore, useWalletStore } from "@pye/sdk/react";
-import { Widget, Body, Footer, TabBar, StepHeader, Spacer, Tooltip } from "../shared/Layout";
+import { useBalanceStore, useWalletStore, useMarketStore, useApyStore } from "@pye/sdk/react";
+import { Widget, Body, Footer, TabBar, StepHeader, Spacer } from "../shared/Layout";
 import { ProductIcon, IconYieldForward, IconYieldSwap, IconFixedYield } from "../Icons";
-import { c, font, displayFont } from "../design-system";
+import { c, font, displayFont, formatSolAmount } from "../design-system";
+
+const NEON = "#00c97a";
+const EXAMPLE_SOL = 100;
+const FALLBACK_APY = 0.07;
 
 // ─── Tab mapping ──────────────────────────────────────────────────────────────
 
 const TAB_MAP: Record<string, HomeTab> = {
-  "Yield Recipes": "earn",
-  "Manage": "positions",
+  "Earn": "earn",
+  "Positions": "positions",
   "Learn": "learn",
 };
 
 const REVERSE_TAB_MAP: Record<HomeTab, string> = {
-  earn: "Yield Recipes",
-  positions: "Manage",
+  earn: "Earn",
+  positions: "Positions",
   learn: "Learn",
 };
 
@@ -147,16 +151,16 @@ function PositionRow({ position, onRedeem, isRedeeming }: {
     }}>
       <img
         src={position.validatorPtIcon}
-        alt={`${position.validatorName} PT`}
+        alt={position.validatorName}
         style={{ width: 32, height: 32, borderRadius: 8, flexShrink: 0, objectFit: "cover" }}
       />
       <div style={{ flex: 1, minWidth: 0 }}>
-        <p style={font(14, c.primary)}>{position.ptAmount.toFixed(4)} PT</p>
-        <p style={font(12, c.secondary)}>{position.validatorName} · {position.maturityLabel}</p>
+        <p style={font(14, c.primary)}>{position.ptAmount.toFixed(4)} SOL</p>
+        <p style={font(12, c.secondary)}>{position.validatorName} · unlocks {position.maturityLabel}</p>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-        <p style={{ ...font(12, position.isMatured ? c.green : c.secondary), whiteSpace: "nowrap" }}>
-          {position.isMatured ? "Unlocked" : `${position.daysLeft}d left`}
+        <p style={{ ...font(12, position.isMatured ? NEON : c.secondary), whiteSpace: "nowrap" }}>
+          {position.isMatured ? "Ready" : `${position.daysLeft}d`}
         </p>
         {position.isMatured ? (
           <button
@@ -175,7 +179,7 @@ function PositionRow({ position, onRedeem, isRedeeming }: {
               opacity: isRedeeming ? 0.7 : 1,
             }}
           >
-            {isRedeeming ? "..." : "Redeem"}
+            {isRedeeming ? "..." : "Unlock"}
           </button>
         ) : (
           <button
@@ -192,7 +196,7 @@ function PositionRow({ position, onRedeem, isRedeeming }: {
               whiteSpace: "nowrap",
             }}
           >
-            Redeem
+            Unlock
           </button>
         )}
       </div>
@@ -296,11 +300,8 @@ function PositionsTab() {
           background: c.surface,
           boxShadow: `inset 0 -1px 0 ${c.shadow}`,
         }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <p style={font(14, c.primary)}>Your positions</p>
-            <Tooltip position="below" text="Each PT (Principal Token) is a 1:1 tokenised claim on your staked SOL. It accrues no rewards — those were sold upfront. Redeem at maturity to receive your full SOL stake back." />
-          </div>
-          <p style={font(12, c.secondary)}>Each PT is 1:1 redeemable for your staked SOL at maturity.</p>
+          <p style={font(14, c.primary)}>Your positions</p>
+          <p style={font(12, c.secondary)}>Your stake unlocks and returns to you at maturity.</p>
         </div>
 
         {redeemError && (
@@ -320,7 +321,7 @@ function PositionsTab() {
             gap: 6, padding: 24, textAlign: "center",
           }}>
             <p style={font(14, c.primary)}>Connect your wallet</p>
-            <p style={font(12, c.secondary)}>Connect a wallet to view your PT positions.</p>
+            <p style={font(12, c.secondary)}>Connect a wallet to view your positions.</p>
           </div>
         ) : positions.length > 0 ? (
           <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
@@ -459,6 +460,27 @@ export default function HomeScreen({ validatorName }: HomeScreenProps) {
   const navigate = useWidgetStore((s) => s.navigate);
   const learnArticle = useWidgetStore((s) => s.selectedLearnArticle);
   const setLearnArticle = useWidgetStore((s) => s.setSelectedLearnArticle);
+  const walletStatus = useWalletStore((s) => s.status);
+  const isConnected = walletStatus === "connected";
+  const markets = useMarketStore((s) => s.markets);
+  const apyByVoteAccount = useApyStore((s) => s.apyByVoteAccount);
+
+  const exampleYield = useMemo(() => {
+    let bestBid: number | null = null;
+    for (const [key, market] of Object.entries(markets)) {
+      if (key.endsWith("-q32026-RT") && market.bestBidPrice != null) {
+        bestBid = market.bestBidPrice;
+        break;
+      }
+    }
+    const matTs = Number(maturities.q32026.maturity_timestamp);
+    const nowS = Date.now() / 1000;
+    const yearsToMaturity = Math.max(0, (matTs - nowS) / (365 * 24 * 60 * 60));
+    const vals = Object.values(apyByVoteAccount);
+    const apy = vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : FALLBACK_APY;
+    const hold = apy * yearsToMaturity * EXAMPLE_SOL;
+    return bestBid != null ? bestBid * EXAMPLE_SOL : hold * 0.96;
+  }, [markets, apyByVoteAccount]);
 
   const displayTab = REVERSE_TAB_MAP[homeTab];
 
@@ -479,30 +501,57 @@ export default function HomeScreen({ validatorName }: HomeScreenProps) {
           : <LearnTab onSelect={setLearnArticle} validatorName={validatorName ?? "your validator"} />
       ) : (
         <Body padding={16}>
-          <p style={{ ...displayFont(45, c.primary), letterSpacing: "-0.02em" }}>
-            Validator-Centric DeFi
+          <p style={{ ...displayFont(38, c.primary), letterSpacing: "-0.02em", lineHeight: 1.15 }}>
+            Sell your yield.<br />Get paid today.
           </p>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <ProductRow
-              onClick={() => navigate("yield-forward-intro")}
-              icon={<ProductIcon><IconYieldForward /></ProductIcon>}
-              label="Yield Forward"
-              sub="Sell your future staking rewards today"
-            />
+          {/* ── Hero sell yield card ── */}
+          <div
+            className="pye-hoverable"
+            onClick={() => navigate(isConnected ? "sell-yield" : "connect-wallet")}
+            style={{
+              background: "linear-gradient(135deg, rgba(154,77,255,0.1) 0%, rgba(0,200,255,0.05) 100%)",
+              border: "1px solid rgba(154,77,255,0.22)",
+              borderRadius: 8, padding: 16,
+              cursor: "pointer",
+              boxShadow: "0 4px 20px rgba(154,77,255,0.1)",
+              transition: "background 0.15s",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+              <ProductIcon><IconYieldForward /></ProductIcon>
+              <p style={{ ...font(15, c.primary, 500), flex: 1 }}>Sell Yield</p>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path d="M6 4L10 8L6 12" stroke={c.secondary} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </div>
+            <p style={font(12, c.secondary)}>Get your staking rewards upfront — today.</p>
+            <div style={{ marginTop: 10, display: "flex", alignItems: "baseline", gap: 8 }}>
+              <p style={{
+                ...displayFont(28, NEON),
+                fontVariantNumeric: "lining-nums tabular-nums",
+                textShadow: "0 0 16px rgba(0,201,122,0.3)",
+              }}>
+                +{formatSolAmount(exampleYield, 3)} SOL
+              </p>
+              <p style={font(12, c.secondary)}>for 100 SOL, 6mo</p>
+            </div>
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             <ProductRow
               disabled
               icon={<ProductIcon><IconYieldSwap /></ProductIcon>}
               label="Yield Swap"
               sub="Stake SOL, earn BTC"
-              badge="Coming soon"
+              badge="Soon"
             />
             <ProductRow
               disabled
               icon={<ProductIcon><IconFixedYield /></ProductIcon>}
               label="Fixed Yield"
-              sub="Get a fixed yield quote"
-              badge="Coming soon"
+              sub="Lock in a fixed yield"
+              badge="Soon"
             />
           </div>
 
@@ -510,14 +559,13 @@ export default function HomeScreen({ validatorName }: HomeScreenProps) {
 
           <div style={{
             background: c.bg,
-            borderRadius: 4,
-            padding: 12,
+            borderRadius: 4, padding: 12,
             borderTop: `1px solid ${c.shadow}`,
             boxShadow: `inset 0 -1px 0 ${c.highlight}`,
           }}>
             <p style={font(12, c.primary)}>
               <strong style={{ fontWeight: 600 }}>Your SOL stays with {validatorName ?? "your validator"}.</strong>{" "}
-              We lock your position into a quarterly Pye lockup. Your stake keeps earning. Your principal comes back at maturity.
+              Rewards paid today. Principal back at maturity.
             </p>
           </div>
         </Body>

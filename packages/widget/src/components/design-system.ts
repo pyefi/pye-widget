@@ -12,6 +12,7 @@ export const c = {
   secondary: "var(--c-secondary)",
   muted:     "var(--c-muted)",
   green:     "#0d9c5e",
+  neon:      "#00c97a",
   purple:    "var(--c-brand)",
   red:       "#D93B3B",
 };
@@ -65,12 +66,25 @@ export const THEME_CSS = `
     --c-brand-text:    #000000;
     --fill-0:          #ffffff;
   }
-  /* ─── Hover rules (replaces JS useState hover state) ─────────────── */
+  /* ─── Hover rules ────────────────────────────────────────────────── */
   .pye-hoverable:hover { background: var(--c-highlight) !important; }
   .pye-pill:not(.pye-pill--selected):hover { background: var(--c-highlight) !important; }
-  .pye-cta-purple:hover:not(:disabled) { filter: brightness(1.15); }
   .pye-cta-default:hover:not(:disabled) { background: var(--c-highlight) !important; }
   .pye-redeem-btn:hover:not(:disabled) { filter: brightness(1.15); }
+
+  /* ─── CTA glow pulse ─────────────────────────────────────────────── */
+  @keyframes pye-cta-glow {
+    0%, 100% { box-shadow: 0 0 16px rgba(154,77,255,0.45), inset 0 -1px 0 var(--c-brand-sh); }
+    50%       { box-shadow: 0 0 30px rgba(154,77,255,0.75), inset 0 -1px 0 var(--c-brand-sh); }
+  }
+  .pye-cta-purple:not(:disabled) {
+    animation: pye-cta-glow 2.4s ease-in-out infinite;
+  }
+  .pye-cta-purple:hover:not(:disabled) {
+    filter: brightness(1.2);
+    animation-play-state: paused;
+    box-shadow: 0 0 40px rgba(154,77,255,0.9), inset 0 -1px 0 var(--c-brand-sh) !important;
+  }
 `;
 
 export const DISPLAY_FONT = "'ITC Garamond Std', 'EB Garamond', 'Garamond', 'Georgia', serif";

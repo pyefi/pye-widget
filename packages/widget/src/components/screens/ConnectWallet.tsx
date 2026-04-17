@@ -60,7 +60,7 @@ export default function ConnectWallet() {
   // Auto-advance when wallet connects
   useEffect(() => {
     if (walletStatus === "connected") {
-      navigate("select-position");
+      navigate("sell-yield");
     }
   }, [walletStatus, navigate]);
 
