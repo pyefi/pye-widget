@@ -16,7 +16,7 @@ import {
   fetchUserStakeAccounts,
 } from "@pye/sdk";
 import { useMarketStore, useBalanceStore, useWalletStore } from "@pye/sdk/react";
-import { c, font, displayFont, MARKET_RATE, pointsMap, formatSolAmount } from "../design-system";
+import { c, font, MARKET_RATE, pointsMap, formatSolAmount } from "../design-system";
 import { StepTitle, CTA, Tooltip, Spacer } from "../shared/Layout";
 import { Odometer } from "../shared/Odometer";
 
@@ -318,59 +318,102 @@ export default function ReviewQuote() {
 
   return (
     <>
-      <StepTitle
-        title="Approve in your wallet"
-        subtitle="Review your deal and sign to complete."
-      />
+      <StepTitle title="Approve in your wallet" />
 
-      {/* Hero quote card */}
-      <div style={{ display: "flex", flexDirection: "column" }}>
-        {/* Top: yield */}
-        <div style={{
-          background: c.lowered,
-          borderTop: `1px solid ${c.shadow}`,
-          boxShadow: `inset 0 -1px 0 ${c.highlight}`,
-          borderRadius: "8px 8px 0 0",
-          padding: 12,
-          display: "flex", flexDirection: "column", gap: 12,
-        }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <p style={font(14, c.secondary)}>You receive today</p>
-            <Tooltip text="Estimated upfront payout based on current market rates, net of fees. The final amount is confirmed when your order fills on the Pye orderbook." />
+      {/* Quote — stacked sections */}
+      {(() => {
+        const rows: Array<{ key: string; left: React.ReactNode; right: React.ReactNode }> = [
+          {
+            key: "receive",
+            left: (
+              <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+                <p style={font(14, c.secondary)}>You receive today</p>
+                <Tooltip text="Estimated upfront payout based on current market rates, net of fees. The final amount is confirmed when your order fills on the Pye orderbook." />
+              </div>
+            ),
+            right: (
+              <Odometer
+                value={`+${formatSolAmount(sellAmount)} SOL`}
+                style={{ ...font(15, c.green, 500), whiteSpace: "nowrap", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}
+              />
+            ),
+          },
+          {
+            key: "stake",
+            left: <p style={font(14, c.secondary)}>Stake amount</p>,
+            right: (
+              <p style={{ ...font(14, c.primary), whiteSpace: "nowrap", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>
+                {parsedAmount} SOL
+              </p>
+            ),
+          },
+          {
+            key: "pt",
+            left: (
+              <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+                <p style={font(14, c.secondary)}>PTs you&apos;ll receive</p>
+                <Tooltip text="A PT (Principal Token) is a 1:1 tokenised claim on your staked SOL. Hold it until the redeem date, then burn it to reclaim your full stake." />
+              </div>
+            ),
+            right: (
+              <p style={{ ...font(14, c.primary), whiteSpace: "nowrap", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>
+                {parsedAmount} PT
+              </p>
+            ),
+          },
+          {
+            key: "redeem",
+            left: <p style={font(14, c.secondary)}>Redeem date</p>,
+            right: (
+              <p style={{ ...font(14, c.primary), whiteSpace: "nowrap", flexShrink: 0 }}>
+                {matures}
+              </p>
+            ),
+          },
+          ...(points ? [{
+            key: "points",
+            left: <p style={font(14, c.secondary)}>Points multiplier</p>,
+            right: (
+              <p style={{ ...font(14, c.purple), whiteSpace: "nowrap", flexShrink: 0 }}>
+                {points}
+              </p>
+            ),
+          }] : []),
+        ];
+
+        return (
+          <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+            {rows.map((row, i) => {
+              const isFirst = i === 0;
+              const isLast = i === rows.length - 1;
+              const radius = isFirst && isLast
+                ? 8
+                : isFirst
+                  ? "8px 8px 0 0"
+                  : isLast
+                    ? "0 0 8px 8px"
+                    : 0;
+              return (
+                <div
+                  key={row.key}
+                  style={{
+                    background: c.lowered,
+                    borderTop: `1px solid ${c.shadow}`,
+                    boxShadow: `inset 0 -1px 0 ${c.highlight}`,
+                    borderRadius: radius,
+                    padding: "12px 12px",
+                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                    gap: 12,
+                  }}
+                >
+                  {row.left}
+                  {row.right}
+                </div>
+              );
+            })}
           </div>
-          <Odometer
-            value={`+${formatSolAmount(sellAmount)} SOL`}
-            style={{ ...displayFont(32, c.green), lineHeight: 1.2, marginBottom: slippage > 0 ? -4 : 0 }}
-          />
-          {slippage > 0 && (
-            <Odometer
-              value={`Min. received: ${formatSolAmount(sellAmount * (1 - slippage / 100))} SOL`}
-              style={font(14, c.secondary)}
-              duration={700}
-              stagger={40}
-            />
-          )}
-        </div>
-        {/* Bottom: maturity + points */}
-        <div style={{
-          background: c.lowered,
-          borderTop: `1px solid ${c.shadow}`,
-          boxShadow: `inset 0 -1px 0 ${c.highlight}`,
-          borderRadius: "0 0 8px 8px",
-          padding: 12,
-          display: "flex", justifyContent: "space-between", alignItems: "center",
-          gap: 12, overflow: "hidden",
-        }}>
-          <p style={{ ...font(14, c.secondary), flex: 1, minWidth: 0 }}>
-            <span style={{ color: c.primary }}>{parsedAmount} SOL</span>{` back ${matures}`}
-          </p>
-          {points && (
-            <p style={{ ...font(12, c.purple), whiteSpace: "nowrap", flexShrink: 0 }}>
-              {points}
-            </p>
-          )}
-        </div>
-      </div>
+        );
+      })()}
 
       {/* Advanced toggle */}
       <div
@@ -443,16 +486,6 @@ export default function ReviewQuote() {
           </p>
         </div>
       )}
-
-      {/* Orderbook disclosure */}
-      <p style={font(14, c.secondary)}>
-        Orders are matched on the{" "}
-        <a href="https://app.pye.fi/trade" target="_blank" rel="noreferrer"
-          style={{ color: c.secondary, textDecoration: "underline" }}>
-          Pye orderbook
-        </a>
-        . If the market moves beyond your max slippage, this transaction will not execute.
-      </p>
 
       {/* Error */}
       {txStatus === "error" && txError && (
