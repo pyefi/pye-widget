@@ -157,10 +157,10 @@ export default function WelcomeScreen({ validatorName }: WelcomeScreenProps) {
   const canSell = activeStakeSol > 0;
 
   const redeemSub = !canRedeem
-    ? "No ptSOL positions"
+    ? "No PT positions"
     : maturedPtSol > 0
-      ? `${formatSolAmount(maturedPtSol)} ptSOL ready to redeem`
-      : `${formatSolAmount(totalPtSol)} ptSOL locked`;
+      ? `${formatSolAmount(maturedPtSol)} PT ready to redeem`
+      : `${formatSolAmount(totalPtSol)} PT locked`;
 
   const sellSub = canSell
     ? `${formatSolAmount(activeStakeSol, 2)} SOL across active stake`
@@ -174,11 +174,11 @@ export default function WelcomeScreen({ validatorName }: WelcomeScreenProps) {
         </p>
         <p style={font(15, c.secondary)}>
           {canRedeem && canSell
-            ? "We found ptSOL ready to redeem and active stake accounts. What would you like to do?"
+            ? "We found active staked SOL positions and PTs ready to redeem. What would you like to do?"
             : canRedeem
-              ? "We found ptSOL ready to redeem. What would you like to do?"
+              ? "We found PTs ready to redeem. What would you like to do?"
               : canSell
-                ? "We found active stake accounts. Sell your future rewards upfront."
+                ? "We found active staked SOL positions. Sell your future rewards upfront."
                 : `Stake SOL with ${validatorName ?? "your validator"} to get started.`}
         </p>
       </div>
@@ -193,7 +193,7 @@ export default function WelcomeScreen({ validatorName }: WelcomeScreenProps) {
         />
         <ChoiceRow
           icon={<IconRedeem />}
-          label="Redeem ptSOL"
+          label="Redeem PTs"
           sub={redeemSub}
           subColor={maturedPtSol > 0 ? c.green : undefined}
           disabled={!canRedeem}

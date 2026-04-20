@@ -5,6 +5,7 @@ import { useStore } from "zustand";
 import type { MaturityId } from "@pye/sdk";
 
 export type WidgetScreen =
+  | "yield-forward-intro"
   | "connect-wallet"
   | "welcome"
   | "redeem-list"
@@ -77,7 +78,7 @@ export interface WidgetActions {
 export type WidgetStoreType = WidgetState & WidgetActions;
 
 const initialState: WidgetState = {
-  screen: "connect-wallet",
+  screen: "yield-forward-intro",
   screenHistory: [],
 
   selectedStakeAccountPubkey: null,

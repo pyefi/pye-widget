@@ -4,6 +4,7 @@ import { useWidgetStore } from "../stores/widget-store";
 import { Widget, Body, Footer, StepHeader } from "./shared/Layout";
 import WelcomeScreen from "./screens/WelcomeScreen";
 import ConnectWallet from "./screens/ConnectWallet";
+import YieldForwardIntro from "./screens/YieldForwardIntro";
 import SelectPosition from "./screens/SelectPosition";
 import ChooseAmount from "./screens/ChooseAmount";
 import ChooseDuration from "./screens/ChooseDuration";
@@ -34,10 +35,13 @@ export default function WidgetShell({ validatorName }: WidgetShellProps) {
   const initializedRef = useRef(false);
 
   // Initial screen: if a wallet is already connected when the widget mounts,
-  // skip connect-wallet and go straight to welcome.
+  // skip the appetiser/connect-wallet and go straight to welcome.
   useEffect(() => {
     if (initializedRef.current) return;
-    if (walletStatus === "connected" && screen === "connect-wallet") {
+    if (
+      walletStatus === "connected" &&
+      (screen === "yield-forward-intro" || screen === "connect-wallet")
+    ) {
       navigate("welcome");
     }
     initializedRef.current = true;
@@ -57,9 +61,13 @@ export default function WidgetShell({ validatorName }: WidgetShellProps) {
     prevWalletRef.current = walletPublicKey;
   }, [walletPublicKey, reset, navigate, screen]);
 
-  // If wallet disconnects, send user back to connect screen
+  // If wallet disconnects, reset to the intro/appetiser screen
   useEffect(() => {
-    if (walletStatus !== "connected" && screen !== "connect-wallet") {
+    if (
+      walletStatus !== "connected" &&
+      screen !== "yield-forward-intro" &&
+      screen !== "connect-wallet"
+    ) {
       reset();
     }
   }, [walletStatus, screen, reset]);
@@ -88,6 +96,20 @@ export default function WidgetShell({ validatorName }: WidgetShellProps) {
     return (
       <Widget>
         <WelcomeScreen validatorName={validatorName} />
+        <Footer />
+      </Widget>
+    );
+  }
+
+  // Intro / appetiser: no header, shown before wallet connect
+  if (screen === "yield-forward-intro") {
+    return (
+      <Widget>
+        <Body style={{ borderRadius: "10px 10px 0 0", borderTop: "none" }}>
+          <div key={screen} className="pye-step-in">
+            <YieldForwardIntro />
+          </div>
+        </Body>
         <Footer />
       </Widget>
     );

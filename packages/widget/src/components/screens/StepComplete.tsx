@@ -60,7 +60,12 @@ export default function StepComplete() {
           }}>
             <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <p style={font(14, c.primary)}>+{parsedAmount} PT in your wallet</p>
+                <Odometer
+                  value={`+${parsedAmount} PT in your wallet`}
+                  style={font(14, c.primary)}
+                  duration={900}
+                  stagger={50}
+                />
                 <Tooltip text="A PT (Principal Token) is a 1:1 tokenised claim on your staked SOL. It accrues no rewards — those were sold upfront. Redeem it at maturity to get your full stake back." />
               </div>
               <p style={font(11, c.secondary)}>Your staked SOL, returned to you {matures}</p>

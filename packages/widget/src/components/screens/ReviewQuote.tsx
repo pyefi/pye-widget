@@ -319,8 +319,8 @@ export default function ReviewQuote() {
   return (
     <>
       <StepTitle
-        title="Your quote"
-        subtitle="Estimated rewards sold upfront, net of fees."
+        title="Approve in your wallet"
+        subtitle="Review your deal and sign to complete."
       />
 
       {/* Hero quote card */}
@@ -343,9 +343,12 @@ export default function ReviewQuote() {
             style={{ ...displayFont(32, c.green), lineHeight: 1.2, marginBottom: slippage > 0 ? -4 : 0 }}
           />
           {slippage > 0 && (
-            <p style={font(14, c.secondary)}>
-              Min. received: {formatSolAmount(sellAmount * (1 - slippage / 100))} SOL
-            </p>
+            <Odometer
+              value={`Min. received: ${formatSolAmount(sellAmount * (1 - slippage / 100))} SOL`}
+              style={font(14, c.secondary)}
+              duration={700}
+              stagger={40}
+            />
           )}
         </div>
         {/* Bottom: maturity + points */}
@@ -362,7 +365,7 @@ export default function ReviewQuote() {
             <span style={{ color: c.primary }}>{parsedAmount} SOL</span>{` back ${matures}`}
           </p>
           {points && (
-            <p style={{ ...font(14, c.purple), whiteSpace: "nowrap", flexShrink: 0 }}>
+            <p style={{ ...font(12, c.purple), whiteSpace: "nowrap", flexShrink: 0 }}>
               {points}
             </p>
           )}
@@ -385,35 +388,44 @@ export default function ReviewQuote() {
         </svg>
       </div>
 
-      {/* Advanced panel — discount rate */}
-      {advancedOpen && (
+      {/* Advanced panel — discount rate (grid-row height transition) */}
+      <div style={{
+        display: "grid",
+        gridTemplateRows: advancedOpen ? "1fr" : "0fr",
+        transition: "grid-template-rows 280ms cubic-bezier(0.2,0.9,0.2,1)",
+      }}>
         <div style={{
-          background: c.raised, borderRadius: 8, padding: 12,
-          borderTop: `1px solid ${c.highlight}`,
-          boxShadow: `inset 0 -1px 0 ${c.shadow}`,
-          display: "flex", flexDirection: "column", gap: 16,
-          overflow: "visible",
+          overflow: "hidden",
+          opacity: advancedOpen ? 1 : 0,
+          transition: "opacity 200ms cubic-bezier(0.2,0.9,0.2,1)",
         }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <div style={{ display: "flex", justifyContent: "space-between" }}>
-              <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                <span style={font(14, c.secondary)}>Max slippage tolerance</span>
-                <Tooltip bg={c.highlight} text="Slippage is the maximum difference between the quoted price and the price you actually receive. A higher tolerance means your order is more likely to fill, but you may receive slightly less SOL." />
-              </span>
-              {orderBookSlippageBps > 0 && (
-                <span style={font(14, c.secondary)}>Est. slippage: {(orderBookSlippageBps / 100).toFixed(2)}%</span>
-              )}
+          <div style={{
+            background: c.raised, borderRadius: 8, padding: 12,
+            borderTop: `1px solid ${c.highlight}`,
+            boxShadow: `inset 0 -1px 0 ${c.shadow}`,
+            display: "flex", flexDirection: "column", gap: 16,
+          }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  <span style={font(14, c.secondary)}>Max slippage tolerance</span>
+                  <Tooltip bg={c.highlight} text="Slippage is the maximum difference between the quoted price and the price you actually receive. A higher tolerance means your order is more likely to fill, but you may receive slightly less SOL." />
+                </span>
+                {orderBookSlippageBps > 0 && (
+                  <span style={font(14, c.secondary)}>Est. slippage: {(orderBookSlippageBps / 100).toFixed(2)}%</span>
+                )}
+              </div>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
+                <span style={{ ...font(18, c.primary), transition: "color 0.15s" }}>
+                  {slippage.toFixed(2)}
+                </span>
+                <span style={font(14, c.secondary)}>% max slippage</span>
+              </div>
+              <DiscountSlider value={slippage} onChange={(v) => setSlippageBps(Math.round(v * 100))} />
             </div>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
-              <span style={{ ...font(18, c.primary), transition: "color 0.15s" }}>
-                {slippage.toFixed(2)}
-              </span>
-              <span style={font(14, c.secondary)}>% max slippage</span>
-            </div>
-            <DiscountSlider value={slippage} onChange={(v) => setSlippageBps(Math.round(v * 100))} />
           </div>
         </div>
-      )}
+      </div>
 
       {/* Liquidity warning */}
       {!hasLiquidity && rtAmount > 0 && (

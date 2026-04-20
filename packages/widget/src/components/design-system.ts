@@ -66,11 +66,41 @@ export const THEME_CSS = `
     --fill-0:          #ffffff;
   }
   /* ─── Hover rules (replaces JS useState hover state) ─────────────── */
-  .pye-hoverable:hover { background: var(--c-highlight) !important; }
+  .pye-hoverable {
+    transition: background 160ms cubic-bezier(0.2,0.9,0.2,1),
+                transform  160ms cubic-bezier(0.2,0.9,0.2,1),
+                box-shadow 160ms cubic-bezier(0.2,0.9,0.2,1) !important;
+  }
+  .pye-hoverable:hover {
+    background: var(--c-highlight) !important;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08), inset 0 -1px 0 var(--c-shadow) !important;
+  }
   .pye-pill:not(.pye-pill--selected):hover { background: var(--c-highlight) !important; }
   .pye-cta-purple:hover:not(:disabled) { filter: brightness(1.15); }
   .pye-cta-default:hover:not(:disabled) { background: var(--c-highlight) !important; }
   .pye-redeem-btn:hover:not(:disabled) { filter: brightness(1.15); }
+
+  /* ─── Press feedback (scale 0.98 on active) ──────────────────────── */
+  .pye-cta-purple, .pye-cta-default, .pye-redeem-btn, .pye-pill {
+    transition: background 120ms cubic-bezier(0.2,0.9,0.2,1),
+                filter     120ms cubic-bezier(0.2,0.9,0.2,1),
+                transform  120ms cubic-bezier(0.2,0.9,0.2,1) !important;
+  }
+  .pye-cta-purple:active:not(:disabled),
+  .pye-cta-default:active:not(:disabled),
+  .pye-redeem-btn:active:not(:disabled),
+  .pye-pill:active {
+    transform: scale(0.98);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .pye-hoverable, .pye-hoverable:hover,
+    .pye-cta-purple, .pye-cta-default, .pye-redeem-btn, .pye-pill,
+    .pye-cta-purple:active, .pye-cta-default:active, .pye-redeem-btn:active, .pye-pill:active {
+      transform: none !important;
+      transition: background 120ms, filter 120ms !important;
+    }
+  }
 
   /* ─── Step transition: subtle translate + fade on mount ──────── */
   @keyframes pye-step-in {
