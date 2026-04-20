@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useWidgetStore } from "../../stores/widget-store";
-import { c, font } from "../design-system";
+import { c, font, formatSolAmount } from "../design-system";
 import { StepTitle, CTA, InlineError, Spacer } from "../shared/Layout";
 
 const SLIDER_CSS = `
@@ -70,17 +70,23 @@ export default function ChooseAmount() {
 
   const rampToAmount = (target: number) => {
     if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
+    const start = parsed;
+    if (Math.abs(target - start) < 1e-9) return;
     const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
     if (reduced) { setDepositAmount(target.toFixed(4)); return; }
 
-    const start = parsed;
     const duration = 500;
     const startTime = performance.now();
     const ease = (t: number) => 1 - Math.pow(1 - t, 3); // easeOutCubic
+    let lastWritten = "";
     const tick = (now: number) => {
       const t = Math.min(1, (now - startTime) / duration);
       const v = start + (target - start) * ease(t);
-      setDepositAmount(v.toFixed(4));
+      const s = v.toFixed(4);
+      if (s !== lastWritten) {
+        lastWritten = s;
+        setDepositAmount(s);
+      }
       if (t < 1) rafRef.current = requestAnimationFrame(tick);
       else rafRef.current = null;
     };
@@ -105,9 +111,10 @@ export default function ChooseAmount() {
 
   const stepSize = Math.max(0.0001, available / 1000);
 
+  const availableLabel = formatSolAmount(available);
   const subtitle = validatorName
-    ? `${validatorName} balance detected: ${available.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 })} SOL.`
-    : `Balance detected: ${available.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 })} SOL.`;
+    ? `${validatorName} balance detected: ${availableLabel} SOL.`
+    : `Balance detected: ${availableLabel} SOL.`;
 
   return (
     <>
@@ -158,8 +165,8 @@ export default function ChooseAmount() {
           step={stepSize}
           value={sliderValue}
           onChange={(e) => {
-            const v = parseFloat(e.target.value);
-            setDepositAmount(v.toFixed(4));
+            const s = parseFloat(e.target.value).toFixed(4);
+            if (s !== depositAmount) setDepositAmount(s);
           }}
           style={{ "--pye-slider-pct": `${sliderPct}%` } as React.CSSProperties}
         />

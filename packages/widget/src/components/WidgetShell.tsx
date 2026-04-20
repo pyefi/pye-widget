@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useWalletStore } from "@pye/sdk/react";
-import { useWidgetStore } from "../stores/widget-store";
+import { useWidgetStore, type WidgetScreen } from "../stores/widget-store";
 import { Widget, Body, Footer, StepHeader } from "./shared/Layout";
 import WelcomeScreen from "./screens/WelcomeScreen";
 import ConnectWallet from "./screens/ConnectWallet";
@@ -17,12 +17,26 @@ interface WidgetShellProps {
   validatorName?: string;
 }
 
-const STEP_CONFIG: Record<string, { step?: number; total?: number; label?: string }> = {
+const STEP_CONFIG: Partial<Record<WidgetScreen, { step: number; total: number }>> = {
   "select-position": { step: 1, total: 4 },
   "choose-amount": { step: 2, total: 4 },
   "choose-duration": { step: 3, total: 4 },
   "review-quote": { step: 4, total: 4 },
 };
+
+const REDEEM_TOOLTIP =
+  "Each PT (Principal Token) is a 1:1 tokenised claim on your staked SOL. It accrues no rewards — those were sold upfront. Redeem at maturity to receive your full SOL stake back.";
+
+function HeaderlessShell({ screen, children }: { screen: WidgetScreen; children: React.ReactNode }) {
+  return (
+    <Widget>
+      <Body style={{ borderRadius: "10px 10px 0 0", borderTop: "none" }}>
+        <div key={screen} className="pye-step-in">{children}</div>
+      </Body>
+      <Footer />
+    </Widget>
+  );
+}
 
 export default function WidgetShell({ validatorName }: WidgetShellProps) {
   const screen = useWidgetStore((s) => s.screen);
@@ -33,105 +47,54 @@ export default function WidgetShell({ validatorName }: WidgetShellProps) {
   const walletStatus = useWalletStore((s) => s.status);
   const prevWalletRef = useRef<string | null>(null);
 
-  // Auto-advance to welcome when the wallet is connected and the user is
-  // still on a pre-welcome screen (covers both autoConnect after mount and
-  // the user clicking through connect-wallet).
   useEffect(() => {
-    if (
-      walletStatus === "connected" &&
-      (screen === "yield-forward-intro" || screen === "connect-wallet")
-    ) {
-      navigate("welcome");
-    }
-  }, [walletStatus, screen, navigate]);
+    const connected = walletStatus === "connected";
+    const atIntro = screen === "yield-forward-intro" || screen === "connect-wallet";
 
-  // Reset widget selections when wallet changes mid-flow
+    if (connected && atIntro) {
+      navigate("welcome");
+    } else if (!connected && !atIntro) {
+      reset();
+    }
+  }, [walletStatus, screen, navigate, reset]);
+
+  // Reset mid-flow if the connected wallet changes
   useEffect(() => {
     if (!walletPublicKey) {
       prevWalletRef.current = null;
       return;
     }
     if (prevWalletRef.current && prevWalletRef.current !== walletPublicKey) {
-      console.log("[WidgetShell] wallet changed mid-flow:", prevWalletRef.current, "→", walletPublicKey, "| screen:", screen);
       reset();
       navigate("welcome");
     }
     prevWalletRef.current = walletPublicKey;
-  }, [walletPublicKey, reset, navigate, screen]);
+  }, [walletPublicKey, reset, navigate]);
 
-  // If wallet disconnects, reset to the intro/appetiser screen
-  useEffect(() => {
-    if (
-      walletStatus !== "connected" &&
-      screen !== "yield-forward-intro" &&
-      screen !== "connect-wallet"
-    ) {
-      reset();
-    }
-  }, [walletStatus, screen, reset]);
-
-  // Complete screens have their own custom headers
   if (screen === "complete") {
-    return (
-      <Widget>
-        <StepComplete />
-        <Footer />
-      </Widget>
-    );
+    return <Widget><StepComplete /><Footer /></Widget>;
   }
 
   if (screen === "redeem-complete") {
-    return (
-      <Widget>
-        <RedeemComplete />
-        <Footer />
-      </Widget>
-    );
+    return <Widget><RedeemComplete /><Footer /></Widget>;
   }
 
-  // Welcome: no header at all (it's the root once connected)
   if (screen === "welcome") {
-    return (
-      <Widget>
-        <WelcomeScreen validatorName={validatorName} />
-        <Footer />
-      </Widget>
-    );
+    return <Widget><WelcomeScreen validatorName={validatorName} /><Footer /></Widget>;
   }
 
-  // Intro / appetiser: no header, shown before wallet connect
   if (screen === "yield-forward-intro") {
-    return (
-      <Widget>
-        <Body style={{ borderRadius: "10px 10px 0 0", borderTop: "none" }}>
-          <div key={screen} className="pye-step-in">
-            <YieldForwardIntro />
-          </div>
-        </Body>
-        <Footer />
-      </Widget>
-    );
+    return <HeaderlessShell screen={screen}><YieldForwardIntro /></HeaderlessShell>;
   }
 
-  // Connect wallet: no header
   if (screen === "connect-wallet") {
-    return (
-      <Widget>
-        <Body style={{ borderRadius: "10px 10px 0 0", borderTop: "none" }}>
-          <div key={screen} className="pye-step-in">
-            <ConnectWallet />
-          </div>
-        </Body>
-        <Footer />
-      </Widget>
-    );
+    return <HeaderlessShell screen={screen}><ConnectWallet /></HeaderlessShell>;
   }
 
-  // Redeem list: back to welcome, no step counter
   if (screen === "redeem-list") {
     return (
       <Widget>
-        <StepHeader hideStep label="Your positions" tooltipText="Each PT (Principal Token) is a 1:1 tokenised claim on your staked SOL. It accrues no rewards — those were sold upfront. Redeem at maturity to receive your full SOL stake back." onBack={goBack} onClose={reset} />
+        <StepHeader hideStep label="Your positions" tooltipText={REDEEM_TOOLTIP} onBack={goBack} />
         <RedeemList />
         <Footer />
       </Widget>
@@ -147,7 +110,6 @@ export default function WidgetShell({ validatorName }: WidgetShellProps) {
         total={config?.total}
         hideStep={!config?.step}
         onBack={goBack}
-        onClose={reset}
       />
       <Body>
         <div key={screen} className="pye-step-in">
