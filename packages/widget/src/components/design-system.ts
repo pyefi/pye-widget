@@ -71,9 +71,27 @@ export const THEME_CSS = `
   .pye-cta-purple:hover:not(:disabled) { filter: brightness(1.15); }
   .pye-cta-default:hover:not(:disabled) { background: var(--c-highlight) !important; }
   .pye-redeem-btn:hover:not(:disabled) { filter: brightness(1.15); }
+
+  /* ─── Step transition: subtle translate + fade on mount ──────── */
+  @keyframes pye-step-in {
+    0%   { transform: translateY(8px); opacity: 0; }
+    100% { transform: translateY(0);   opacity: 1; }
+  }
+  .pye-step-in {
+    animation: pye-step-in 280ms cubic-bezier(0.2, 0.9, 0.2, 1) both;
+    will-change: transform, opacity;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    flex: 1;
+    min-height: 0;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .pye-step-in { animation: none; }
+  }
 `;
 
-export const DISPLAY_FONT = "'ITC Garamond Std', 'EB Garamond', 'Garamond', 'Georgia', serif";
+export const DISPLAY_FONT = "'Inter', sans-serif";
 
 export const font = (size: number, color = c.primary, weight = 400): React.CSSProperties => ({
   fontFamily: "'Inter', sans-serif",

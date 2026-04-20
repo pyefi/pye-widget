@@ -7,7 +7,7 @@ export function Widget({ children }: { children: ReactNode }) {
   return (
     <div style={{
       width: "min(420px, calc(100vw - 32px))", height: 600,
-      borderRadius: 8,
+      borderRadius: 10,
       boxShadow: "0px 4px 8px rgba(0,0,0,0.07)",
       display: "flex", flexDirection: "column",
       background: c.surface,
@@ -17,7 +17,7 @@ export function Widget({ children }: { children: ReactNode }) {
   );
 }
 
-export function Body({ children, padding = 16, style }: { children: ReactNode; padding?: number; style?: CSSProperties }) {
+export function Body({ children, padding = 24, style }: { children: ReactNode; padding?: number; style?: CSSProperties }) {
   return (
     <div style={{
       flex: 1, display: "flex", flexDirection: "column", minHeight: 0,
@@ -38,89 +38,76 @@ export function Body({ children, padding = 16, style }: { children: ReactNode; p
 
 export function Spacer() { return <div style={{ flex: 1 }} />; }
 
-export function StepHeader({ step, total, onBack, onClose, hideStep, label }: {
+export function StepHeader({ step, total, onBack, hideStep, label, tooltipText }: {
   step?: number;
   total?: number;
   onBack?: () => void;
   onClose?: () => void;
   hideStep?: boolean;
   label?: string;
+  sectionLabel?: string;
+  tooltipText?: string;
 }) {
+  const hasProgress = !hideStep && step != null && total != null && total > 0;
+  const pct = hasProgress ? Math.round((step! / total!) * 100) : 0;
+
+  const backButton = (
+    <button onClick={onBack} style={{
+      background: "none", border: "none", cursor: "pointer", padding: 0,
+      display: "flex", alignItems: "center",
+      visibility: onBack ? "visible" : "hidden",
+      color: c.secondary, flexShrink: 0,
+    }}>
+      <svg width="18" height="18" viewBox="0 0 16 16" fill="none" style={{ display: "block" }}>
+        <path d="M13 8H3M3 8L7 4M3 8L7 12" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round"/>
+      </svg>
+    </button>
+  );
+
   return (
     <div style={{
-      height: 48, display: "flex", alignItems: "center",
-      padding: "0 16px",
-      position: "relative", flexShrink: 0,
+      display: "flex", alignItems: "center", gap: 14,
+      padding: "20px 24px",
+      flexShrink: 0,
       background: c.surface,
       borderTop: `1px solid ${c.highlight}`,
       boxShadow: `inset 0 -1px 0 ${c.shadow}`,
-      borderRadius: "8px 8px 0 0",
+      borderRadius: "10px 10px 0 0",
     }}>
-      <button onClick={onBack} style={{
-        background: "none", border: "none", cursor: "pointer",
-        padding: 0, width: 28, height: 28, marginLeft: -6,
-        display: "flex", alignItems: "center", justifyContent: "center",
-        borderRadius: 6, visibility: onBack ? "visible" : "hidden",
-      }}>
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-          <path d="M10 12L6 8L10 4" stroke={c.primary} strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
-      </button>
-      {(label || !hideStep) && (
-        <span style={{
-          ...font(12, c.secondary),
-          position: "absolute", left: "50%", transform: "translateX(-50%)",
-          textTransform: "uppercase", letterSpacing: "0.06em", whiteSpace: "nowrap",
-        }}>
-          {label ?? `Step ${step} of ${total}`}
-        </span>
-      )}
-      <button onClick={onClose} style={{
-        background: "none", border: "none", cursor: "pointer",
-        padding: 0, width: 28, height: 28, marginLeft: "auto", marginRight: -7,
-        display: "flex", alignItems: "center", justifyContent: "center",
-        borderRadius: 6,
-      }}>
-        <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
-          <path d="M1 1L13 13M13 1L1 13" stroke={c.secondary} strokeWidth="1" strokeLinecap="round"/>
-        </svg>
-      </button>
-    </div>
-  );
-}
-
-// Dan's TabBar — gap:1 separator, each tab full elevation, corner radii
-export function TabBar({ active, onChange }: { active: string; onChange: (tab: string) => void }) {
-  const tabs = ["Yield Recipes", "Manage", "Learn"];
-  return (
-    <div style={{
-      display: "flex", flexShrink: 0,
-      background: c.shadow,
-      gap: 1,
-      borderRadius: "8px 8px 0 0",
-    }}>
-      {tabs.map((tab, i) => (
-        <div key={tab} onClick={() => onChange(tab)} style={{
-          flex: 1, height: 48,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          cursor: "pointer",
-          background: c.surface,
-          borderTop: `1px solid ${c.highlight}`,
-          boxShadow: `inset 0 -1px 0 ${c.shadow}`,
-          borderRadius: i === 0 ? "8px 0 0 0" : i === tabs.length - 1 ? "0 8px 0 0" : 0,
-        }}>
-          <span style={{ ...font(14, c.primary), opacity: tab === active ? 1 : 0.5 }}>{tab}</span>
+      {backButton}
+      {!hasProgress && label && (
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{ ...font(15, c.primary, 500) }}>{label}</span>
+          {tooltipText && <Tooltip position="below" text={tooltipText} />}
         </div>
-      ))}
+      )}
+      {hasProgress && (
+        <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{
+            flex: 1, height: 3, background: c.shadow, borderRadius: 2, overflow: "hidden",
+          }}>
+            <div style={{
+              height: "100%", width: `${pct}%`, background: c.purple, borderRadius: 2,
+              transition: "width 0.25s ease",
+            }} />
+          </div>
+          <span style={{
+            ...font(13, c.secondary), lineHeight: 1, whiteSpace: "nowrap",
+            fontVariantNumeric: "tabular-nums",
+          }}>
+            {step}/{total}
+          </span>
+        </div>
+      )}
     </div>
   );
 }
 
 export function StepTitle({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-      <p style={font(14, c.primary)}>{title}</p>
-      {subtitle && <p style={font(12, c.secondary)}>{subtitle}</p>}
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <p style={font(18, c.primary, 500)}>{title}</p>
+      {subtitle && <p style={font(14, c.secondary)}>{subtitle}</p>}
     </div>
   );
 }
@@ -153,7 +140,7 @@ export function Tooltip({ text, bg, position = "above" }: { text: string; bg?: s
       background: fill,
       borderTop: `1px solid ${c.highlight}`,
       boxShadow: `0 4px 16px rgba(0,0,0,0.15), inset 0 -1px 0 ${c.shadow}`,
-      borderRadius: 6,
+      borderRadius: 8,
       padding: "8px 10px",
       zIndex: 10000,
       pointerEvents: "none",
@@ -198,9 +185,9 @@ export function Tooltip({ text, bg, position = "above" }: { text: string; bg?: s
   );
 }
 
-// Dan's RowGroup — just a simple column with gap:5
+// Dan's RowGroup — column with 8px gap between items
 export function RowGroup({ children }: { children: ReactNode }) {
-  return <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>{children}</div>;
+  return <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>{children}</div>;
 }
 
 // Dan's SelectableRow — with inset shadow elevation, inverted on selected
@@ -222,21 +209,21 @@ export function SelectableRow({ icon, label, sub, amount, selected, onClick }: {
       onClick={onClick}
       style={{
         display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: 12, borderRadius: 6,
+        padding: 12, borderRadius: 8,
         background: bg, boxShadow: shadow,
         cursor: "pointer", transition: "background 0.1s",
       }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         {icon}
         <div>
-          <p style={font(14, c.primary)}>{label}</p>
-          <p style={font(12, c.secondary)}>{sub}</p>
+          <p style={font(15, c.primary)}>{label}</p>
+          <p style={font(14, c.secondary)}>{sub}</p>
         </div>
       </div>
       {amount && (
         <div style={{ textAlign: "right" }}>
-          <p style={font(14, c.primary)}>{amount}</p>
-          <p style={font(12, c.secondary)}>SOL</p>
+          <p style={font(15, c.primary)}>{amount}</p>
+          <p style={font(14, c.secondary)}>SOL</p>
         </div>
       )}
     </div>
@@ -253,21 +240,21 @@ export function RecapRow({ icon, label, sub, amount }: {
   return (
     <div style={{
       display: "flex", alignItems: "center", justifyContent: "space-between",
-      padding: 12, borderRadius: 6, minHeight: 62,
+      padding: 12, borderRadius: 8, minHeight: 62,
       background: c.raised,
       boxShadow: `inset 0 -1px 0 ${c.shadow}`,
     }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         {icon}
         <div>
-          <p style={font(14, c.primary)}>{label}</p>
-          <p style={font(12, c.secondary)}>{sub}</p>
+          <p style={font(15, c.primary)}>{label}</p>
+          <p style={font(14, c.secondary)}>{sub}</p>
         </div>
       </div>
       {amount && (
         <div style={{ textAlign: "right" }}>
-          <p style={font(14, c.primary)}>{amount}</p>
-          <p style={font(12, c.secondary)}>SOL</p>
+          <p style={font(15, c.primary)}>{amount}</p>
+          <p style={font(14, c.secondary)}>SOL</p>
         </div>
       )}
     </div>
@@ -288,12 +275,12 @@ export function CTA({ label, onClick, disabled, purple }: {
         onClick={disabled ? undefined : onClick}
         disabled={disabled}
         style={{
-          width: "100%", height: 40, borderRadius: 4,
+          width: "100%", height: 40, borderRadius: 6,
           border: "none",
           borderTop: `1px solid var(--c-brand-hi)`,
           cursor: disabled ? "not-allowed" : "pointer",
           background: c.purple,
-          ...font(14, "var(--c-brand-text)"),
+          ...font(15, "var(--c-brand-text)"),
           boxShadow: `inset 0 -1px 0 var(--c-brand-sh)`,
           opacity: disabled ? 0.5 : 1,
           transition: "filter 0.1s, opacity 0.1s", flexShrink: 0,
@@ -309,12 +296,12 @@ export function CTA({ label, onClick, disabled, purple }: {
       onClick={onClick}
       disabled={disabled}
       style={{
-        width: "100%", height: 40, borderRadius: 4,
+        width: "100%", height: 40, borderRadius: 6,
         border: "none",
         borderTop: `1px solid ${c.highlight}`,
         cursor: disabled ? "not-allowed" : "pointer",
         background: c.raised,
-        ...font(14, c.primary),
+        ...font(15, c.primary),
         boxShadow: `inset 0 -1px 0 ${c.shadow}`,
         opacity: disabled ? 0.5 : 1,
         transition: "background 0.1s, opacity 0.1s", flexShrink: 0,
@@ -329,10 +316,10 @@ export function SuccessHeader({ label, onClose }: { label: string; onClose: () =
   return (
     <div style={{
       height: 48, display: "flex", alignItems: "center",
-      padding: "0 16px",
+      padding: "0 24px",
       flexShrink: 0, gap: 8,
       background: c.surface,
-      borderRadius: "8px 8px 0 0",
+      borderRadius: "10px 10px 0 0",
       borderTop: `1px solid ${c.highlight}`,
       boxShadow: `inset 0 -1px 0 ${c.shadow}`,
     }}>
@@ -345,12 +332,12 @@ export function SuccessHeader({ label, onClose }: { label: string; onClose: () =
           <path d="M3 8.5L6.5 12L13 5" stroke="#0d9c5e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
         </svg>
       </div>
-      <p style={{ ...font(14, c.primary), flex: 1 }}>{label}</p>
+      <p style={{ ...font(15, c.primary), flex: 1 }}>{label}</p>
       <button onClick={onClose} style={{
         background: "none", border: "none", cursor: "pointer",
         padding: 0, width: 28, height: 28, marginRight: -7,
         display: "flex", alignItems: "center", justifyContent: "center",
-        borderRadius: 6, flexShrink: 0,
+        borderRadius: 8, flexShrink: 0,
       }}>
         <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
           <path d="M1 1L13 13M13 1L1 13" stroke={c.secondary} strokeWidth="1" strokeLinecap="round"/>
@@ -368,10 +355,10 @@ export function Footer() {
       background: c.surface,
       borderTop: `1px solid ${c.highlight}`,
       boxShadow: `inset 0 -1px 0 ${c.shadow}`,
-      borderRadius: "0 0 8px 8px",
+      borderRadius: "0 0 10px 10px",
     }}>
       <a href="https://pye.fi/" target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", gap: 8, textDecoration: "none" }}>
-        <span style={font(14, c.secondary)}>Powered by</span>
+        <span style={font(15, c.secondary)}>Powered by</span>
         <PyeWordmark />
       </a>
     </div>
@@ -382,17 +369,17 @@ export function Footer() {
 export function Alert({ children }: { children: ReactNode }) {
   return (
     <div style={{
-      background: c.raised, borderRadius: 6, padding: 12,
+      background: c.raised, borderRadius: 8, padding: 12,
       boxShadow: `inset 0 -1px 0 ${c.shadow}`,
     }}>
-      <p style={font(12, c.secondary)}>{children}</p>
+      <p style={font(14, c.secondary)}>{children}</p>
     </div>
   );
 }
 
 export function InlineError({ message }: { message?: string | null }) {
   return message
-    ? <p style={{ ...font(12, c.red), marginTop: 4 }}>{message}</p>
+    ? <p style={{ ...font(14, c.red), marginTop: 4 }}>{message}</p>
     : null;
 }
 

@@ -4,6 +4,7 @@ import { maturities, type MaturityId, lookupBondByVoteAccount } from "@pye/sdk";
 import { useMarketStore } from "@pye/sdk/react";
 import { c, font, displayFont, MARKET_RATE, formatSolAmount } from "../design-system";
 import { CTA, Tooltip, Spacer } from "../shared/Layout";
+import { Odometer } from "../shared/Odometer";
 
 /** Map SDK maturity IDs to Dan's display format */
 const QUARTER_INFO: Record<MaturityId, { label: string; pts: string | null }> =
@@ -90,10 +91,10 @@ export default function ChooseDuration() {
     <>
       <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <p style={font(14, c.primary)}>Choose a staking duration</p>
+          <p style={font(18, c.primary, 500)}>Choose a staking duration</p>
           <Tooltip position="below" text="Lock your stake until the chosen date. All staking rewards for the period are sold to you upfront today. Your full SOL stake is returned at maturity." />
         </div>
-        <p style={font(12, c.secondary)}>
+        <p style={font(14, c.secondary)}>
           All rewards for the period are paid to you today. Your stake is
           returned in full at the end.
         </p>
@@ -115,7 +116,7 @@ export default function ChooseDuration() {
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  borderRadius: 4,
+                  borderRadius: 6,
                   cursor: "pointer",
                   background: isSelected ? c.bg : c.raised,
                   borderTop: `1px solid ${isSelected ? c.shadow : c.highlight}`,
@@ -125,7 +126,7 @@ export default function ChooseDuration() {
                   transition: "background 0.1s",
                 }}
               >
-                <span style={font(12, isSelected ? c.primary : c.secondary)}>
+                <span style={font(14, isSelected ? c.primary : c.secondary)}>
                   {q.label}
                 </span>
               </div>
@@ -138,7 +139,7 @@ export default function ChooseDuration() {
           <div
             style={{
               background: c.lowered,
-              borderRadius: 6,
+              borderRadius: 8,
               padding: 12,
               borderTop: `1px solid ${c.shadow}`,
               boxShadow: `inset 0 -1px 0 ${c.highlight}`,
@@ -147,23 +148,28 @@ export default function ChooseDuration() {
               gap: 4,
             }}
           >
-            <p style={font(12, c.secondary)}>You receive today</p>
+            <p style={font(14, c.secondary)}>You receive today</p>
             <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-              <p
-                style={{
-                  ...displayFont(32, c.green),
-                  lineHeight: 1.2,
-                  fontVariantNumeric: "lining-nums tabular-nums",
-                }}
-              >
-                {sel.grossYield < 0.0001
-                  ? "< 0.0001 SOL"
-                  : `+${formatSolAmount(sel.grossYield, 3)} SOL`}
-              </p>
+              {sel.grossYield < 0.0001 ? (
+                <p
+                  style={{
+                    ...displayFont(32, c.green),
+                    lineHeight: 1.2,
+                    fontVariantNumeric: "lining-nums tabular-nums",
+                  }}
+                >
+                  &lt; 0.0001 SOL
+                </p>
+              ) : (
+                <Odometer
+                  value={`+${formatSolAmount(sel.grossYield, 3)} SOL`}
+                  style={{ ...displayFont(32, c.green), lineHeight: 1.2 }}
+                />
+              )}
             </div>
             {sel.pts && (
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <p style={font(12, c.purple)}>{sel.pts} multiplier</p>
+                <p style={font(14, c.purple)}>{sel.pts} multiplier</p>
                 <Tooltip text="Longer durations earn a points multiplier on your locked position — 2x for Q3, 3x for Q4, and 4x for Q1. Points accumulate throughout your lockup period." />
               </div>
             )}
