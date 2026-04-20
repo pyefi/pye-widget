@@ -40,9 +40,9 @@ export interface WidgetState {
   /** Actual SOL received from RT sell, set after transaction completes */
   sellAmountSol: number | null;
 
-  /** Which PT mint is currently being redeemed (Manage tab) */
+  /** Which PT mint is currently being redeemed */
   redeemingMint: string | null;
-  /** Redeem error message (Manage tab) */
+  /** Error surfaced by the redeem flow */
   redeemError: string | null;
   /** Wallet name currently connecting */
   connectingWallet: string | null;

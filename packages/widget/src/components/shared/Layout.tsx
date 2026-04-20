@@ -42,10 +42,8 @@ export function StepHeader({ step, total, onBack, hideStep, label, tooltipText }
   step?: number;
   total?: number;
   onBack?: () => void;
-  onClose?: () => void;
   hideStep?: boolean;
   label?: string;
-  sectionLabel?: string;
   tooltipText?: string;
 }) {
   const hasProgress = !hideStep && step != null && total != null && total > 0;

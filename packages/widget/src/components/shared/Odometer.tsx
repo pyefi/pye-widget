@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 
+const DIGITS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9] as const;
+
 type OdometerProps = {
   /** Fully-formatted string. Digits roll; all other characters (+, ., space, letters) pass through. */
   value: string;
@@ -83,7 +85,7 @@ function DigitColumn({ digit, delay, duration }: { digit: number; delay: number;
           willChange: "transform",
         }}
       >
-        {Array.from({ length: 10 }, (_, n) => (
+        {DIGITS.map((n) => (
           <span key={n} style={{ height: "1em", lineHeight: 1 }}>
             {n}
           </span>

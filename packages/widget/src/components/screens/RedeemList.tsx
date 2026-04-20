@@ -14,7 +14,7 @@ import {
 } from "@pye/sdk";
 import { useBalanceStore, useWalletStore } from "@pye/sdk/react";
 import { Body } from "../shared/Layout";
-import { c, font } from "../design-system";
+import { c, font, formatSolAmount } from "../design-system";
 
 const LAMPORTS_PER_SOL = 1_000_000_000;
 
@@ -52,50 +52,32 @@ function PositionRow({ position, onRedeem, isRedeeming }: {
         style={{ width: 32, height: 32, borderRadius: 8, flexShrink: 0, objectFit: "cover" }}
       />
       <div style={{ flex: 1, minWidth: 0 }}>
-        <p style={font(15, c.primary)}>{position.ptAmount.toFixed(4)} PT</p>
+        <p style={font(15, c.primary)}>{formatSolAmount(position.ptAmount)} PT</p>
         <p style={font(14, c.secondary)}>{position.validatorName} · {position.maturityLabel}</p>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
         <p style={{ ...font(14, position.isMatured ? c.green : c.secondary), whiteSpace: "nowrap" }}>
           {position.isMatured ? "Unlocked" : `${position.daysLeft}d left`}
         </p>
-        {position.isMatured ? (
-          <button
-            className="pye-redeem-btn"
-            onClick={() => onRedeem(position)}
-            disabled={isRedeeming}
-            style={{
-              height: 26, width: 72, borderRadius: 6, border: "none",
-              padding: "0 10px",
-              borderTop: `1px solid var(--c-brand-hi)`,
-              cursor: isRedeeming ? "wait" : "pointer",
-              background: c.purple,
-              ...font(14, "var(--c-brand-text)"),
-              boxShadow: `inset 0 -1px 0 var(--c-brand-sh)`,
-              transition: "filter 0.1s",
-              opacity: isRedeeming ? 0.7 : 1,
-            }}
-          >
-            {isRedeeming ? "..." : "Redeem"}
-          </button>
-        ) : (
-          <button
-            disabled
-            style={{
-              height: 26, width: 72, borderRadius: 6, border: "none",
-              padding: "0 10px",
-              borderTop: `1px solid var(--c-brand-hi)`,
-              cursor: "not-allowed",
-              background: c.purple,
-              ...font(14, "var(--c-brand-text)"),
-              boxShadow: `inset 0 -1px 0 var(--c-brand-sh)`,
-              opacity: 0.5,
-              whiteSpace: "nowrap",
-            }}
-          >
-            Redeem
-          </button>
-        )}
+        <button
+          className="pye-redeem-btn"
+          onClick={position.isMatured && !isRedeeming ? () => onRedeem(position) : undefined}
+          disabled={!position.isMatured || isRedeeming}
+          style={{
+            height: 26, width: 72, borderRadius: 6, border: "none",
+            padding: "0 10px",
+            borderTop: `1px solid var(--c-brand-hi)`,
+            cursor: !position.isMatured ? "not-allowed" : isRedeeming ? "wait" : "pointer",
+            background: c.purple,
+            ...font(14, "var(--c-brand-text)"),
+            boxShadow: `inset 0 -1px 0 var(--c-brand-sh)`,
+            transition: "filter 0.1s",
+            opacity: !position.isMatured ? 0.5 : isRedeeming ? 0.7 : 1,
+            whiteSpace: "nowrap",
+          }}
+        >
+          {isRedeeming ? "..." : "Redeem"}
+        </button>
       </div>
     </div>
   );
@@ -117,7 +99,7 @@ export default function RedeemList() {
   const setUserStakeAccounts = useBalanceStore((s) => s.setUserStakeAccounts);
   const setBalanceLamports = useWalletStore((s) => s.setBalanceLamports);
 
-  const ptLookup = useMemo(() => buildPtLookup(), []);
+  const ptLookup = buildPtLookup();
 
   const positions: Position[] = useMemo(() => {
     const now = Date.now() / 1000;

@@ -125,7 +125,7 @@ export default function WelcomeScreen({ validatorName }: WelcomeScreenProps) {
   const walletPublicKey = useWalletStore((s) => s.publicKey);
   const { disconnect } = useWallet();
 
-  const ptLookup = useMemo(() => buildPtLookup(), []);
+  const ptLookup = buildPtLookup();
 
   // Sum of all ptSOL positions (matured + unmatured) and matured-only subtotal
   const { totalPtSol, maturedPtSol } = useMemo(() => {
