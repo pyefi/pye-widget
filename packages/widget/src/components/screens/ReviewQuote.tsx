@@ -18,6 +18,7 @@ import {
 import { useMarketStore, useBalanceStore, useWalletStore } from "@pye/sdk/react";
 import { c, font, displayFont, MARKET_RATE, pointsMap, formatSolAmount } from "../design-system";
 import { StepTitle, CTA, Tooltip, Spacer } from "../shared/Layout";
+import { Odometer } from "../shared/Odometer";
 
 /* ═══════════════════════════════════════════════════════════════════════════
    DiscountSlider — Dan's exact pointer-capture slider
@@ -89,7 +90,7 @@ function DiscountSlider({
       <div style={{ display: "flex", justifyContent: "space-between" }}>
         {["0%", "1%", "2%", "3%", "4%", "5%"].map((l) => (
           <span key={l} style={{
-            ...font(12, c.secondary),
+            ...font(14, c.secondary),
             textTransform: "uppercase" as const, letterSpacing: "0.04em",
             width: 24, textAlign: l === "0%" ? "left" : l === "5%" ? "right" : "center",
           }}>{l}</span>
@@ -329,19 +330,20 @@ export default function ReviewQuote() {
           background: c.lowered,
           borderTop: `1px solid ${c.shadow}`,
           boxShadow: `inset 0 -1px 0 ${c.highlight}`,
-          borderRadius: "6px 6px 0 0",
+          borderRadius: "8px 8px 0 0",
           padding: 12,
           display: "flex", flexDirection: "column", gap: 12,
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <p style={font(12, c.secondary)}>You receive today</p>
+            <p style={font(14, c.secondary)}>You receive today</p>
             <Tooltip text="Estimated upfront payout based on current market rates, net of fees. The final amount is confirmed when your order fills on the Pye orderbook." />
           </div>
-          <p style={{ ...displayFont(32, c.green), lineHeight: 1.2, fontVariantNumeric: "lining-nums tabular-nums", marginBottom: slippage > 0 ? -4 : 0 }}>
-            +{formatSolAmount(sellAmount)} SOL
-          </p>
+          <Odometer
+            value={`+${formatSolAmount(sellAmount)} SOL`}
+            style={{ ...displayFont(32, c.green), lineHeight: 1.2, marginBottom: slippage > 0 ? -4 : 0 }}
+          />
           {slippage > 0 && (
-            <p style={font(12, c.secondary)}>
+            <p style={font(14, c.secondary)}>
               Min. received: {formatSolAmount(sellAmount * (1 - slippage / 100))} SOL
             </p>
           )}
@@ -351,15 +353,19 @@ export default function ReviewQuote() {
           background: c.lowered,
           borderTop: `1px solid ${c.shadow}`,
           boxShadow: `inset 0 -1px 0 ${c.highlight}`,
-          borderRadius: "0 0 6px 6px",
+          borderRadius: "0 0 8px 8px",
           padding: 12,
           display: "flex", justifyContent: "space-between", alignItems: "center",
-          overflow: "hidden",
+          gap: 12, overflow: "hidden",
         }}>
-          <p style={font(12, c.secondary)}>
+          <p style={{ ...font(14, c.secondary), flex: 1, minWidth: 0 }}>
             <span style={{ color: c.primary }}>{parsedAmount} SOL</span>{` back ${matures}`}
           </p>
-          {points && <p style={font(12, c.purple)}>{points}</p>}
+          {points && (
+            <p style={{ ...font(14, c.purple), whiteSpace: "nowrap", flexShrink: 0 }}>
+              {points}
+            </p>
+          )}
         </div>
       </div>
 
@@ -371,7 +377,7 @@ export default function ReviewQuote() {
           cursor: "pointer", padding: "2px 0", userSelect: "none",
         }}
       >
-        <span style={font(12, c.secondary)}>Advanced</span>
+        <span style={font(14, c.secondary)}>Advanced</span>
         <svg width="10" height="6" viewBox="0 0 10 6" fill="none" style={{
           transform: advancedOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s",
         }}>
@@ -382,7 +388,7 @@ export default function ReviewQuote() {
       {/* Advanced panel — discount rate */}
       {advancedOpen && (
         <div style={{
-          background: c.raised, borderRadius: 6, padding: 12,
+          background: c.raised, borderRadius: 8, padding: 12,
           borderTop: `1px solid ${c.highlight}`,
           boxShadow: `inset 0 -1px 0 ${c.shadow}`,
           display: "flex", flexDirection: "column", gap: 16,
@@ -391,18 +397,18 @@ export default function ReviewQuote() {
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             <div style={{ display: "flex", justifyContent: "space-between" }}>
               <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                <span style={font(12, c.secondary)}>Max slippage tolerance</span>
+                <span style={font(14, c.secondary)}>Max slippage tolerance</span>
                 <Tooltip bg={c.highlight} text="Slippage is the maximum difference between the quoted price and the price you actually receive. A higher tolerance means your order is more likely to fill, but you may receive slightly less SOL." />
               </span>
               {orderBookSlippageBps > 0 && (
-                <span style={font(12, c.secondary)}>Est. slippage: {(orderBookSlippageBps / 100).toFixed(2)}%</span>
+                <span style={font(14, c.secondary)}>Est. slippage: {(orderBookSlippageBps / 100).toFixed(2)}%</span>
               )}
             </div>
             <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
               <span style={{ ...font(18, c.primary), transition: "color 0.15s" }}>
                 {slippage.toFixed(2)}
               </span>
-              <span style={font(12, c.secondary)}>% max slippage</span>
+              <span style={font(14, c.secondary)}>% max slippage</span>
             </div>
             <DiscountSlider value={slippage} onChange={(v) => setSlippageBps(Math.round(v * 100))} />
           </div>
@@ -415,11 +421,11 @@ export default function ReviewQuote() {
           background: "rgba(255,181,77,0.15)",
           borderTop: "1px solid rgba(255,255,255,0.2)",
           boxShadow: "inset 0 -1px 0 rgba(0,0,0,0.08)",
-          borderRadius: 4, padding: 12,
+          borderRadius: 6, padding: 12,
           display: "flex", flexDirection: "column", gap: 2,
         }}>
-          <p style={{ ...font(12, c.primary), fontWeight: 500 }}>Insufficient liquidity</p>
-          <p style={font(12, c.secondary)}>
+          <p style={{ ...font(14, c.primary), fontWeight: 500 }}>Insufficient liquidity</p>
+          <p style={font(14, c.secondary)}>
             Only {liquidityCheck?.totalAvailableSize?.toFixed(2) ?? "0"} RT available on the order book.
             Your order may partially fill or not fill at all.
           </p>
@@ -427,7 +433,7 @@ export default function ReviewQuote() {
       )}
 
       {/* Orderbook disclosure */}
-      <p style={font(12, c.secondary)}>
+      <p style={font(14, c.secondary)}>
         Orders are matched on the{" "}
         <a href="https://app.pye.fi/trade" target="_blank" rel="noreferrer"
           style={{ color: c.secondary, textDecoration: "underline" }}>
@@ -439,9 +445,9 @@ export default function ReviewQuote() {
       {/* Error */}
       {txStatus === "error" && txError && (
         <div style={{
-          ...font(12, c.red),
+          ...font(14, c.red),
           background: `${c.red}12`,
-          borderRadius: 4, padding: "8px 12px",
+          borderRadius: 6, padding: "8px 12px",
         }}>
           {txError}
         </div>

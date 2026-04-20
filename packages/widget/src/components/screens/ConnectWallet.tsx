@@ -25,7 +25,7 @@ function WalletRow({ name, iconUrl, connecting, onConnect }: WalletRowProps) {
       onClick={() => !connecting && onConnect(name)}
       style={{
         display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: 12, borderRadius: 6,
+        padding: 12, borderRadius: 8,
         background: c.raised,
         boxShadow: `inset 0 1px 0 ${c.highlight}, inset 0 -1px 0 ${c.shadow}`,
         cursor: connecting ? "default" : "pointer",
@@ -39,9 +39,9 @@ function WalletRow({ name, iconUrl, connecting, onConnect }: WalletRowProps) {
         ) : (
           <WalletDot name={name} size={32} />
         )}
-        <p style={font(14, c.primary)}>{name}</p>
+        <p style={font(15, c.primary)}>{name}</p>
       </div>
-      <p style={font(12, isConnecting ? c.purple : c.secondary)}>
+      <p style={font(14, isConnecting ? c.purple : c.secondary)}>
         {isConnecting ? "Connecting\u2026" : "Detected"}
       </p>
     </div>
@@ -60,7 +60,7 @@ export default function ConnectWallet() {
   // Auto-advance when wallet connects
   useEffect(() => {
     if (walletStatus === "connected") {
-      navigate("select-position");
+      navigate("welcome");
     }
   }, [walletStatus, navigate]);
 
