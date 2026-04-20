@@ -32,19 +32,17 @@ export default function WidgetShell({ validatorName }: WidgetShellProps) {
   const walletPublicKey = useWalletStore((s) => s.publicKey);
   const walletStatus = useWalletStore((s) => s.status);
   const prevWalletRef = useRef<string | null>(null);
-  const initializedRef = useRef(false);
 
-  // Initial screen: if a wallet is already connected when the widget mounts,
-  // skip the appetiser/connect-wallet and go straight to welcome.
+  // Auto-advance to welcome when the wallet is connected and the user is
+  // still on a pre-welcome screen (covers both autoConnect after mount and
+  // the user clicking through connect-wallet).
   useEffect(() => {
-    if (initializedRef.current) return;
     if (
       walletStatus === "connected" &&
       (screen === "yield-forward-intro" || screen === "connect-wallet")
     ) {
       navigate("welcome");
     }
-    initializedRef.current = true;
   }, [walletStatus, screen, navigate]);
 
   // Reset widget selections when wallet changes mid-flow
