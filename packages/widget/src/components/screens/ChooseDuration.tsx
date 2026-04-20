@@ -101,8 +101,8 @@ export default function ChooseDuration() {
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        {/* Pill row */}
-        <div style={{ display: "flex", gap: 8 }}>
+        {/* Duration rows — full width, one per row */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {quarters.map((q) => {
             const isSelected = selectedMaturityId === q.matId;
             return (
@@ -111,12 +111,13 @@ export default function ChooseDuration() {
                 className={isSelected ? "pye-pill pye-pill--selected" : "pye-pill"}
                 onClick={() => setSelectedMaturity(q.matId as MaturityId)}
                 style={{
-                  flex: 1,
-                  height: 32,
+                  width: "100%",
+                  minHeight: 48,
                   display: "flex",
                   alignItems: "center",
-                  justifyContent: "center",
-                  borderRadius: 6,
+                  justifyContent: "space-between",
+                  padding: "10px 16px",
+                  borderRadius: 8,
                   cursor: "pointer",
                   background: isSelected ? c.bg : c.raised,
                   borderTop: `1px solid ${isSelected ? c.shadow : c.highlight}`,
@@ -126,9 +127,12 @@ export default function ChooseDuration() {
                   transition: "background 0.1s",
                 }}
               >
-                <span style={font(14, isSelected ? c.primary : c.secondary)}>
+                <span style={font(15, isSelected ? c.primary : c.secondary, isSelected ? 500 : 400)}>
                   {q.label}
                 </span>
+                {q.pts && (
+                  <span style={font(13, c.purple)}>{q.pts}</span>
+                )}
               </div>
             );
           })}
@@ -167,12 +171,6 @@ export default function ChooseDuration() {
                 />
               )}
             </div>
-            {sel.pts && (
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <p style={font(14, c.purple)}>{sel.pts} multiplier</p>
-                <Tooltip text="Longer durations earn a points multiplier on your locked position — 2x for Q3, 3x for Q4, and 4x for Q1. Points accumulate throughout your lockup period." />
-              </div>
-            )}
           </div>
         )}
 

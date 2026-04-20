@@ -352,7 +352,7 @@ export default function ReviewQuote() {
             left: (
               <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
                 <p style={font(14, c.secondary)}>PTs you&apos;ll receive</p>
-                <Tooltip text="A PT (Principal Token) is a 1:1 tokenised claim on your staked SOL. Hold it until the redeem date, then burn it to reclaim your full stake." />
+                <Tooltip text="Your PT is a token receipt for your staked SOL. At the redeem date, redeem it 1:1 for your full stake." />
               </div>
             ),
             right: (
