@@ -204,7 +204,16 @@ export default function ReviewQuote() {
   const slippage = slippageBps / 100;
 
   const isLoading = txStatus === "loading";
-  const canSign = !!selectedStakeAccountPubkey && !!selectedMaturityId && !isLoading && hasLiquidity;
+  const selectedStakeStillOwned =
+    selectedStakeAccountPubkey === "liquid-sol" ||
+    (selectedStakeAccountPubkey !== null &&
+      userStakeAccounts.some((a) => a.pubkey === selectedStakeAccountPubkey));
+  const canSign =
+    !!selectedStakeAccountPubkey &&
+    !!selectedMaturityId &&
+    !isLoading &&
+    hasLiquidity &&
+    selectedStakeStillOwned;
 
   // Resolve bond from the stake account's actual validator (not from market key)
   // Fall back to market-key-based resolution for liquid SOL (no stake account)

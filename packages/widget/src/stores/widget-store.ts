@@ -74,6 +74,7 @@ export interface WidgetActions {
     error?: string | null,
   ): void;
   reset(): void;
+  resetForWalletChange(): void;
 }
 
 export type WidgetStoreType = WidgetState & WidgetActions;
@@ -220,6 +221,41 @@ export function createWidgetStore() {
 
       reset() {
         set(() => ({ ...initialState }));
+      },
+
+      resetForWalletChange() {
+        set((s) => {
+          s.selectedStakeAccountPubkey = null;
+          s.selectedStakeAccountBalance = 0;
+          s.selectedValidatorName = null;
+          s.selectedValidatorIcon = null;
+          s.selectedValidatorVoteAccount = null;
+          s.selectedValidatorAltPubkey = null;
+          s.depositAmount = "";
+          s.selectedMaturityId = null;
+          s.txStatus = "idle";
+          s.txStep = "idle";
+          s.depositTxSignature = null;
+          s.sellTxSignature = null;
+          s.txSignature = null;
+          s.txError = null;
+          s.sellAmountSol = null;
+          s.redeemingMint = null;
+          s.redeemError = null;
+          s.redeemAmountSol = null;
+          s.redeemTxSignature = null;
+          if (
+            s.screen === "choose-amount" ||
+            s.screen === "choose-duration" ||
+            s.screen === "review-quote" ||
+            s.screen === "complete" ||
+            s.screen === "redeem-complete" ||
+            s.screen === "redeem-list"
+          ) {
+            s.screen = "welcome";
+            s.screenHistory = [];
+          }
+        });
       },
     })),
   );
