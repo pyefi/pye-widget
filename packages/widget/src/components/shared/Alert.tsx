@@ -8,9 +8,9 @@ interface AlertProps {
 
 export default function Alert({ variant = "info", children }: AlertProps) {
   const base: CSSProperties = {
-    ...font(12, c.secondary),
+    ...font(14, c.secondary),
     padding: "10px 14px",
-    borderRadius: 10,
+    borderRadius: 12,
     lineHeight: 1.5,
   };
 
