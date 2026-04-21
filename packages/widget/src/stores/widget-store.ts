@@ -5,10 +5,9 @@ import { useStore } from "zustand";
 import type { MaturityId } from "@pye/sdk";
 
 export type WidgetScreen =
+  | "home"
   | "yield-forward-intro"
   | "connect-wallet"
-  | "welcome"
-  | "redeem-list"
   | "select-position"
   | "choose-amount"
   | "choose-duration"
@@ -16,9 +15,12 @@ export type WidgetScreen =
   | "complete"
   | "redeem-complete";
 
+export type HomeTab = "earn" | "positions" | "learn";
+
 export interface WidgetState {
   screen: WidgetScreen;
   screenHistory: WidgetScreen[];
+  homeTab: HomeTab;
 
   selectedStakeAccountPubkey: string | null;
   selectedStakeAccountBalance: number;
@@ -40,10 +42,12 @@ export interface WidgetState {
   /** Actual SOL received from RT sell, set after transaction completes */
   sellAmountSol: number | null;
 
-  /** Which PT mint is currently being redeemed */
+  /** Which PT mint is currently being redeemed (Manage tab) */
   redeemingMint: string | null;
-  /** Error surfaced by the redeem flow */
+  /** Redeem error message (Manage tab) */
   redeemError: string | null;
+  /** Currently viewed learn article */
+  selectedLearnArticle: { title: string; teaser: string; body: string[] } | null;
   /** Wallet name currently connecting */
   connectingWallet: string | null;
   /** SOL amount received from redeem, set after transaction completes */
@@ -55,6 +59,7 @@ export interface WidgetState {
 export interface WidgetActions {
   navigate(screen: WidgetScreen): void;
   goBack(): void;
+  setHomeTab(tab: HomeTab): void;
   selectStakeAccount(pubkey: string, balance: number, validatorName?: string, validatorIcon?: string, validatorVoteAccount?: string): void;
   setDepositAmount(amount: string): void;
   setSelectedMaturity(id: MaturityId): void;
@@ -63,6 +68,7 @@ export interface WidgetActions {
   setSellAmountSol(amount: number): void;
   setRedeemingMint(mint: string | null): void;
   setRedeemError(error: string | null): void;
+  setSelectedLearnArticle(article: WidgetState["selectedLearnArticle"]): void;
   setConnectingWallet(name: string | null): void;
   setRedeemAmountSol(amount: number): void;
   setRedeemTxSignature(sig: string): void;
@@ -78,8 +84,9 @@ export interface WidgetActions {
 export type WidgetStoreType = WidgetState & WidgetActions;
 
 const initialState: WidgetState = {
-  screen: "yield-forward-intro",
+  screen: "home",
   screenHistory: [],
+  homeTab: "earn",
 
   selectedStakeAccountPubkey: null,
   selectedStakeAccountBalance: 0,
@@ -102,6 +109,7 @@ const initialState: WidgetState = {
 
   redeemingMint: null,
   redeemError: null,
+  selectedLearnArticle: null,
   connectingWallet: null,
   redeemAmountSol: null,
   redeemTxSignature: null,
@@ -123,6 +131,12 @@ export function createWidgetStore() {
         set((s) => {
           const prev = s.screenHistory.pop();
           if (prev) s.screen = prev;
+        });
+      },
+
+      setHomeTab(tab) {
+        set((s) => {
+          s.homeTab = tab;
         });
       },
 
@@ -175,6 +189,12 @@ export function createWidgetStore() {
       setRedeemError(error) {
         set((s) => {
           s.redeemError = error;
+        });
+      },
+
+      setSelectedLearnArticle(article) {
+        set((s) => {
+          s.selectedLearnArticle = article;
         });
       },
 

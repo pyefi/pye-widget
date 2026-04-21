@@ -62,8 +62,8 @@ export default function YieldForwardIntro() {
 
   return (
     <>
-      <p style={{ ...displayFont(45, c.primary), letterSpacing: "-0.02em" }}>
-        Get your future staking rewards today.
+      <p style={{ ...displayFont(45, c.primary), letterSpacing: "-0.02em", whiteSpace: "pre-wrap" }}>
+        {"Your rewards,\nwithout the wait."}
       </p>
 
       <Spacer />
