@@ -1,7 +1,6 @@
 import { useWidgetStore } from "../../stores/widget-store";
 import { c, font, displayFont, formatSolAmount } from "../design-system";
 import { Body, CTA, Spacer, SuccessHeader } from "../shared/Layout";
-import { Odometer } from "../shared/Odometer";
 
 export default function RedeemComplete() {
   const reset = useWidgetStore((s) => s.reset);
@@ -19,7 +18,7 @@ export default function RedeemComplete() {
       <SuccessHeader label="Redeem confirmed" onClose={() => reset()} />
 
       <Body>
-        <p style={font(14, c.secondary)}>Your staked SOL has been returned to your wallet.</p>
+        <p style={font(12, c.secondary)}>Your staked SOL has been returned to your wallet.</p>
 
         {/* Amount received */}
         <div style={{ display: "flex", flexDirection: "column" }}>
@@ -27,31 +26,30 @@ export default function RedeemComplete() {
             background: c.lowered,
             borderTop: `1px solid ${c.shadow}`,
             boxShadow: `inset 0 -1px 0 ${c.highlight}`,
-            borderRadius: "8px 8px 0 0",
+            borderRadius: "6px 6px 0 0",
             padding: 12,
             display: "flex", flexDirection: "column", gap: 12,
           }}>
-            <p style={font(14, c.secondary)}>Staked SOL returned</p>
-            <Odometer
-              value={`${formatSolAmount(amount)} SOL`}
-              style={{ ...displayFont(32, c.green), lineHeight: 1.2 }}
-            />
+            <p style={font(12, c.secondary)}>Staked SOL returned</p>
+            <p style={{ ...displayFont(32, c.green), lineHeight: 1.2, fontVariantNumeric: "lining-nums tabular-nums" }}>
+              {formatSolAmount(amount)} SOL
+            </p>
           </div>
           {/* Solscan link row */}
           <div style={{
             background: c.lowered,
             borderTop: `1px solid ${c.shadow}`,
             boxShadow: `inset 0 -1px 0 ${c.highlight}`,
-            borderRadius: "0 0 8px 8px",
+            borderRadius: "0 0 6px 6px",
             padding: 12,
             display: "flex", justifyContent: "space-between", alignItems: "center",
           }}>
-            <p style={font(14, c.secondary)}>Received as a stake account</p>
+            <p style={font(12, c.secondary)}>Received as a stake account</p>
             <a
               href={solscanUrl}
               target="_blank"
               rel="noreferrer"
-              style={{ ...font(14, c.purple), textDecoration: "none", display: "flex", alignItems: "center", gap: 4 }}
+              style={{ ...font(12, c.purple), textDecoration: "none", display: "flex", alignItems: "center", gap: 4 }}
             >
               Solscan
               <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
@@ -66,13 +64,13 @@ export default function RedeemComplete() {
           background: c.raised,
           borderTop: `1px solid ${c.highlight}`,
           boxShadow: `inset 0 -1px 0 ${c.shadow}`,
-          borderRadius: 8, padding: 12,
+          borderRadius: 6, padding: 12,
           display: "flex", flexDirection: "column", gap: 12,
         }}>
-          <p style={font(14, c.primary)}>
+          <p style={font(12, c.primary)}>
             <strong style={{ fontWeight: 600 }}>What to do next</strong>
           </p>
-          <p style={font(14, c.secondary)}>
+          <p style={font(12, c.secondary)}>
             Two more steps to make it liquid.
           </p>
 
@@ -89,7 +87,7 @@ export default function RedeemComplete() {
               1
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-              <p style={font(14, c.primary)}>Deactivate the stake account</p>
+              <p style={font(12, c.primary)}>Deactivate the stake account</p>
               <p style={font(11, c.secondary)}>
                 Deactivate in your wallet app. Takes ~1 epoch (~2 days).
               </p>
@@ -109,7 +107,7 @@ export default function RedeemComplete() {
               2
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-              <p style={font(14, c.primary)}>Withdraw to liquid SOL</p>
+              <p style={font(12, c.primary)}>Withdraw to liquid SOL</p>
               <p style={font(11, c.secondary)}>
                 Once deactivated, withdraw to get liquid SOL.
               </p>
