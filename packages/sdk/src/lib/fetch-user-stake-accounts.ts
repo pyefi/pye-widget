@@ -113,6 +113,7 @@ export async function fetchUserStakeAccounts(
       validatorName: validatorInfo?.name ?? "Unknown Validator",
       validatorIcon: validatorInfo?.icon ?? "/solana-token.png",
       validatorLogo: null,
+      validatorAltPubkey: null,
       lamports: Number(delegation.stake ?? account.lamports),
       state,
     });
@@ -125,17 +126,22 @@ export async function fetchUserStakeAccounts(
     const supabase = createClient(config.supabaseUrl, config.supabaseAnonKey);
     const { data, error } = await supabase
       .from("validator_metadata_configs")
-      .select("vote_pubkey, base_image_url")
+      .select("vote_pubkey, base_image_url, alt_pubkey")
       .in("vote_pubkey", voteAccounts);
     if (error) {
-      console.warn("[fetchUserStakeAccounts] logo fetch failed:", error);
+      console.warn("[fetchUserStakeAccounts] metadata fetch failed:", error);
     } else if (data) {
-      const logoByVote = new Map<string, string>();
+      const metaByVote = new Map<string, { logo: string | null; alt: string | null }>();
       for (const row of data) {
-        if (row.base_image_url) logoByVote.set(row.vote_pubkey, row.base_image_url);
+        metaByVote.set(row.vote_pubkey, {
+          logo: row.base_image_url ?? null,
+          alt: row.alt_pubkey ?? null,
+        });
       }
       for (const r of results) {
-        r.validatorLogo = logoByVote.get(r.validatorVoteAccount) ?? null;
+        const meta = metaByVote.get(r.validatorVoteAccount);
+        r.validatorLogo = meta?.logo ?? null;
+        r.validatorAltPubkey = meta?.alt ?? null;
       }
     }
   }

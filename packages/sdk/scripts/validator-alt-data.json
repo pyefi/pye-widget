@@ -1,0 +1,135 @@
+{
+  "validators": [
+    {
+      "name": "Alchemy",
+      "vote_account": "JEJzKYzyYJJjtn6Yb1P7r6YV75TdSNmmJT49sgDoHvmk",
+      "bonds": [
+        { "pubkey": "DAvM99bax26DbtQg8arjKCnGShc1D2DmEkrTrzjo83gG", "pt_mint": "399NjCZnuFbgHs2uCtvvEAGPPmsEpxxVmE8TV6wUhNVQ", "yt_mint": "5CNRw6qELjQuocgv1d44rXrCe12MkgzbkHb2tRKdWqG8" },
+        { "pubkey": "8k8EyRnaybKP9g9E9JNsWTXWMHdMoJttzShwq2994jDL", "pt_mint": "2toCKwQjihotbYZNNQtoXCjXkp669xoT5Ms4gWtJYvDr", "yt_mint": "2aPkXwCD4pbvaoenWcx9oKaeJ9rdyVeqkLNyJS5sRyfv" },
+        { "pubkey": "DY7Bm6nhrEKyXXnVwTDfrmwdFZrjqdM9jPvESWtGcpHv", "pt_mint": "GA8MAhp5mWew3VwdxJU8571rUKeEeU3yVsG8Ag7SU7Hs", "yt_mint": "EAbT1HvVdo7EtByZVifw3f6wJA4YqK1FaUQx41uAYe6X" },
+        { "pubkey": "UbzpFyhFVkRUQx3oGqFJ6Cjx86A9N4SgPKHhDPhmhfv", "pt_mint": "4TmjAh1FKbLkfRHRooJLMyxYSqaNfEvGu3KziJfHBsvq", "yt_mint": "CH3hjYys34LGP2b4YrBUwXP7JsakvjV3fjhXL33A9o9n" }
+      ],
+      "rt_markets": [
+        "8JcbYCqZL9x3Zz8x9LuP6b3qtmYzz96tRUK7TQqU4Zni",
+        "7gYBPVZ8KTKVLfkrJy3dYFmr9zAUvra3GrTbrYd6Sjpv",
+        "6Gh2NN8aSxmWRpLkyQEYjGB2boQxNdqtjmeKren6SdVL",
+        "8qMU92zwYW6zPAaCfDBxUCGLDPhnox5nyVmbiswyVgAD"
+      ]
+    },
+    {
+      "name": "Chorus One",
+      "vote_account": "Chorus6Kis8tFHA7AowrPMcRJk3LbApHTYpgSNXzY5KE",
+      "bonds": [
+        { "pubkey": "2ASJRCVBvxuoVbeYTUdTaiQV4KGADwArj8dnhF31ecGJ", "pt_mint": "9ct4MwT7tvWhKbRJXaWgLh73X47qMuVX8CMjDiK1HB7v", "yt_mint": "GBWgdv4L9CoCy7c7XXfqoWVGnMnzaXpQ4MsXjuaY2KSS" },
+        { "pubkey": "3Mfe1D6FL5ZWG4evCUZ3vYpPPoCV97EiYVGk52FMv84T", "pt_mint": "CvMe2jY1ZmBf48bVTd5FHYF8CwWTUDS9sto8tCm3cLgd", "yt_mint": "X4KWCWiizSQTR6Gti7mYqN3TTFgf2TazNPwKSCkmjCy" },
+        { "pubkey": "9Nif871skt8u75PaTqhiSzGymsFhhEjb28PWVKULpFf2", "pt_mint": "21iWeEVPTtWosNvAfvENMTAxQbkizLxAQhtF3vrJUzEe", "yt_mint": "5m8ySHASsFPV6x7wQr7RDocw5VCBAn3iEmc8CALFvEAs" },
+        { "pubkey": "3qYNA2GRMsejog9HQ2K4rg1U7dQHrtCx1jphFYxe4fd7", "pt_mint": "C2sRbkTGKZstWYx7caSow2HRw12eoUZEN66ntvrppqoH", "yt_mint": "24Si2nj1wWpXfHH27uyMkbQ56pguu91Ag8aiXZu6ZSH5" }
+      ],
+      "rt_markets": [
+        "CcYNyacvk2k4kd4c9m3ZbTox6dZHnrBYS2SJoYS1EjVa",
+        "2DTX7eWFGPE3VEirXsrrFm9hv7dGpcjGf813dA8S1k7B",
+        "5L3MFJv3s6BrChKWZSBD34e1zvJaBCkA7o9sJfdW8Vya",
+        "GPWLJuQXJfhi9DWjWqYLLJiQbWSxVgjxDGd8pAzXUtPH"
+      ]
+    },
+    {
+      "name": "Exo Tech",
+      "vote_account": "6q1VNp8Vy2Go12vb8CwbjUqqj2SXr2JYftJRWs71sW23",
+      "bonds": [
+        { "pubkey": "CyTBvu5CkLujVgETLpYFjhXgkeRHPqTBbMkNFfxj6pJW", "pt_mint": "w9VNqfsT7WkSkZaPzp5ZkCytE97b9GBn7M6xfTe9xFQ", "yt_mint": "GhAZcqqqo37mAmXtLKAyW36shVUq2Q7uk8JSrEAhMCSn" },
+        { "pubkey": "FCScnhLhJh7My72cesYXHHqfTTNWcYzoExQdEkmmNqWm", "pt_mint": "6nVoqJxjns8bcqmRhbehcPgm7CQhqqj4FN6hzcbHqLg4", "yt_mint": "FQUfzqcEjd9rLNisGtEhZDUnWG4U22W3aTTCFAaREPJm" },
+        { "pubkey": "CNVGQD9jiTiTJWpiv4eqVueQUdJtXDLi7zR2hDRBxgMG", "pt_mint": "DTs3D8mmXP9oDhwogaC1vxCuMS2ybbp5VmmCuwXzvUEF", "yt_mint": "6mVUjZxfFAvR2HKac6ec48kGa5CrR3pcgGXytEP34poM" },
+        { "pubkey": "6cSM6CRxKjfaN57t2vPFEiBgUrzkeap7v3b4y7MSpwhm", "pt_mint": "G6PnSFdTVK8BJbXjiRFe4VPdS8oMbZnPhx9dGc8bj4q9", "yt_mint": "5wYuWfMzssTKRDvyDrmf58DhhUYwkg2FMz3u7tCao9L1" }
+      ],
+      "rt_markets": [
+        "BkwKQTtCcLw352vkSQsfTpex64mXHjo7YNYPziK1LHEi",
+        "GrukNsqujx3ov6nixso822jdz8ySiQLsM7QRpzU9Ag1d",
+        "CZHQqQgEUMZFzme11QSFzRZd3a3gMcEhemd2CD66kNh1",
+        "7xNXRD22BgxfLHETqq7SLC4itVe4tp7oRcpbVgCLMXYM",
+        "9jq1ZPT2Kskh9WAYdK2nD9kv2SGZR88GoHUBBYgW4o63"
+      ]
+    },
+    {
+      "name": "Figment",
+      "vote_account": "CcaHc2L43ZWjwCHART3oZoJvHLAe9hzT2DJNUpBzoTN1",
+      "bonds": [
+        { "pubkey": "25qer2TaoaKHW3ChdENDASSf2CVXabvkBKz5BCebV4oL", "pt_mint": "3euQQ8MecQJN6PDY4NCbqYLByNYhqcNb28K9M6GCRd1Y", "yt_mint": "BqWq2vEqXPioNNRhd1m66Py9P3JYNRFWUoG6HTZUgaA5" },
+        { "pubkey": "FY6Lv3x5WpTertEHSM3i62Vg5Dkx3e7P9MWEyDKpGfi2", "pt_mint": "Ht2K5CqmVutxA4Q7cdNfqV7dFJmyngTeySXM6inz8H6w", "yt_mint": "EjiQ1aCkzh3Y3VrJhbjh9SrcRzK9YCwJTS1orT8BUbJt" },
+        { "pubkey": "3DBC5wtCBjnkKm81ENLpdwFUd7QNVk34VFdMX72hvQPP", "pt_mint": "6wtRJHHZiYbENr6N8MvZnZd9tfk4FvXNzuLUMYnafMDt", "yt_mint": "AEzgw71QsC3CKvEj7XLE61kmft2SpYwT5NfXdd2gN9dV" },
+        { "pubkey": "8Fgxev5GwYY8fG4RkVZkZJa91ohjQnLt6HyqL896okLy", "pt_mint": "BPawHp6rw14rkDws7i2BzYPkrZhiNogXQ9zDyj8H6jNx", "yt_mint": "2HDBy9oGbTXTF9QhcaDKe4oQEM1S2RV2D4iYE4jiTHNy" }
+      ],
+      "rt_markets": [
+        "327f71FLDkaADLwmce6FP9dVp7c5Wv523XeRWeBs6tzz",
+        "FVLyZWY5sRRsefUb81Z8mxHLUiiiBgKdirs8R41hBh7z",
+        "4hJEudsDjANcw485PeScQRiSafDJrHkxDeinugdgZJZ8",
+        "3m5sfhQaCUDD1aFtSHepAgjPDJ2CUYi5m867dEKScHdW",
+        "477qugQgX9iaVdcws1p7MVT9V6YYjWcChvmYtJXovVUK"
+      ]
+    },
+    {
+      "name": "Galaxy",
+      "vote_account": "CvSb7wdQAFpHuSpTYTJnX5SYH4hCfQ9VuGnqrKaKwycB",
+      "bonds": [
+        { "pubkey": "D2GU4gY2wtm85iUjcYvm9CaX1ys7Y35HvJQdz17FFAHj", "pt_mint": "GctVsXR8snwEwZF4mZCo7pixZqaqQJQPbQThznFK9u63", "yt_mint": "Gs4Ph3RDCWiCT5ZVmLGWLiBQro7HHcp1dfUYf5qWLgtC" },
+        { "pubkey": "9vwjAqDkoyCqyQ8EFBtnMEA6yDTYKDbCu8HzYAnb6617", "pt_mint": "BrQoKRRY48xwJAKSNHLmuSqmdH67g7cp2J8KjSL6GpDh", "yt_mint": "4zu25Yu77p3AX3W2rAyww9cCbSZ69GraywHCPTAV2jnw" },
+        { "pubkey": "41XWqAP4ctWDj3BVPasVshv1oE7H2XPK3PoNYFVPkEAv", "pt_mint": "CSASXWttsfeJtykyjMt5sBZ2WF3dHNWFj6qcsZVgzT5T", "yt_mint": "EHSbzLJj85FYuR2zJwCZmoHLj2VAb8Ta2t131QdTz4nx" },
+        { "pubkey": "8ujEkRq1HHXVZa7bJTkk1rp7JYR4FpmCjAFeRUTiYMF", "pt_mint": "HmxB56N7qdcT6Y8RmuwxbovYJgyB5wjrKdGXmfV6NXTm", "yt_mint": "73UmSc7PWT2FoVCZvWZc8wNKnLqPWAyRttbHoyg4GT4w" }
+      ],
+      "rt_markets": [
+        "BzHAmbLN6mZSADNDsa4DoaUqKXC1J57n1EhY8mvwSfBz",
+        "soq8n33FhjwK59euR5K4HsT8P2zNgTnGRnc43X7wXjR",
+        "7V14sFD9fGKtwaPPdXjqBXVi38WhSJKD8xzeChJDCijK",
+        "FuURYJaCWeeL3C4nu1jBmHzSxDxaCLWYnNoQXDySZj3o"
+      ]
+    },
+    {
+      "name": "Helius",
+      "vote_account": "he1iusunGwqrNtafDtLdhsUQDFvo13z9sUa36PauBtk",
+      "bonds": [
+        { "pubkey": "UqCX9u1tcGedcenHVyh2AAK98B2MrYT8a28qNcCqRLo", "pt_mint": "3X1MsYzvYchr3oXZHJmNsRByouteSkHxpCcFmxLyGTrq", "yt_mint": "9V46xNRChEYseHF2uUhMuMD925WX7Ccc9qyjnacgVNWJ" },
+        { "pubkey": "CBoM7AaEGTTSLrUGjgnaj8KgeMyaX76AmRt33iz8PDsp", "pt_mint": "8M7PnbbAj59DZHACHZpfAmF78YsEsZyrrPuBhM4P8xwJ", "yt_mint": "Gfou83rrKxkVALBKdZUPYzqkhCsFBgTCPAmxiEe5navT" },
+        { "pubkey": "GE8cbZcBJqc2ftBXgfkyyaFZcDqZibHNFpsd1rPoR5zp", "pt_mint": "EyuispXoWQPXS7N8ieLwFCPQhZPsufQQTdeHBao36aL7", "yt_mint": "DDRBbX62PMf6qbCUfufDoudLfpXeN8XkWzUgU3hxuNsz" },
+        { "pubkey": "EpxJt1e5DcKrC4vA82d5HXEhCanz8yJA6e3Zv3GPdzp8", "pt_mint": "Fq148RgF4Er3bRB8LakVfLUFrFsr7aRAe4Hdeke8JR2v", "yt_mint": "UK2sFwdMMXv6mBbnFZFs6Q2frKbUQTaHAHM7AmriFmn" }
+      ],
+      "rt_markets": [
+        "CEAFtX93ugw7PWSWVyxZQaDJB6n3Et1j6xfZARzwNLyR",
+        "12DcdXW3Gif6oNXdYVcVreLGd8RAxGUSgf2LoYhaxmL4",
+        "Cx7N7b9M5Wy8Jc4xo79vpJ1tpjF9Qe7XyWeXKZzDk53C",
+        "5cKYfReSrxA4VPaEX6vhehEzD8XYgXA6QWjZ5q2F6dmR"
+      ]
+    },
+    {
+      "name": "Hylo",
+      "vote_account": "hy1oJTV2kX9acsqpwk7hbteqXFw9VDbWvbxoamFEufW",
+      "bonds": [
+        { "pubkey": "2XRNfai2vgce2RB7Dkw5bK552Y8ZdWuF72kxZxcyLJQR", "pt_mint": "Enr4YMRddUneK5fhfiR1HjV2uUaPARKCVp4ooT698Gh", "yt_mint": "DhEDQhdNd7rfKhs8pDazgWPNUTSkCYCZUZE4Nz5qjR7i" },
+        { "pubkey": "6NAmn1NXrCo2zyUTBX75amV4mZ29uACzDgqBG1WzSs6z", "pt_mint": "FS3AEgwcMom95evGUz6HPo7DRa2yrQc8SavS1vbARdJc", "yt_mint": "Wd8cKG1SdNNcUaD3dEJADDLHfK7ZMwoVm8FqaCt2z1C" },
+        { "pubkey": "7c7A43mWJVMEAMEGCz1PkVDdHbJYz6haUkDHKwCnnFQq", "pt_mint": "2761Y465LxMpzgHzYgQFDmJQeT2Nv2wgdcTrRXxfH6uz", "yt_mint": "EaDna31yUtrYuomRmJHeATqg8wWaUX9TxJBGbAPPvSKM" },
+        { "pubkey": "9SZaPEWdtezZiwbCCQHw1KHMD5F7USYgTGCc6y9ZGxfJ", "pt_mint": "HGZQKziv3bnXezwmHeUdQR4xzqNejyA4234HU9ZGoDpc", "yt_mint": "EZJAo2BF7xXfPEDQWecWPPcCh9XnwbuhSrxApps2MDqb" }
+      ],
+      "rt_markets": [
+        "HFnb6MB5Z4ESLzQkB3vd144Wt1G4YbQpr7MM7VsDHC4F",
+        "4xBfTARPmGQAr69D3cuQuPhaSGit5LpaUH4C1bQtZxSR",
+        "BWt24sGkcCjcvKmGMQTGuCRKnSLEunNotSxUrYf68ck3",
+        "Djon68z7JKnofDDhemKsEA3zLDpbF9tJNruEBdARTBRn",
+        "9BoM1L5DfbjUBNkWvuWgTEzsWnx5K28cYTkZUR2dSjE5"
+      ]
+    },
+    {
+      "name": "Kiln",
+      "vote_account": "DdCNGDpP7qMgoAy6paFzhhak2EeyCZcgjH7ak5u5v28m",
+      "bonds": [
+        { "pubkey": "9Ez8wHNRvxeSDztR7kFChxJhkDxgtbhipMuohjr2vSJx", "pt_mint": "ENZhSVE5jzGNm5jYKwyyCj59pSsfAWV4RQFnsFZu6e3k", "yt_mint": "B7z4anxnDvNGfQ4TeHofUSDTDYy7JPyfQwfJPuPkGjJw" },
+        { "pubkey": "Fbd2n47V2QP8iFpyKZVgbeH2DkMBdJZt9UBCKEyKQSyy", "pt_mint": "CwyJAJCWnmZXP2ntZHUBndhcoLyWJpLfMwFSauFevuz8", "yt_mint": "GVuVASAoGoKgWD6xWoEFS2QwCcd6MG5EXXJ4aPJkABvf" },
+        { "pubkey": "8ecgtkNeDPD5v4U4N19p9KJBMBVYCivFmGu76w6GczUi", "pt_mint": "9gCoEbdU9MW67MbTHESoX3n3kaJMaFcbyezKNcDxY5w4", "yt_mint": "7APibp2kDAhbEMr158zZakrNMZefHm4H2dt6U9DicJNy" },
+        { "pubkey": "9BCUwHoFPdbvJReZa2HoVKRGby8L5vxB6JbBiYacDNQi", "pt_mint": "8PFWzpsqXahdemvK1kXPqQ3S365S57JdScdiwxx1N4FP", "yt_mint": "EswvyfG6zW2qPMUnX2JG5RRrR71FfXLd12AV8RTKiTK3" }
+      ],
+      "rt_markets": [
+        "9fRYat343K4JBzCoVQB1E42pN9uxtpLQUDh39L87WuCx",
+        "2gPyW2gGpRW84G2s5uUeiv8ZVxFkDwwXFNkXD7LxCZ33",
+        "9eXxnAWnV12U8s5TNsihLUUcQgjNQpTj6Ciq963X5orz",
+        "BxPsXPdw9qepLMgN1c6xfExixGAVKj2S4wFQXHQ3NZcc"
+      ]
+    }
+  ]
+}

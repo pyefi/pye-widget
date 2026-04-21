@@ -147,6 +147,7 @@ export default function ReviewQuote() {
   const selectedMaturityId = useWidgetStore((s) => s.selectedMaturityId);
   const selectedStakeAccountPubkey = useWidgetStore((s) => s.selectedStakeAccountPubkey);
   const selectedStakeAccountBalance = useWidgetStore((s) => s.selectedStakeAccountBalance);
+  const selectedValidatorAltPubkey = useWidgetStore((s) => s.selectedValidatorAltPubkey);
 
   const markets = useMarketStore((s) => s.markets);
   const userStakeAccounts = useBalanceStore((s) => s.userStakeAccounts);
@@ -203,7 +204,16 @@ export default function ReviewQuote() {
   const slippage = slippageBps / 100;
 
   const isLoading = txStatus === "loading";
-  const canSign = !!selectedStakeAccountPubkey && !!selectedMaturityId && !isLoading && hasLiquidity;
+  const selectedStakeStillOwned =
+    selectedStakeAccountPubkey === "liquid-sol" ||
+    (selectedStakeAccountPubkey !== null &&
+      userStakeAccounts.some((a) => a.pubkey === selectedStakeAccountPubkey));
+  const canSign =
+    !!selectedStakeAccountPubkey &&
+    !!selectedMaturityId &&
+    !isLoading &&
+    hasLiquidity &&
+    selectedStakeStillOwned;
 
   // Resolve bond from the stake account's actual validator (not from market key)
   // Fall back to market-key-based resolution for liquid SOL (no stake account)
@@ -259,7 +269,12 @@ export default function ReviewQuote() {
         setTxStatus("success", rtSellResult.signature);
         navigate("complete");
       } else {
-        // Stake account path — single bundled transaction
+        // Stake account path — single bundled v0 transaction (requires ALT)
+        if (!selectedValidatorAltPubkey) {
+          throw new Error(
+            "Sell Yield is not yet enabled for this validator. An Address Lookup Table hasn't been deployed yet — please contact the Pye team.",
+          );
+        }
         const result = await executeDepositAndSell({
           connection,
           wallet,
@@ -272,6 +287,7 @@ export default function ReviewQuote() {
           stakeBalanceSol: selectedStakeAccountBalance,
           marketPubkey: rtMarket.marketPubkey,
           minReceiveTokens: minReceive,
+          altPubkey: selectedValidatorAltPubkey,
         });
         setTxStep("complete");
         setSellAmountSol(sellAmount);

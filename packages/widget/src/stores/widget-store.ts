@@ -25,6 +25,7 @@ export interface WidgetState {
   selectedValidatorName: string | null;
   selectedValidatorIcon: string | null;
   selectedValidatorVoteAccount: string | null;
+  selectedValidatorAltPubkey: string | null;
   depositAmount: string;
   selectedMaturityId: MaturityId | null;
 
@@ -55,7 +56,7 @@ export interface WidgetState {
 export interface WidgetActions {
   navigate(screen: WidgetScreen): void;
   goBack(): void;
-  selectStakeAccount(pubkey: string, balance: number, validatorName?: string, validatorIcon?: string, validatorVoteAccount?: string): void;
+  selectStakeAccount(pubkey: string, balance: number, validatorName?: string, validatorIcon?: string, validatorVoteAccount?: string, validatorAltPubkey?: string | null): void;
   setDepositAmount(amount: string): void;
   setSelectedMaturity(id: MaturityId): void;
   setAdvancedOpen(open: boolean): void;
@@ -73,6 +74,7 @@ export interface WidgetActions {
     error?: string | null,
   ): void;
   reset(): void;
+  resetForWalletChange(): void;
 }
 
 export type WidgetStoreType = WidgetState & WidgetActions;
@@ -86,6 +88,7 @@ const initialState: WidgetState = {
   selectedValidatorName: null,
   selectedValidatorIcon: null,
   selectedValidatorVoteAccount: null,
+  selectedValidatorAltPubkey: null,
   depositAmount: "",
   selectedMaturityId: null,
 
@@ -126,13 +129,14 @@ export function createWidgetStore() {
         });
       },
 
-      selectStakeAccount(pubkey, balance, validatorName, validatorIcon, validatorVoteAccount) {
+      selectStakeAccount(pubkey, balance, validatorName, validatorIcon, validatorVoteAccount, validatorAltPubkey) {
         set((s) => {
           s.selectedStakeAccountPubkey = pubkey;
           s.selectedStakeAccountBalance = balance;
           s.selectedValidatorName = validatorName ?? null;
           s.selectedValidatorIcon = validatorIcon ?? null;
           s.selectedValidatorVoteAccount = validatorVoteAccount ?? null;
+          s.selectedValidatorAltPubkey = validatorAltPubkey ?? null;
         });
       },
 
@@ -217,6 +221,41 @@ export function createWidgetStore() {
 
       reset() {
         set(() => ({ ...initialState }));
+      },
+
+      resetForWalletChange() {
+        set((s) => {
+          s.selectedStakeAccountPubkey = null;
+          s.selectedStakeAccountBalance = 0;
+          s.selectedValidatorName = null;
+          s.selectedValidatorIcon = null;
+          s.selectedValidatorVoteAccount = null;
+          s.selectedValidatorAltPubkey = null;
+          s.depositAmount = "";
+          s.selectedMaturityId = null;
+          s.txStatus = "idle";
+          s.txStep = "idle";
+          s.depositTxSignature = null;
+          s.sellTxSignature = null;
+          s.txSignature = null;
+          s.txError = null;
+          s.sellAmountSol = null;
+          s.redeemingMint = null;
+          s.redeemError = null;
+          s.redeemAmountSol = null;
+          s.redeemTxSignature = null;
+          if (
+            s.screen === "choose-amount" ||
+            s.screen === "choose-duration" ||
+            s.screen === "review-quote" ||
+            s.screen === "complete" ||
+            s.screen === "redeem-complete" ||
+            s.screen === "redeem-list"
+          ) {
+            s.screen = "welcome";
+            s.screenHistory = [];
+          }
+        });
       },
     })),
   );
