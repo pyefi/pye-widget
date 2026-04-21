@@ -24,7 +24,6 @@ import {
 import { THEME_CSS } from "./components/design-system";
 import WidgetShell from "./components/WidgetShell";
 import type { PyeWidgetProps } from "./types";
-import "./styles/fonts.css";
 
 function resolveValidatorName(voteAccount?: string): string | undefined {
   if (!voteAccount) return undefined;
