@@ -31,8 +31,14 @@ export default function SelectPosition() {
               key={account.pubkey}
               icon={
                 <img
-                  src={account.validatorIcon}
+                  src={account.validatorLogo ?? account.validatorIcon}
                   alt={account.validatorName}
+                  onError={(e) => {
+                    const img = e.currentTarget;
+                    if (img.src !== account.validatorIcon) {
+                      img.src = account.validatorIcon;
+                    }
+                  }}
                   style={{
                     width: 36, height: 36, borderRadius: "50%", flexShrink: 0,
                     objectFit: "cover",

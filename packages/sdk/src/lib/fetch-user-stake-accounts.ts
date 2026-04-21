@@ -1,4 +1,5 @@
 import { Connection, PublicKey } from "@solana/web3.js";
+import { createClient } from "@supabase/supabase-js";
 import { validators, type ValidatorId } from "../constants/validators";
 import { getPyeConfig } from "../config";
 import type {
@@ -111,9 +112,32 @@ export async function fetchUserStakeAccounts(
       validatorVoteAccount: delegation.voter,
       validatorName: validatorInfo?.name ?? "Unknown Validator",
       validatorIcon: validatorInfo?.icon ?? "/solana-token.png",
+      validatorLogo: null,
       lamports: Number(delegation.stake ?? account.lamports),
       state,
     });
+  }
+
+  const voteAccounts = Array.from(
+    new Set(results.map((r) => r.validatorVoteAccount)),
+  );
+  if (voteAccounts.length > 0) {
+    const supabase = createClient(config.supabaseUrl, config.supabaseAnonKey);
+    const { data, error } = await supabase
+      .from("validator_metadata_configs")
+      .select("vote_pubkey, base_image_url")
+      .in("vote_pubkey", voteAccounts);
+    if (error) {
+      console.warn("[fetchUserStakeAccounts] logo fetch failed:", error);
+    } else if (data) {
+      const logoByVote = new Map<string, string>();
+      for (const row of data) {
+        if (row.base_image_url) logoByVote.set(row.vote_pubkey, row.base_image_url);
+      }
+      for (const r of results) {
+        r.validatorLogo = logoByVote.get(r.validatorVoteAccount) ?? null;
+      }
+    }
   }
 
   return results;
