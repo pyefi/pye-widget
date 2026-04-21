@@ -10,7 +10,7 @@ export default function Badge({ variant = "default", children }: BadgeProps) {
   const base: CSSProperties = {
     ...font(10, c.secondary, 600),
     padding: "3px 8px",
-    borderRadius: 8,
+    borderRadius: 6,
     textTransform: "uppercase",
     letterSpacing: 0.5,
     whiteSpace: "nowrap",
