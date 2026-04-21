@@ -15,6 +15,7 @@ export interface UserStakeAccount {
   validatorVoteAccount: string;
   validatorName: string;
   validatorIcon: string;
+  validatorLogo: string | null;
   lamports: number;
   state: StakeAccountState;
 }
