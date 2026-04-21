@@ -16,8 +16,9 @@ import {
   fetchUserStakeAccounts,
 } from "@pye/sdk";
 import { useMarketStore, useBalanceStore, useWalletStore } from "@pye/sdk/react";
-import { c, font, displayFont, MARKET_RATE, pointsMap, formatSolAmount } from "../design-system";
+import { c, font, MARKET_RATE, pointsMap, formatSolAmount } from "../design-system";
 import { StepTitle, CTA, Tooltip, Spacer } from "../shared/Layout";
+import { Odometer } from "../shared/Odometer";
 
 /* ═══════════════════════════════════════════════════════════════════════════
    DiscountSlider — Dan's exact pointer-capture slider
@@ -89,7 +90,7 @@ function DiscountSlider({
       <div style={{ display: "flex", justifyContent: "space-between" }}>
         {["0%", "1%", "2%", "3%", "4%", "5%"].map((l) => (
           <span key={l} style={{
-            ...font(12, c.secondary),
+            ...font(14, c.secondary),
             textTransform: "uppercase" as const, letterSpacing: "0.04em",
             width: 24, textAlign: l === "0%" ? "left" : l === "5%" ? "right" : "center",
           }}>{l}</span>
@@ -317,51 +318,102 @@ export default function ReviewQuote() {
 
   return (
     <>
-      <StepTitle
-        title="Your quote"
-        subtitle="Estimated rewards sold upfront, net of fees."
-      />
+      <StepTitle title="Approve in your wallet" />
 
-      {/* Hero quote card */}
-      <div style={{ display: "flex", flexDirection: "column" }}>
-        {/* Top: yield */}
-        <div style={{
-          background: c.lowered,
-          borderTop: `1px solid ${c.shadow}`,
-          boxShadow: `inset 0 -1px 0 ${c.highlight}`,
-          borderRadius: "6px 6px 0 0",
-          padding: 12,
-          display: "flex", flexDirection: "column", gap: 12,
-        }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <p style={font(12, c.secondary)}>You receive today</p>
-            <Tooltip text="Estimated upfront payout based on current market rates, net of fees. The final amount is confirmed when your order fills on the Pye orderbook." />
+      {/* Quote — stacked sections */}
+      {(() => {
+        const rows: Array<{ key: string; left: React.ReactNode; right: React.ReactNode }> = [
+          {
+            key: "receive",
+            left: (
+              <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+                <p style={font(14, c.secondary)}>You receive today</p>
+                <Tooltip text="Estimated upfront payout based on current market rates, net of fees. The final amount is confirmed when your order fills on the Pye orderbook." />
+              </div>
+            ),
+            right: (
+              <Odometer
+                value={`+${formatSolAmount(sellAmount)} SOL`}
+                style={{ ...font(15, c.green, 500), whiteSpace: "nowrap", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}
+              />
+            ),
+          },
+          {
+            key: "stake",
+            left: <p style={font(14, c.secondary)}>Stake amount</p>,
+            right: (
+              <p style={{ ...font(14, c.primary), whiteSpace: "nowrap", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>
+                {parsedAmount} SOL
+              </p>
+            ),
+          },
+          {
+            key: "pt",
+            left: (
+              <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+                <p style={font(14, c.secondary)}>PTs you&apos;ll receive</p>
+                <Tooltip text="Your PT is a token receipt for your staked SOL. At the redeem date, redeem it 1:1 for your full stake." />
+              </div>
+            ),
+            right: (
+              <p style={{ ...font(14, c.primary), whiteSpace: "nowrap", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>
+                {parsedAmount} PT
+              </p>
+            ),
+          },
+          {
+            key: "redeem",
+            left: <p style={font(14, c.secondary)}>Redeem date</p>,
+            right: (
+              <p style={{ ...font(14, c.primary), whiteSpace: "nowrap", flexShrink: 0 }}>
+                {matures}
+              </p>
+            ),
+          },
+          ...(points ? [{
+            key: "points",
+            left: <p style={font(14, c.secondary)}>Points multiplier</p>,
+            right: (
+              <p style={{ ...font(14, c.purple), whiteSpace: "nowrap", flexShrink: 0 }}>
+                {points}
+              </p>
+            ),
+          }] : []),
+        ];
+
+        return (
+          <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+            {rows.map((row, i) => {
+              const isFirst = i === 0;
+              const isLast = i === rows.length - 1;
+              const radius = isFirst && isLast
+                ? 8
+                : isFirst
+                  ? "8px 8px 0 0"
+                  : isLast
+                    ? "0 0 8px 8px"
+                    : 0;
+              return (
+                <div
+                  key={row.key}
+                  style={{
+                    background: c.lowered,
+                    borderTop: `1px solid ${c.shadow}`,
+                    boxShadow: `inset 0 -1px 0 ${c.highlight}`,
+                    borderRadius: radius,
+                    padding: "12px 12px",
+                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                    gap: 12,
+                  }}
+                >
+                  {row.left}
+                  {row.right}
+                </div>
+              );
+            })}
           </div>
-          <p style={{ ...displayFont(32, c.green), lineHeight: 1.2, fontVariantNumeric: "lining-nums tabular-nums", marginBottom: slippage > 0 ? -4 : 0 }}>
-            +{formatSolAmount(sellAmount)} SOL
-          </p>
-          {slippage > 0 && (
-            <p style={font(12, c.secondary)}>
-              Min. received: {formatSolAmount(sellAmount * (1 - slippage / 100))} SOL
-            </p>
-          )}
-        </div>
-        {/* Bottom: maturity + points */}
-        <div style={{
-          background: c.lowered,
-          borderTop: `1px solid ${c.shadow}`,
-          boxShadow: `inset 0 -1px 0 ${c.highlight}`,
-          borderRadius: "0 0 6px 6px",
-          padding: 12,
-          display: "flex", justifyContent: "space-between", alignItems: "center",
-          overflow: "hidden",
-        }}>
-          <p style={font(12, c.secondary)}>
-            <span style={{ color: c.primary }}>{parsedAmount} SOL</span>{` back ${matures}`}
-          </p>
-          {points && <p style={font(12, c.purple)}>{points}</p>}
-        </div>
-      </div>
+        );
+      })()}
 
       {/* Advanced toggle */}
       <div
@@ -371,7 +423,7 @@ export default function ReviewQuote() {
           cursor: "pointer", padding: "2px 0", userSelect: "none",
         }}
       >
-        <span style={font(12, c.secondary)}>Advanced</span>
+        <span style={font(14, c.secondary)}>Advanced</span>
         <svg width="10" height="6" viewBox="0 0 10 6" fill="none" style={{
           transform: advancedOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s",
         }}>
@@ -379,35 +431,44 @@ export default function ReviewQuote() {
         </svg>
       </div>
 
-      {/* Advanced panel — discount rate */}
-      {advancedOpen && (
+      {/* Advanced panel — discount rate (grid-row height transition) */}
+      <div style={{
+        display: "grid",
+        gridTemplateRows: advancedOpen ? "1fr" : "0fr",
+        transition: "grid-template-rows 280ms cubic-bezier(0.2,0.9,0.2,1)",
+      }}>
         <div style={{
-          background: c.raised, borderRadius: 6, padding: 12,
-          borderTop: `1px solid ${c.highlight}`,
-          boxShadow: `inset 0 -1px 0 ${c.shadow}`,
-          display: "flex", flexDirection: "column", gap: 16,
-          overflow: "visible",
+          overflow: "hidden",
+          opacity: advancedOpen ? 1 : 0,
+          transition: "opacity 200ms cubic-bezier(0.2,0.9,0.2,1)",
         }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <div style={{ display: "flex", justifyContent: "space-between" }}>
-              <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                <span style={font(12, c.secondary)}>Max slippage tolerance</span>
-                <Tooltip bg={c.highlight} text="Slippage is the maximum difference between the quoted price and the price you actually receive. A higher tolerance means your order is more likely to fill, but you may receive slightly less SOL." />
-              </span>
-              {orderBookSlippageBps > 0 && (
-                <span style={font(12, c.secondary)}>Est. slippage: {(orderBookSlippageBps / 100).toFixed(2)}%</span>
-              )}
+          <div style={{
+            background: c.raised, borderRadius: 8, padding: 12,
+            borderTop: `1px solid ${c.highlight}`,
+            boxShadow: `inset 0 -1px 0 ${c.shadow}`,
+            display: "flex", flexDirection: "column", gap: 16,
+          }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  <span style={font(14, c.secondary)}>Max slippage tolerance</span>
+                  <Tooltip bg={c.highlight} text="Slippage is the maximum difference between the quoted price and the price you actually receive. A higher tolerance means your order is more likely to fill, but you may receive slightly less SOL." />
+                </span>
+                {orderBookSlippageBps > 0 && (
+                  <span style={font(14, c.secondary)}>Est. slippage: {(orderBookSlippageBps / 100).toFixed(2)}%</span>
+                )}
+              </div>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
+                <span style={{ ...font(18, c.primary), transition: "color 0.15s" }}>
+                  {slippage.toFixed(2)}
+                </span>
+                <span style={font(14, c.secondary)}>% max slippage</span>
+              </div>
+              <DiscountSlider value={slippage} onChange={(v) => setSlippageBps(Math.round(v * 100))} />
             </div>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
-              <span style={{ ...font(18, c.primary), transition: "color 0.15s" }}>
-                {slippage.toFixed(2)}
-              </span>
-              <span style={font(12, c.secondary)}>% max slippage</span>
-            </div>
-            <DiscountSlider value={slippage} onChange={(v) => setSlippageBps(Math.round(v * 100))} />
           </div>
         </div>
-      )}
+      </div>
 
       {/* Liquidity warning */}
       {!hasLiquidity && rtAmount > 0 && (
@@ -415,33 +476,23 @@ export default function ReviewQuote() {
           background: "rgba(255,181,77,0.15)",
           borderTop: "1px solid rgba(255,255,255,0.2)",
           boxShadow: "inset 0 -1px 0 rgba(0,0,0,0.08)",
-          borderRadius: 4, padding: 12,
+          borderRadius: 6, padding: 12,
           display: "flex", flexDirection: "column", gap: 2,
         }}>
-          <p style={{ ...font(12, c.primary), fontWeight: 500 }}>Insufficient liquidity</p>
-          <p style={font(12, c.secondary)}>
+          <p style={{ ...font(14, c.primary), fontWeight: 500 }}>Insufficient liquidity</p>
+          <p style={font(14, c.secondary)}>
             Only {liquidityCheck?.totalAvailableSize?.toFixed(2) ?? "0"} RT available on the order book.
             Your order may partially fill or not fill at all.
           </p>
         </div>
       )}
 
-      {/* Orderbook disclosure */}
-      <p style={font(12, c.secondary)}>
-        Orders are matched on the{" "}
-        <a href="https://app.pye.fi/trade" target="_blank" rel="noreferrer"
-          style={{ color: c.secondary, textDecoration: "underline" }}>
-          Pye orderbook
-        </a>
-        . If the market moves beyond your max slippage, this transaction will not execute.
-      </p>
-
       {/* Error */}
       {txStatus === "error" && txError && (
         <div style={{
-          ...font(12, c.red),
+          ...font(14, c.red),
           background: `${c.red}12`,
-          borderRadius: 4, padding: "8px 12px",
+          borderRadius: 6, padding: "8px 12px",
         }}>
           {txError}
         </div>
