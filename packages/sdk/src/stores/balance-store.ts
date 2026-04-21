@@ -16,6 +16,8 @@ export interface UserStakeAccount {
   validatorName: string;
   validatorIcon: string;
   validatorLogo: string | null;
+  /** Address Lookup Table pubkey for this validator. Required for v0 txs; null if not yet deployed. */
+  validatorAltPubkey: string | null;
   lamports: number;
   state: StakeAccountState;
 }
