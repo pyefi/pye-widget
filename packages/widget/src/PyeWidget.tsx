@@ -23,6 +23,7 @@ import {
 } from "./stores/widget-store";
 import { THEME_CSS } from "./components/design-system";
 import WidgetShell from "./components/WidgetShell";
+import WalletChangeWatcher from "./components/WalletChangeWatcher";
 import type { PyeWidgetProps } from "./types";
 
 function resolveValidatorName(voteAccount?: string): string | undefined {
@@ -75,6 +76,7 @@ export default function PyeWidget({
             <MarketSyncer />
             <ApySyncer />
             <WidgetStoreContext.Provider value={widgetStoreRef.current}>
+              <WalletChangeWatcher />
               <WidgetShell validatorName={validatorName} />
             </WidgetStoreContext.Provider>
           </PyeSDKProvider>
