@@ -153,6 +153,15 @@ export async function executeDepositAndSell({
   const feeWalletYt = getAssociatedTokenAddressSync(ytMint, protocolFeeWallet, true);
   const wsolAta   = getAssociatedTokenAddressSync(NATIVE_MINT, owner, false, TOKEN_PROGRAM_ID);
 
+  // Pre-check which ATAs already exist so we can skip their createIdempotent ixs.
+  // Each skipped ix shaves ~11 bytes off the tx; fee-wallet ATAs are almost
+  // always present in steady state.
+  const ataInfos = await connection.getMultipleAccountsInfo([
+    ownerPt, ownerYt, feeWalletPt, feeWalletYt, wsolAta,
+  ]);
+  const [ownerPtExists, ownerYtExists, feeWalletPtExists, feeWalletYtExists, wsolAtaExists] =
+    ataInfos.map((info) => info !== null);
+
   const amountLamports = Math.round(amountSol * 1e9);
   const totalLamports  = Math.round(stakeBalanceSol * 1e9);
   const isPartial      = amountLamports < totalLamports;
@@ -195,12 +204,12 @@ export async function executeDepositAndSell({
     depositStakeAccount = userStake;
   }
 
-  // Create all token accounts needed by both legs (idempotent)
-  tx.add(createAssociatedTokenAccountIdempotentInstruction(owner, ownerPt,     owner,             ptMint));
-  tx.add(createAssociatedTokenAccountIdempotentInstruction(owner, ownerYt,     owner,             ytMint));
-  tx.add(createAssociatedTokenAccountIdempotentInstruction(owner, feeWalletPt, protocolFeeWallet, ptMint));
-  tx.add(createAssociatedTokenAccountIdempotentInstruction(owner, feeWalletYt, protocolFeeWallet, ytMint));
-  tx.add(createAssociatedTokenAccountIdempotentInstruction(owner, wsolAta,     owner,             NATIVE_MINT));
+  // Create only the token accounts that don't already exist.
+  if (!ownerPtExists)       tx.add(createAssociatedTokenAccountIdempotentInstruction(owner, ownerPt,     owner,             ptMint));
+  if (!ownerYtExists)       tx.add(createAssociatedTokenAccountIdempotentInstruction(owner, ownerYt,     owner,             ytMint));
+  if (!feeWalletPtExists)   tx.add(createAssociatedTokenAccountIdempotentInstruction(owner, feeWalletPt, protocolFeeWallet, ptMint));
+  if (!feeWalletYtExists)   tx.add(createAssociatedTokenAccountIdempotentInstruction(owner, feeWalletYt, protocolFeeWallet, ytMint));
+  if (!wsolAtaExists)       tx.add(createAssociatedTokenAccountIdempotentInstruction(owner, wsolAta,     owner,             NATIVE_MINT));
 
   // Bonds deposit instruction — mints PT + RT into ownerPt / ownerYt
   const isTransientSet = !transientStakeAccount.equals(PublicKey.default);
@@ -253,6 +262,22 @@ export async function executeDepositAndSell({
   // ── Send & confirm ─────────────────────────────────────────────────────────
 
   const signers = splitKeypair ? [splitKeypair] : [];
+
+  // Log serialized size so we can verify we're under the 1232-byte limit.
+  // Skipped ATA creates: ownerPt=${ownerPtExists}, ownerYt=${ownerYtExists},
+  // feeWalletPt=${feeWalletPtExists}, feeWalletYt=${feeWalletYtExists},
+  // wsolAta=${wsolAtaExists}
+  try {
+    const serialized = tx.serialize({ requireAllSignatures: false, verifySignatures: false });
+    console.log(
+      `[executeDepositAndSell] tx size=${serialized.length}B ` +
+      `(limit=1232) skipped=[ownerPt:${ownerPtExists},ownerYt:${ownerYtExists},` +
+      `feeWalletPt:${feeWalletPtExists},feeWalletYt:${feeWalletYtExists},wsolAta:${wsolAtaExists}]`,
+    );
+  } catch (err) {
+    console.warn("[executeDepositAndSell] could not measure tx size:", err);
+  }
+
   const signature = await wallet.sendTransaction(tx, connection, { signers });
 
   const confirmation = await connection.confirmTransaction(
