@@ -6,8 +6,9 @@ import {
   Keypair,
   PublicKey,
   StakeProgram,
-  Transaction,
   TransactionInstruction,
+  TransactionMessage,
+  VersionedTransaction,
 } from "@solana/web3.js";
 import {
   ASSOCIATED_TOKEN_PROGRAM_ID,
@@ -83,6 +84,8 @@ export interface ExecuteDepositAndSellParams {
   // sell
   marketPubkey: string;
   minReceiveTokens: number;
+  // v0 lookup table containing this validator's static accounts
+  altPubkey: string;
 }
 
 export interface ExecuteDepositAndSellResult {
@@ -115,6 +118,7 @@ export async function executeDepositAndSell({
   stakeBalanceSol,
   marketPubkey,
   minReceiveTokens,
+  altPubkey,
 }: ExecuteDepositAndSellParams): Promise<ExecuteDepositAndSellResult> {
   if (!wallet.publicKey || !wallet.sendTransaction) {
     throw new Error("Wallet not connected");
@@ -138,13 +142,22 @@ export async function executeDepositAndSell({
     rentExemptReserve,
     latestBlockhash,
     manifestClient,
+    altResponse,
   ] = await Promise.all([
     fetchProtocolFeeWallet(connection, globalSettingsPda),
     fetchTransientStakeAccount(connection, bond),
     connection.getMinimumBalanceForRentExemption(StakeProgram.space),
     connection.getLatestBlockhash("confirmed"),
     ManifestClient.getClientReadOnly(connection, marketPk),
+    connection.getAddressLookupTable(new PublicKey(altPubkey)),
   ]);
+
+  const altAccount = altResponse.value;
+  if (!altAccount) {
+    throw new Error(
+      `Address Lookup Table ${altPubkey} not found on-chain — it may not be deployed yet.`,
+    );
+  }
 
   // Derive ATAs
   const ownerPt   = getAssociatedTokenAddressSync(ptMint, owner);
@@ -172,15 +185,13 @@ export async function executeDepositAndSell({
   const inAtoms  = BigInt(Math.round(amountSol * 10 ** baseDecimals));
   const outAtoms = BigInt(Math.round(minReceiveTokens * 10 ** quoteDecimals));
 
-  // ── Build transaction ──────────────────────────────────────────────────────
+  // ── Build instructions ─────────────────────────────────────────────────────
 
-  const tx = new Transaction();
-  tx.recentBlockhash = latestBlockhash.blockhash;
-  tx.feePayer = owner;
+  const instructions: TransactionInstruction[] = [];
 
   // Combined compute budget for deposit (~400k) + Manifest swap (~150k)
-  tx.add(ComputeBudgetProgram.setComputeUnitLimit({ units: 550_000 }));
-  tx.add(ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 1_000 }));
+  instructions.push(ComputeBudgetProgram.setComputeUnitLimit({ units: 550_000 }));
+  instructions.push(ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 1_000 }));
 
   // Optional stake split for partial deposits
   let depositStakeAccount: PublicKey;
@@ -188,8 +199,8 @@ export async function executeDepositAndSell({
 
   if (isPartial) {
     splitKeypair = Keypair.generate();
-    tx.add(
-      StakeProgram.split(
+    instructions.push(
+      ...StakeProgram.split(
         {
           stakePubkey: userStake,
           authorizedPubkey: owner,
@@ -197,7 +208,7 @@ export async function executeDepositAndSell({
           lamports: amountLamports,
         },
         rentExemptReserve,
-      ),
+      ).instructions,
     );
     depositStakeAccount = splitKeypair.publicKey;
   } else {
@@ -205,11 +216,11 @@ export async function executeDepositAndSell({
   }
 
   // Create only the token accounts that don't already exist.
-  if (!ownerPtExists)       tx.add(createAssociatedTokenAccountIdempotentInstruction(owner, ownerPt,     owner,             ptMint));
-  if (!ownerYtExists)       tx.add(createAssociatedTokenAccountIdempotentInstruction(owner, ownerYt,     owner,             ytMint));
-  if (!feeWalletPtExists)   tx.add(createAssociatedTokenAccountIdempotentInstruction(owner, feeWalletPt, protocolFeeWallet, ptMint));
-  if (!feeWalletYtExists)   tx.add(createAssociatedTokenAccountIdempotentInstruction(owner, feeWalletYt, protocolFeeWallet, ytMint));
-  if (!wsolAtaExists)       tx.add(createAssociatedTokenAccountIdempotentInstruction(owner, wsolAta,     owner,             NATIVE_MINT));
+  if (!ownerPtExists)       instructions.push(createAssociatedTokenAccountIdempotentInstruction(owner, ownerPt,     owner,             ptMint));
+  if (!ownerYtExists)       instructions.push(createAssociatedTokenAccountIdempotentInstruction(owner, ownerYt,     owner,             ytMint));
+  if (!feeWalletPtExists)   instructions.push(createAssociatedTokenAccountIdempotentInstruction(owner, feeWalletPt, protocolFeeWallet, ptMint));
+  if (!feeWalletYtExists)   instructions.push(createAssociatedTokenAccountIdempotentInstruction(owner, feeWalletYt, protocolFeeWallet, ytMint));
+  if (!wsolAtaExists)       instructions.push(createAssociatedTokenAccountIdempotentInstruction(owner, wsolAta,     owner,             NATIVE_MINT));
 
   // Bonds deposit instruction — mints PT + RT into ownerPt / ownerYt
   const isTransientSet = !transientStakeAccount.equals(PublicKey.default);
@@ -217,7 +228,7 @@ export async function executeDepositAndSell({
     ? [{ pubkey: transientStakeAccount, isSigner: false, isWritable: true }]
     : [];
 
-  tx.add(
+  instructions.push(
     new TransactionInstruction({
       programId: BONDS_PROGRAM_ID,
       keys: [
@@ -247,7 +258,7 @@ export async function executeDepositAndSell({
   );
 
   // Manifest swap — sells RT (ownerYt) for wSOL
-  tx.add(
+  instructions.push(
     manifestClient.swapIx(owner, {
       inAtoms,
       outAtoms,
@@ -257,28 +268,34 @@ export async function executeDepositAndSell({
   );
 
   // Unwrap wSOL → native SOL
-  tx.add(createCloseAccountInstruction(wsolAta, owner, owner));
+  instructions.push(createCloseAccountInstruction(wsolAta, owner, owner));
 
-  // ── Send & confirm ─────────────────────────────────────────────────────────
+  // ── Compile to v0 with ALT ─────────────────────────────────────────────────
 
-  const signers = splitKeypair ? [splitKeypair] : [];
+  const message = new TransactionMessage({
+    payerKey: owner,
+    recentBlockhash: latestBlockhash.blockhash,
+    instructions,
+  }).compileToV0Message([altAccount]);
+
+  const vtx = new VersionedTransaction(message);
+  if (splitKeypair) vtx.sign([splitKeypair]);
 
   // Log serialized size so we can verify we're under the 1232-byte limit.
-  // Skipped ATA creates: ownerPt=${ownerPtExists}, ownerYt=${ownerYtExists},
-  // feeWalletPt=${feeWalletPtExists}, feeWalletYt=${feeWalletYtExists},
-  // wsolAta=${wsolAtaExists}
   try {
-    const serialized = tx.serialize({ requireAllSignatures: false, verifySignatures: false });
+    const serialized = vtx.serialize();
     console.log(
-      `[executeDepositAndSell] tx size=${serialized.length}B ` +
-      `(limit=1232) skipped=[ownerPt:${ownerPtExists},ownerYt:${ownerYtExists},` +
+      `[executeDepositAndSell] v0 tx size=${serialized.length}B ` +
+      `(limit=1232) alt=${altPubkey.slice(0, 8)}... skipped=[ownerPt:${ownerPtExists},ownerYt:${ownerYtExists},` +
       `feeWalletPt:${feeWalletPtExists},feeWalletYt:${feeWalletYtExists},wsolAta:${wsolAtaExists}]`,
     );
   } catch (err) {
     console.warn("[executeDepositAndSell] could not measure tx size:", err);
   }
 
-  const signature = await wallet.sendTransaction(tx, connection, { signers });
+  // ── Send & confirm ─────────────────────────────────────────────────────────
+
+  const signature = await wallet.sendTransaction(vtx, connection);
 
   const confirmation = await connection.confirmTransaction(
     {

@@ -13,8 +13,8 @@ export default function SelectPosition() {
 
   const activeAccounts = userStakeAccounts.filter((a) => a.state === "active");
 
-  const handleSelectStake = (pubkey: string, lamports: number, validatorName?: string, validatorIcon?: string, validatorVoteAccount?: string) => {
-    selectStakeAccount(pubkey, lamports / LAMPORTS_PER_SOL, validatorName, validatorIcon, validatorVoteAccount);
+  const handleSelectStake = (pubkey: string, lamports: number, validatorName?: string, validatorIcon?: string, validatorVoteAccount?: string, validatorAltPubkey?: string | null) => {
+    selectStakeAccount(pubkey, lamports / LAMPORTS_PER_SOL, validatorName, validatorIcon, validatorVoteAccount, validatorAltPubkey);
     navigate("choose-amount");
   };
 
@@ -49,7 +49,7 @@ export default function SelectPosition() {
               label="Staked SOL"
               sub={account.validatorName || `${account.pubkey.slice(0, 8)}...`}
               amount={(account.lamports / LAMPORTS_PER_SOL).toFixed(4)}
-              onClick={() => handleSelectStake(account.pubkey, account.lamports, account.validatorName, account.validatorIcon, account.validatorVoteAccount)}
+              onClick={() => handleSelectStake(account.pubkey, account.lamports, account.validatorName, account.validatorIcon, account.validatorVoteAccount, account.validatorAltPubkey)}
             />
           ))}
           {/* TODO(SIMD-185): Re-enable liquid SOL deposit once transient account flow is fixed.
