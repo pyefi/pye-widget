@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useWidgetStore } from "../../stores/widget-store";
 import { useWalletStore } from "@pye/sdk/react";
@@ -51,11 +51,12 @@ function WalletRow({ name, iconUrl, connecting, onConnect }: WalletRowProps) {
 // ─── Main component ──────────────────────────────────────────────────────────
 
 export default function ConnectWallet() {
-  const { wallets, select, connect } = useWallet();
+  const { wallets, wallet, select, connect } = useWallet();
   const navigate = useWidgetStore((s) => s.navigate);
   const walletStatus = useWalletStore((s) => s.status);
   const connecting = useWidgetStore((s) => s.connectingWallet);
   const setConnecting = useWidgetStore((s) => s.setConnectingWallet);
+  const [pendingWalletName, setPendingWalletName] = useState<string | null>(null);
 
   // Auto-advance when wallet connects
   useEffect(() => {
@@ -64,17 +65,28 @@ export default function ConnectWallet() {
     }
   }, [walletStatus, navigate]);
 
-  const handleConnect = async (walletName: string) => {
+  // `select()` is a React state setter — the `wallet` object only updates on
+  // the next render, so calling `connect()` in the same tick sees a stale
+  // null wallet and throws WalletNotSelectedError. Previously this happened
+  // to work for browser-extension adapters because autoConnect pre-selected
+  // them on mount, but adapters like WalletConnect (no extension, requires
+  // interaction) exposed the race. Fix: select, let React flush, then
+  // connect from this effect once `wallet` reflects our pick.
+  useEffect(() => {
+    if (!pendingWalletName) return;
+    if (wallet?.adapter.name !== pendingWalletName) return;
+    connect()
+      .catch(() => setConnecting(null))
+      .finally(() => setPendingWalletName(null));
+  }, [pendingWalletName, wallet, connect, setConnecting]);
+
+  const handleConnect = (walletName: string) => {
     const adapter = wallets.find((w) => w.adapter.name === walletName);
     if (!adapter) return;
 
     setConnecting(walletName);
-    try {
-      select(adapter.adapter.name);
-      await connect();
-    } catch {
-      setConnecting(null);
-    }
+    setPendingWalletName(walletName);
+    select(adapter.adapter.name);
   };
 
   // Sort: detected wallets first
