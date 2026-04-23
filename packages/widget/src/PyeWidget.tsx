@@ -9,7 +9,7 @@ import {
   TorusWalletAdapter,
   LedgerWalletAdapter,
 } from "@solana/wallet-adapter-wallets";
-import { configurePyeSDK, validators } from "@pye/sdk";
+import { configurePyeSDK, validators, hasConnectIntent } from "@pye/sdk";
 import {
   PyeSDKProvider,
   WalletSyncer,
@@ -60,6 +60,15 @@ export default function PyeWidget({
     [],
   );
 
+  // Gate autoConnect on a sessionStorage intent flag set by WalletSyncer after
+  // a successful connect. Effect: closing the tab ends the "session" and forces
+  // re-connect; same-tab reload stays connected. Fixes the bug where signing out
+  // of a wallet externally still showed connected state on reopen.
+  const autoConnect = useMemo(
+    () => async () => hasConnectIntent(),
+    [],
+  );
+
   const widgetStoreRef = useRef<ReturnType<typeof createWidgetStore>>(undefined);
   if (!widgetStoreRef.current) {
     widgetStoreRef.current = createWidgetStore();
@@ -69,7 +78,7 @@ export default function PyeWidget({
     <div data-theme={theme}>
       <style>{THEME_CSS}</style>
       <ConnectionProvider endpoint={rpcUrl}>
-        <WalletProvider wallets={wallets} autoConnect>
+        <WalletProvider wallets={wallets} autoConnect={autoConnect}>
           <PyeSDKProvider>
             <WalletSyncer />
             <BalanceSyncer />
