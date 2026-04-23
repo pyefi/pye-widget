@@ -14,6 +14,8 @@ import {
   lookupBondByVoteAccount,
   fetchBalances,
   fetchUserStakeAccounts,
+  PYE_TRADING_FEE_BPS,
+  applyTradingFee,
 } from "@pye/sdk";
 import { useMarketStore, useBalanceStore, useWalletStore } from "@pye/sdk/react";
 import { c, font, MARKET_RATE, pointsMap, formatSolAmount } from "../design-system";
@@ -195,10 +197,15 @@ export default function ReviewQuote() {
   const hasLiquidity = liquidityCheck?.isSufficientLiquidity ?? false;
   const orderBookSlippageBps = liquidityCheck?.slippageBps ?? 0;
 
-  // Quote: expected SOL from selling RT
-  const sellAmount = liquidityCheck?.expectedFillPrice != null
+  // Quote: expected gross SOL from selling RT on Manifest
+  const grossSellAmount = liquidityCheck?.expectedFillPrice != null
     ? liquidityCheck.expectedFillPrice * rtAmount
     : rtAmount * (MARKET_RATE / 100); // fallback
+
+  // Net-of-fee SOL shown to the user and paid out after treasury transfer
+  const sellAmount = applyTradingFee(grossSellAmount);
+  const feeAmountSol = grossSellAmount - sellAmount;
+  const feePct = (PYE_TRADING_FEE_BPS / 100).toFixed(2);
 
   // Slippage tolerance from slider (0-5 float)
   const slippage = slippageBps / 100;
@@ -241,7 +248,9 @@ export default function ReviewQuote() {
     setTxStatus("loading");
     setTxStep("depositing");
 
-    const minReceive = Math.max(sellAmount * (1 - slippage / 100), 0);
+    // Swap-level minReceive is measured against the gross swap output;
+    // the fixed taker fee is transferred from that wSOL post-swap.
+    const minReceive = Math.max(grossSellAmount * (1 - slippage / 100), 0);
 
     try {
       if (selectedStakeAccountPubkey === "liquid-sol") {
@@ -263,6 +272,7 @@ export default function ReviewQuote() {
           rtMint: bondParams.yieldTokenMint,
           orderSizeTokens: parsedAmount,
           minReceiveTokens: minReceive,
+          expectedSolOut: grossSellAmount,
         });
         setTxStep("complete");
         setSellAmountSol(sellAmount);
@@ -287,6 +297,7 @@ export default function ReviewQuote() {
           stakeBalanceSol: selectedStakeAccountBalance,
           marketPubkey: rtMarket.marketPubkey,
           minReceiveTokens: minReceive,
+          expectedSolOut: grossSellAmount,
           altPubkey: selectedValidatorAltPubkey,
         });
         setTxStep("complete");
@@ -312,11 +323,13 @@ export default function ReviewQuote() {
     selectedStakeAccount,
     selectedStakeAccountPubkey,
     selectedMaturityId,
+    selectedValidatorAltPubkey,
     connection,
     wallet,
     parsedAmount,
     selectedStakeAccountBalance,
     sellAmount,
+    grossSellAmount,
     slippage,
     setTxStatus,
     setTxStep,
@@ -347,6 +360,20 @@ export default function ReviewQuote() {
                 value={`+${formatSolAmount(sellAmount)} SOL`}
                 style={{ ...font(15, c.green, 500), whiteSpace: "nowrap", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}
               />
+            ),
+          },
+          {
+            key: "fee",
+            left: (
+              <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+                <p style={font(14, c.secondary)}>Pye protocol fee ({feePct}%)</p>
+                <Tooltip text={`A ${feePct}% fee is taken from the SOL proceeds of your sale and routed to the Pye treasury.`} />
+              </div>
+            ),
+            right: (
+              <p style={{ ...font(14, c.primary), whiteSpace: "nowrap", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>
+                −{formatSolAmount(feeAmountSol)} SOL
+              </p>
             ),
           },
           {
