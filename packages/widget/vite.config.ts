@@ -36,6 +36,7 @@ export default defineConfig(({ mode }) => {
               "immer",
               "@solana/web3.js",
               "@solana/spl-token",
+              "@solana/wallet-adapter-base",
               "@solana/wallet-adapter-react",
               "@solana/wallet-adapter-react-ui",
               "@solana/wallet-adapter-wallets",

@@ -8,7 +8,11 @@ import {
   SolflareWalletAdapter,
   TorusWalletAdapter,
   LedgerWalletAdapter,
+  WalletConnectWalletAdapter,
 } from "@solana/wallet-adapter-wallets";
+import { WalletAdapterNetwork } from "@solana/wallet-adapter-base";
+
+const WALLET_CONNECT_PROJECT_ID = "7b89b9d2ef5d0298961c3eeb879793b0";
 import { configurePyeSDK, validators } from "@pye/sdk";
 import {
   PyeSDKProvider,
@@ -56,6 +60,18 @@ export default function PyeWidget({
       new SolflareWalletAdapter(),
       new TorusWalletAdapter(),
       new LedgerWalletAdapter(),
+      new WalletConnectWalletAdapter({
+        network: WalletAdapterNetwork.Mainnet,
+        options: {
+          projectId: WALLET_CONNECT_PROJECT_ID,
+          metadata: {
+            name: "Pye",
+            description: "Earn staking rewards upfront",
+            url: "https://pye.fi",
+            icons: ["https://pye.fi/icon.png"],
+          },
+        },
+      }),
     ],
     [],
   );
