@@ -1,4 +1,5 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useConnection } from "@solana/wallet-adapter-react";
 import { useWidgetStore } from "../../stores/widget-store";
 import {
   maturities,
@@ -6,6 +7,8 @@ import {
   lookupBondByVoteAccount,
   PYE_TRADING_FEE_BPS,
   applyTradingFee,
+  estimateRtFromStake,
+  fetchEpochSyncedNowTs,
 } from "@pye/sdk";
 import { useMarketStore } from "@pye/sdk/react";
 import { c, font, displayFont, MARKET_RATE, formatSolAmount, POINTS_ENABLED } from "../design-system";
@@ -36,12 +39,23 @@ function getAvailableMaturities(): MaturityId[] {
 }
 
 export default function ChooseDuration() {
+  const { connection } = useConnection();
   const navigate = useWidgetStore((s) => s.navigate);
   const selectedMaturityId = useWidgetStore((s) => s.selectedMaturityId);
   const setSelectedMaturity = useWidgetStore((s) => s.setSelectedMaturity);
   const depositAmount = useWidgetStore((s) => s.depositAmount);
   const selectedValidatorVoteAccount = useWidgetStore((s) => s.selectedValidatorVoteAccount);
   const markets = useMarketStore((s) => s.markets);
+
+  // Epoch-synced wall-clock seconds — matches the on-chain "now" used by the
+  // Bonds program when computing RT issuance, so our preview number stays in
+  // sync with the real swap amount.
+  const [nowTs, setNowTs] = useState<number | null>(null);
+  useEffect(() => {
+    fetchEpochSyncedNowTs(connection).then(setNowTs).catch(() => {
+      setNowTs(Date.now() / 1000);
+    });
+  }, [connection]);
 
   const availableMaturities = useMemo(() => getAvailableMaturities(), []);
 
@@ -63,6 +77,9 @@ export default function ChooseDuration() {
   }, [selectedMaturityId, setSelectedMaturity, availableMaturities]);
 
   const parsedAmount = parseFloat(depositAmount) || 0;
+  // Use epoch-synced now when available; fall back to wall-clock for the
+  // first render before the RPC call resolves.
+  const effectiveNowTs = nowTs ?? Date.now() / 1000;
 
   // Build display quarters from available maturities
   const quarters = availableMaturities.map((matId) => {
@@ -79,13 +96,23 @@ export default function ChooseDuration() {
     const rtMarket = rtMarketKey ? markets[rtMarketKey] ?? null : null;
     const bestBid = rtMarket?.bestBidPrice ?? null;
 
-    // Gross yield: RT amount (1:1 with deposit) × best bid price (SOL per RT)
+    // Bonds program mints RT proportional to remaining issuance window, so
+    // we scale the deposit by time remaining to get the RT the user will
+    // actually receive. Using `parsedAmount` here would overstate the quote.
+    const maturity = maturities[matId];
+    const estimatedRt = estimateRtFromStake({
+      amountSol: parsedAmount,
+      maturity,
+      nowTs: effectiveNowTs,
+    });
+
+    // Gross yield: estimated RT × best bid price (SOL per RT)
     // Fallback: MARKET_RATE is annual (0.85%), scaled by time remaining so Q2–Q4 differ
-    const maturityTs = Number(maturities[matId].maturity_timestamp);
-    const yearsRemaining = Math.max(0, (maturityTs - Date.now() / 1000) / (365.25 * 86400));
+    const maturityTs = Number(maturity.maturity_timestamp);
+    const yearsRemaining = Math.max(0, (maturityTs - effectiveNowTs) / (365.25 * 86400));
     const grossYield =
       bestBid != null
-        ? bestBid * parsedAmount
+        ? bestBid * estimatedRt
         : parsedAmount * (MARKET_RATE / 100) * yearsRemaining;
     // User-facing yield is net of Pye's taker fee
     const netYield = applyTradingFee(grossYield);

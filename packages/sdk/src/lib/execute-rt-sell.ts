@@ -21,6 +21,11 @@ export interface ExecuteRtSellParams {
   wallet: WalletContextState;
   marketPubkey: string;
   rtMint: string;
+  /**
+   * Amount of RT tokens to sell. This must match what the user actually holds
+   * in their RT ATA — for a fresh deposit, compute with `estimateRtFromStake`,
+   * not `amountSol`, since the Bonds program mints less than 1:1.
+   */
   orderSizeTokens: number;
   minReceiveTokens: number;
   /** Gross SOL out (pre-fee) used to size the Pye taker-fee transfer. */
@@ -58,8 +63,13 @@ export async function executeRtSell({
   const baseDecimals = client.market.baseDecimals();
   const quoteDecimals = client.market.quoteDecimals();
 
-  const inAtoms = BigInt(Math.round(orderSizeTokens * 10 ** baseDecimals));
-  const outAtoms = BigInt(Math.round(minReceiveTokens * 10 ** quoteDecimals));
+  // Apply a 2 bps safety buffer (floored + min 100 atoms) to absorb clock
+  // drift between the quote and the on-chain Bonds mint — see the matching
+  // comment in execute-deposit-and-sell.ts for context.
+  const rawInAtoms   = Math.floor(orderSizeTokens * 10 ** baseDecimals);
+  const safetyBuffer = Math.max(Math.ceil(rawInAtoms * 0.0002), 100);
+  const inAtoms  = BigInt(Math.max(rawInAtoms - safetyBuffer, 0));
+  const outAtoms = BigInt(Math.floor(minReceiveTokens * 10 ** quoteDecimals));
 
   const rtAta = getAssociatedTokenAddressSync(rtMintPk, payer, false, TOKEN_PROGRAM_ID);
   const wsolAta = getAssociatedTokenAddressSync(NATIVE_MINT, payer, false, TOKEN_PROGRAM_ID);

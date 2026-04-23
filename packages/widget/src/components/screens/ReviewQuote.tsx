@@ -1,4 +1,4 @@
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { useWidgetStore } from "../../stores/widget-store";
 import {
@@ -16,6 +16,8 @@ import {
   fetchUserStakeAccounts,
   PYE_TRADING_FEE_BPS,
   applyTradingFee,
+  estimateRtFromStake,
+  fetchEpochSyncedNowTs,
 } from "@pye/sdk";
 import { useMarketStore, useBalanceStore, useWalletStore } from "@pye/sdk/react";
 import { c, font, MARKET_RATE, pointsMap, formatSolAmount, POINTS_ENABLED } from "../design-system";
@@ -133,6 +135,16 @@ export default function ReviewQuote() {
   const { connection } = useConnection();
   const wallet = useWallet();
 
+  // Epoch-synced wall-clock — matches the on-chain clock the Bonds program
+  // uses when computing RT issuance, so the swap we build matches what the
+  // user will actually hold after deposit.
+  const [nowTs, setNowTs] = useState<number | null>(null);
+  useEffect(() => {
+    fetchEpochSyncedNowTs(connection).then(setNowTs).catch(() => {
+      setNowTs(Date.now() / 1000);
+    });
+  }, [connection]);
+
   const navigate = useWidgetStore((s) => s.navigate);
   const txStatus = useWidgetStore((s) => s.txStatus);
   const txStep = useWidgetStore((s) => s.txStep);
@@ -186,8 +198,18 @@ export default function ReviewQuote() {
     : null;
   const rtMarket = rtMarketKey ? markets[rtMarketKey] ?? null : null;
 
-  // RT amount = deposit amount (1:1 from stake deposit)
-  const rtAmount = parsedAmount;
+  // Bonds program mints RT proportional to remaining issuance window, not
+  // 1:1 with the deposit. Use the same formula the on-chain program does
+  // so the swap we build matches the user's actual post-deposit RT balance.
+  // PT, separately, *is* 1:1 with the stake — keep `parsedAmount` for PT rows.
+  const effectiveNowTs = nowTs ?? Date.now() / 1000;
+  const rtAmount = maturity
+    ? estimateRtFromStake({
+        amountSol: parsedAmount,
+        maturity,
+        nowTs: effectiveNowTs,
+      })
+    : 0;
 
   // Real liquidity check against RT order book bids
   const liquidityCheck = rtMarket?.bids?.length
@@ -244,6 +266,7 @@ export default function ReviewQuote() {
     if (!selectedStakeAccountPubkey || !selectedMaturityId) return;
     if (!bondParams) throw new Error("Could not resolve bond data for this market");
     if (!rtMarket) throw new Error("No RT market found for this maturity");
+    if (!maturity) throw new Error("No maturity selected");
 
     setTxStatus("loading");
     setTxStep("depositing");
@@ -251,6 +274,19 @@ export default function ReviewQuote() {
     // Swap-level minReceive is measured against the gross swap output;
     // the fixed taker fee is transferred from that wSOL post-swap.
     const minReceive = Math.max(grossSellAmount * (1 - slippage / 100), 0);
+
+    // Refresh the epoch-synced clock right before signing — the mount-time
+    // value can be minutes stale by the time the user clicks, and the chain
+    // clock keeps advancing. An out-of-date nowTs overshoots the actual
+    // mint by ~1 atom per second of drift, which fails the Manifest swap.
+    const freshNowTs = await fetchEpochSyncedNowTs(connection).catch(
+      () => Date.now() / 1000,
+    );
+    const freshRtAmount = estimateRtFromStake({
+      amountSol: parsedAmount,
+      maturity,
+      nowTs: freshNowTs,
+    });
 
     try {
       if (selectedStakeAccountPubkey === "liquid-sol") {
@@ -270,7 +306,7 @@ export default function ReviewQuote() {
           wallet,
           marketPubkey: rtMarket.marketPubkey,
           rtMint: bondParams.yieldTokenMint,
-          orderSizeTokens: parsedAmount,
+          orderSizeTokens: freshRtAmount,
           minReceiveTokens: minReceive,
           expectedSolOut: grossSellAmount,
         });
@@ -294,6 +330,7 @@ export default function ReviewQuote() {
           validatorVoteAccount: bondParams.voteAccount,
           stakeAccountPubkey: selectedStakeAccountPubkey,
           amountSol: parsedAmount,
+          rtAmountToSell: freshRtAmount,
           stakeBalanceSol: selectedStakeAccountBalance,
           marketPubkey: rtMarket.marketPubkey,
           minReceiveTokens: minReceive,
@@ -327,6 +364,7 @@ export default function ReviewQuote() {
     connection,
     wallet,
     parsedAmount,
+    maturity,
     selectedStakeAccountBalance,
     sellAmount,
     grossSellAmount,
