@@ -18,7 +18,7 @@ import {
   applyTradingFee,
 } from "@pye/sdk";
 import { useMarketStore, useBalanceStore, useWalletStore } from "@pye/sdk/react";
-import { c, font, MARKET_RATE, pointsMap, formatSolAmount } from "../design-system";
+import { c, font, MARKET_RATE, pointsMap, formatSolAmount, POINTS_ENABLED } from "../design-system";
 import { StepTitle, CTA, Tooltip, Spacer } from "../shared/Layout";
 import { Odometer } from "../shared/Odometer";
 
@@ -164,7 +164,7 @@ export default function ReviewQuote() {
   // Find points label from maturity month
   const monthToQuarter: Record<string, string> = { JUN: "Q3", SEP: "Q4", DEC: "Q1", MAR: "Q2" };
   const quarterId = maturity ? (monthToQuarter[maturity.month] ?? null) : null;
-  const points = quarterId ? (pointsMap[quarterId] ?? null) : null;
+  const points = POINTS_ENABLED && quarterId ? (pointsMap[quarterId] ?? null) : null;
 
   // Find the validator vote account from stake accounts
   const selectedStakeAccount = selectedStakeAccountPubkey !== "liquid-sol"
@@ -363,26 +363,13 @@ export default function ReviewQuote() {
             ),
           },
           {
-            key: "fee",
-            left: (
-              <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
-                <p style={font(14, c.secondary)}>Pye protocol fee ({feePct}%)</p>
-                <Tooltip text={`A ${feePct}% fee is taken from the SOL proceeds of your sale and routed to the Pye treasury.`} />
-              </div>
-            ),
-            right: (
-              <p style={{ ...font(14, c.primary), whiteSpace: "nowrap", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>
-                −{formatSolAmount(feeAmountSol)} SOL
-              </p>
-            ),
-          },
-          {
             key: "stake",
             left: <p style={font(14, c.secondary)}>Stake amount</p>,
             right: (
-              <p style={{ ...font(14, c.primary), whiteSpace: "nowrap", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>
-                {parsedAmount} SOL
-              </p>
+              <Odometer
+                value={`${parsedAmount} SOL`}
+                style={{ ...font(14, c.primary), whiteSpace: "nowrap", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}
+              />
             ),
           },
           {
@@ -394,9 +381,10 @@ export default function ReviewQuote() {
               </div>
             ),
             right: (
-              <p style={{ ...font(14, c.primary), whiteSpace: "nowrap", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>
-                {parsedAmount} PT
-              </p>
+              <Odometer
+                value={`${parsedAmount} PT`}
+                style={{ ...font(14, c.primary), whiteSpace: "nowrap", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}
+              />
             ),
           },
           {
@@ -406,6 +394,21 @@ export default function ReviewQuote() {
               <p style={{ ...font(14, c.primary), whiteSpace: "nowrap", flexShrink: 0 }}>
                 {matures}
               </p>
+            ),
+          },
+          {
+            key: "fee",
+            left: (
+              <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+                <p style={font(14, c.secondary)}>Pye protocol fee ({feePct}%)</p>
+                <Tooltip text={`A ${feePct}% fee is taken from the SOL proceeds of your sale and routed to the Pye treasury.`} />
+              </div>
+            ),
+            right: (
+              <Odometer
+                value={`−${formatSolAmount(feeAmountSol)} SOL`}
+                style={{ ...font(14, c.primary), whiteSpace: "nowrap", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}
+              />
             ),
           },
           ...(points ? [{
@@ -540,9 +543,9 @@ export default function ReviewQuote() {
       <CTA
         label={
           isLoading
-            ? txStep === "selling" ? "Selling yield..."
+            ? txStep === "selling" ? "Selling rewards..."
             : "Confirming..."
-          : `Sell yield — get ${formatSolAmount(sellAmount, 3)} SOL`
+          : `Sell Rewards — get ${formatSolAmount(sellAmount, 3)} SOL`
         }
         onClick={handleSign}
         disabled={!canSign}

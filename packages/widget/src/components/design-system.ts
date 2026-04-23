@@ -184,3 +184,6 @@ export function formatSolAmount(value: number, minDecimals = 4): string {
 }
 export const yieldMap: Record<string, number> = { Q2: 0.43, Q3: 0.85, Q4: 1.28, Q1: 1.70 };
 export const pointsMap: Record<string, string> = { Q3: "2x points multiplier", Q4: "3x points multiplier", Q1: "4x points multiplier" };
+
+// Feature flags
+export const POINTS_ENABLED = false;
