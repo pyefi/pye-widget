@@ -150,8 +150,9 @@ export async function executeStakeAccountDeposit({
       connection.getLatestBlockhash("confirmed"),
     ]);
 
-  const ownerPt = getAssociatedTokenAddressSync(ptMint, owner);
-  const ownerYt = getAssociatedTokenAddressSync(ytMint, owner);
+  // allowOwnerOffCurve: true for PDA-backed wallets (Squads vaults, etc.)
+  const ownerPt = getAssociatedTokenAddressSync(ptMint, owner, true);
+  const ownerYt = getAssociatedTokenAddressSync(ytMint, owner, true);
   const feeWalletPt = getAssociatedTokenAddressSync(ptMint, protocolFeeWallet, true);
   const feeWalletYt = getAssociatedTokenAddressSync(ytMint, protocolFeeWallet, true);
 
@@ -281,8 +282,9 @@ export async function executeStakeDeposit({
     connection.getLatestBlockhash("confirmed"),
   ]);
 
-  const ownerPt = getAssociatedTokenAddressSync(ptMint, owner);
-  const ownerYt = getAssociatedTokenAddressSync(ytMint, owner);
+  // allowOwnerOffCurve: true for PDA-backed wallets (Squads vaults, etc.)
+  const ownerPt = getAssociatedTokenAddressSync(ptMint, owner, true);
+  const ownerYt = getAssociatedTokenAddressSync(ytMint, owner, true);
   const feeWalletPt = getAssociatedTokenAddressSync(ptMint, protocolFeeWallet, true);
   const feeWalletYt = getAssociatedTokenAddressSync(ytMint, protocolFeeWallet, true);
 
