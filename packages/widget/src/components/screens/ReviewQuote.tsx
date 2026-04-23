@@ -1,4 +1,4 @@
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { useWidgetStore } from "../../stores/widget-store";
 import {
@@ -16,6 +16,8 @@ import {
   fetchUserStakeAccounts,
   PYE_TRADING_FEE_BPS,
   applyTradingFee,
+  estimateRtFromStake,
+  fetchEpochSyncedNowTs,
 } from "@pye/sdk";
 import { useMarketStore, useBalanceStore, useWalletStore } from "@pye/sdk/react";
 import { c, font, MARKET_RATE, pointsMap, formatSolAmount, POINTS_ENABLED } from "../design-system";
@@ -133,6 +135,16 @@ export default function ReviewQuote() {
   const { connection } = useConnection();
   const wallet = useWallet();
 
+  // Epoch-synced wall-clock — matches the on-chain clock the Bonds program
+  // uses when computing RT issuance, so the swap we build matches what the
+  // user will actually hold after deposit.
+  const [nowTs, setNowTs] = useState<number | null>(null);
+  useEffect(() => {
+    fetchEpochSyncedNowTs(connection).then(setNowTs).catch(() => {
+      setNowTs(Date.now() / 1000);
+    });
+  }, [connection]);
+
   const navigate = useWidgetStore((s) => s.navigate);
   const txStatus = useWidgetStore((s) => s.txStatus);
   const txStep = useWidgetStore((s) => s.txStep);
@@ -186,8 +198,18 @@ export default function ReviewQuote() {
     : null;
   const rtMarket = rtMarketKey ? markets[rtMarketKey] ?? null : null;
 
-  // RT amount = deposit amount (1:1 from stake deposit)
-  const rtAmount = parsedAmount;
+  // Bonds program mints RT proportional to remaining issuance window, not
+  // 1:1 with the deposit. Use the same formula the on-chain program does
+  // so the swap we build matches the user's actual post-deposit RT balance.
+  // PT, separately, *is* 1:1 with the stake — keep `parsedAmount` for PT rows.
+  const effectiveNowTs = nowTs ?? Date.now() / 1000;
+  const rtAmount = maturity
+    ? estimateRtFromStake({
+        amountSol: parsedAmount,
+        maturity,
+        nowTs: effectiveNowTs,
+      })
+    : 0;
 
   // Real liquidity check against RT order book bids
   const liquidityCheck = rtMarket?.bids?.length
@@ -270,7 +292,7 @@ export default function ReviewQuote() {
           wallet,
           marketPubkey: rtMarket.marketPubkey,
           rtMint: bondParams.yieldTokenMint,
-          orderSizeTokens: parsedAmount,
+          orderSizeTokens: rtAmount,
           minReceiveTokens: minReceive,
           expectedSolOut: grossSellAmount,
         });
@@ -294,6 +316,7 @@ export default function ReviewQuote() {
           validatorVoteAccount: bondParams.voteAccount,
           stakeAccountPubkey: selectedStakeAccountPubkey,
           amountSol: parsedAmount,
+          rtAmountToSell: rtAmount,
           stakeBalanceSol: selectedStakeAccountBalance,
           marketPubkey: rtMarket.marketPubkey,
           minReceiveTokens: minReceive,
@@ -327,6 +350,7 @@ export default function ReviewQuote() {
     connection,
     wallet,
     parsedAmount,
+    rtAmount,
     selectedStakeAccountBalance,
     sellAmount,
     grossSellAmount,
