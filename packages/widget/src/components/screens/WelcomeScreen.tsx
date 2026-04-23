@@ -3,7 +3,7 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { useWidgetStore } from "../../stores/widget-store";
 import { useBalanceStore, useWalletStore } from "@pye/sdk/react";
 import { buildPtLookup, maturities } from "@pye/sdk";
-import { Body, Spacer } from "../shared/Layout";
+import { Body, Spacer, SkeletonRow } from "../shared/Layout";
 import { c, font, displayFont, formatSolAmount } from "../design-system";
 
 const LAMPORTS_PER_SOL = 1_000_000_000;
@@ -83,14 +83,32 @@ function IconRedeem() {
   return (
     <div style={{
       flexShrink: 0, width: 44, height: 44, borderRadius: 10,
-      background: "color-mix(in srgb, #0d9c5e 20%, transparent)",
+      background: "color-mix(in srgb, var(--c-brand) 20%, transparent)",
       borderTop: "1px solid rgba(255,255,255,0.2)",
       boxShadow: "0 4px 8px rgba(0,0,0,0.07), inset 0 -1px 0 rgba(0,0,0,0.2)",
       display: "flex", alignItems: "center", justifyContent: "center",
     }}>
-      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" style={{ color: "#0d9c5e" }}>
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" style={{ color: "var(--c-brand)" }}>
         <circle cx="8" cy="8" r="5" stroke="currentColor" strokeWidth="1.5" />
         <circle cx="12" cy="12" r="5" stroke="currentColor" strokeWidth="1.5" fill="none" />
+      </svg>
+    </div>
+  );
+}
+
+function IconDocs() {
+  return (
+    <div style={{
+      flexShrink: 0, width: 44, height: 44, borderRadius: 10,
+      background: `color-mix(in srgb, ${c.secondary} 15%, transparent)`,
+      borderTop: "1px solid rgba(255,255,255,0.2)",
+      boxShadow: "0 4px 8px rgba(0,0,0,0.07), inset 0 -1px 0 rgba(0,0,0,0.2)",
+      display: "flex", alignItems: "center", justifyContent: "center",
+    }}>
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" style={{ color: c.secondary }}>
+        <path d="M4 3h8a2 2 0 0 1 2 2v12H6a2 2 0 0 1-2-2V3z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+        <path d="M4 15a2 2 0 0 1 2-2h8" stroke="currentColor" strokeWidth="1.5"/>
+        <path d="M7 7h4M7 10h3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
       </svg>
     </div>
   );
@@ -100,12 +118,12 @@ function IconSell() {
   return (
     <div style={{
       flexShrink: 0, width: 44, height: 44, borderRadius: 10,
-      background: "color-mix(in srgb, var(--c-brand) 20%, transparent)",
+      background: "color-mix(in srgb, #0d9c5e 20%, transparent)",
       borderTop: "1px solid rgba(255,255,255,0.2)",
       boxShadow: "0 4px 8px rgba(0,0,0,0.07), inset 0 -1px 0 rgba(0,0,0,0.2)",
       display: "flex", alignItems: "center", justifyContent: "center",
     }}>
-      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" style={{ color: "var(--c-brand)" }}>
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" style={{ color: "#0d9c5e" }}>
         <rect x="3" y="5" width="14" height="11" rx="2" stroke="currentColor" strokeWidth="1.5" />
         <path d="M3 9H17" stroke="currentColor" strokeWidth="1.5" />
         <circle cx="13" cy="12.5" r="1" fill="currentColor" />
@@ -122,6 +140,7 @@ export default function WelcomeScreen({ validatorName }: WelcomeScreenProps) {
   const navigate = useWidgetStore((s) => s.navigate);
   const walletBalances = useBalanceStore((s) => s.walletBalances);
   const userStakeAccounts = useBalanceStore((s) => s.userStakeAccounts);
+  const userStakeAccountsLoading = useBalanceStore((s) => s.userStakeAccountsLoading);
   const walletPublicKey = useWalletStore((s) => s.publicKey);
   const { disconnect } = useWallet();
 
@@ -156,6 +175,12 @@ export default function WelcomeScreen({ validatorName }: WelcomeScreenProps) {
   const canRedeem = totalPtSol > 0;
   const canSell = activeStakeSol > 0;
 
+  // Show skeletons only on the very first fetch when we have nothing to display.
+  // Once stake accounts or balances are known (even if zero), render real rows.
+  const hasAnyBalance = Object.values(walletBalances).some((v) => v > 0);
+  const isInitialLoading =
+    userStakeAccountsLoading && userStakeAccounts.length === 0 && !hasAnyBalance;
+
   const redeemSub = !canRedeem
     ? "No PT positions"
     : maturedPtSol > 0
@@ -173,32 +198,49 @@ export default function WelcomeScreen({ validatorName }: WelcomeScreenProps) {
           Welcome back
         </p>
         <p style={font(15, c.secondary)}>
-          {canRedeem && canSell
-            ? "We found active staked SOL positions and PTs ready to redeem. What would you like to do?"
-            : canRedeem
-              ? "We found PTs ready to redeem. What would you like to do?"
-              : canSell
-                ? "We found active staked SOL positions. Sell your future rewards upfront."
-                : `Stake SOL with ${validatorName ?? "your validator"} to get started.`}
+          {isInitialLoading
+            ? "Loading your positions…"
+            : canRedeem && canSell
+              ? "We found active staked SOL positions and PTs ready to redeem. What would you like to do?"
+              : canRedeem
+                ? "We found PTs ready to redeem. What would you like to do?"
+                : canSell
+                  ? "We found active staked SOL positions. Sell your future rewards upfront."
+                  : `Stake SOL with ${validatorName ?? "your validator"} to get started.`}
         </p>
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 8 }}>
-        <ChoiceRow
-          icon={<IconSell />}
-          label="Sell future rewards"
-          sub={sellSub}
-          disabled={!canSell}
-          onClick={() => navigate("select-position")}
-        />
-        <ChoiceRow
-          icon={<IconRedeem />}
-          label="Redeem PTs"
-          sub={redeemSub}
-          subColor={maturedPtSol > 0 ? c.green : undefined}
-          disabled={!canRedeem}
-          onClick={() => navigate("redeem-list")}
-        />
+        {isInitialLoading ? (
+          <>
+            <SkeletonRow />
+            <SkeletonRow />
+          </>
+        ) : (
+          <>
+            <ChoiceRow
+              icon={<IconSell />}
+              label="Sell future rewards"
+              sub={sellSub}
+              disabled={!canSell}
+              onClick={() => navigate("select-position")}
+            />
+            <ChoiceRow
+              icon={<IconRedeem />}
+              label="Redeem PTs"
+              sub={redeemSub}
+              subColor={maturedPtSol > 0 ? c.green : undefined}
+              disabled={!canRedeem}
+              onClick={() => navigate("redeem-list")}
+            />
+            <ChoiceRow
+              icon={<IconDocs />}
+              label="Learn more"
+              sub="Read the docs"
+              onClick={() => window.open("https://docs.pye.fi/", "_blank", "noopener,noreferrer")}
+            />
+          </>
+        )}
       </div>
 
       <Spacer />

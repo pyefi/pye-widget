@@ -1,8 +1,14 @@
 import { useEffect, useMemo } from "react";
 import { useWidgetStore } from "../../stores/widget-store";
-import { maturities, type MaturityId, lookupBondByVoteAccount } from "@pye/sdk";
+import {
+  maturities,
+  type MaturityId,
+  lookupBondByVoteAccount,
+  PYE_TRADING_FEE_BPS,
+  applyTradingFee,
+} from "@pye/sdk";
 import { useMarketStore } from "@pye/sdk/react";
-import { c, font, displayFont, MARKET_RATE, formatSolAmount } from "../design-system";
+import { c, font, displayFont, MARKET_RATE, formatSolAmount, POINTS_ENABLED } from "../design-system";
 import { CTA, Tooltip, Spacer } from "../shared/Layout";
 import { Odometer } from "../shared/Odometer";
 
@@ -81,9 +87,13 @@ export default function ChooseDuration() {
       bestBid != null
         ? bestBid * parsedAmount
         : parsedAmount * (MARKET_RATE / 100) * yearsRemaining;
+    // User-facing yield is net of Pye's taker fee
+    const netYield = applyTradingFee(grossYield);
 
-    return { matId, ...info, bestBid, grossYield };
+    return { matId, ...info, bestBid, grossYield, netYield };
   });
+
+  const feePct = (PYE_TRADING_FEE_BPS / 100).toFixed(2);
 
   const sel = quarters.find((q) => q.matId === selectedMaturityId);
 
@@ -130,7 +140,7 @@ export default function ChooseDuration() {
                 <span style={font(15, isSelected ? c.primary : c.secondary, isSelected ? 500 : 400)}>
                   {q.label}
                 </span>
-                {q.pts && (
+                {POINTS_ENABLED && q.pts && (
                   <span style={font(13, c.purple)}>{q.pts}</span>
                 )}
               </div>
@@ -154,7 +164,7 @@ export default function ChooseDuration() {
           >
             <p style={font(14, c.secondary)}>You receive today</p>
             <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-              {sel.grossYield < 0.0001 ? (
+              {sel.netYield < 0.0001 ? (
                 <p
                   style={{
                     ...displayFont(32, c.green),
@@ -166,11 +176,14 @@ export default function ChooseDuration() {
                 </p>
               ) : (
                 <Odometer
-                  value={`+${formatSolAmount(sel.grossYield, 3)} SOL`}
+                  value={`+${formatSolAmount(sel.netYield, 3)} SOL`}
                   style={{ ...displayFont(32, c.green), lineHeight: 1.2 }}
                 />
               )}
             </div>
+            <p style={font(12, c.muted)}>
+              Quote includes a {feePct}% Pye protocol fee.
+            </p>
           </div>
         )}
 

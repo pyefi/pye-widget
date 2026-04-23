@@ -259,6 +259,25 @@ export function RecapRow({ icon, label, sub, amount }: {
   );
 }
 
+// Matches ChoiceRow dimensions (min-height 76, same padding/radius) so layout doesn't jump when real rows load.
+export function SkeletonRow() {
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", gap: 12,
+      padding: 16, borderRadius: 10, minHeight: 76,
+      background: c.raised,
+      borderTop: `1px solid ${c.highlight}`,
+      boxShadow: `inset 0 -1px 0 ${c.shadow}`,
+    }}>
+      <div className="pye-skeleton" style={{ width: 44, height: 44, borderRadius: 10, flexShrink: 0 }} />
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8, minWidth: 0 }}>
+        <div className="pye-skeleton" style={{ width: "55%", height: 14 }} />
+        <div className="pye-skeleton" style={{ width: "75%", height: 12 }} />
+      </div>
+    </div>
+  );
+}
+
 // Dan's CTA — two variants: purple (brand) and default
 export function CTA({ label, onClick, disabled, purple }: {
   label: string;
