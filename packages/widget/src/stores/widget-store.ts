@@ -126,6 +126,12 @@ export function createWidgetStore() {
         set((s) => {
           const prev = s.screenHistory.pop();
           if (prev) s.screen = prev;
+          if (s.txStatus === "error") {
+            s.txStatus = "idle";
+            s.txStep = "idle";
+            s.txError = null;
+          }
+          s.redeemError = null;
         });
       },
 

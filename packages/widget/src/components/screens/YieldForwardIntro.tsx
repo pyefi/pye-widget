@@ -103,11 +103,17 @@ export default function YieldForwardIntro() {
           </div>
         </div>
 
-        <CTA
-          label={isConnected ? "Continue" : "Connect Wallet"}
-          onClick={() => navigate(isConnected ? "select-position" : "connect-wallet")}
-          purple
-        />
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
+          <CTA
+            label={isConnected ? "Continue" : "Connect Wallet"}
+            onClick={() => navigate(isConnected ? "select-position" : "connect-wallet")}
+            purple
+          />
+          <a href="https://docs.pye.fi/" target="_blank" rel="noopener noreferrer"
+            style={{ ...font(12, c.secondary), textDecoration: "none" }}>
+            Learn more — read the docs
+          </a>
+        </div>
       </div>
     </>
   );
