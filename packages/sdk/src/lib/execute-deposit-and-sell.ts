@@ -202,10 +202,18 @@ export async function executeDepositAndSell({
   // so the caller computes the expected RT with `estimateRtFromStake` and
   // passes it in. Using amountSol here would overshoot what the Bonds program
   // actually mints and cause Manifest to reject the swap.
+  //
+  // Apply a 2 bps safety buffer (floored + min 100 atoms) to absorb clock
+  // drift between the caller's quote and the on-chain Bonds mint. The chain
+  // clock ticks forward while the tx sits in the user's wallet, shrinking
+  // the actual mint ratio; asking for even 1 atom more than what's minted
+  // fails the swap with "Insufficient base in atoms".
   const baseDecimals  = manifestClient.market.baseDecimals();
   const quoteDecimals = manifestClient.market.quoteDecimals();
-  const inAtoms  = BigInt(Math.round(rtAmountToSell * 10 ** baseDecimals));
-  const outAtoms = BigInt(Math.round(minReceiveTokens * 10 ** quoteDecimals));
+  const rawInAtoms      = Math.floor(rtAmountToSell * 10 ** baseDecimals);
+  const safetyBuffer    = Math.max(Math.ceil(rawInAtoms * 0.0002), 100);
+  const inAtoms  = BigInt(Math.max(rawInAtoms - safetyBuffer, 0));
+  const outAtoms = BigInt(Math.floor(minReceiveTokens * 10 ** quoteDecimals));
 
   // ── Build instructions ─────────────────────────────────────────────────────
 

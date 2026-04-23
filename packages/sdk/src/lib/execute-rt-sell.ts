@@ -63,8 +63,13 @@ export async function executeRtSell({
   const baseDecimals = client.market.baseDecimals();
   const quoteDecimals = client.market.quoteDecimals();
 
-  const inAtoms = BigInt(Math.round(orderSizeTokens * 10 ** baseDecimals));
-  const outAtoms = BigInt(Math.round(minReceiveTokens * 10 ** quoteDecimals));
+  // Apply a 2 bps safety buffer (floored + min 100 atoms) to absorb clock
+  // drift between the quote and the on-chain Bonds mint — see the matching
+  // comment in execute-deposit-and-sell.ts for context.
+  const rawInAtoms   = Math.floor(orderSizeTokens * 10 ** baseDecimals);
+  const safetyBuffer = Math.max(Math.ceil(rawInAtoms * 0.0002), 100);
+  const inAtoms  = BigInt(Math.max(rawInAtoms - safetyBuffer, 0));
+  const outAtoms = BigInt(Math.floor(minReceiveTokens * 10 ** quoteDecimals));
 
   const rtAta = getAssociatedTokenAddressSync(rtMintPk, payer, false, TOKEN_PROGRAM_ID);
   const wsolAta = getAssociatedTokenAddressSync(NATIVE_MINT, payer, false, TOKEN_PROGRAM_ID);

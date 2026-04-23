@@ -266,6 +266,7 @@ export default function ReviewQuote() {
     if (!selectedStakeAccountPubkey || !selectedMaturityId) return;
     if (!bondParams) throw new Error("Could not resolve bond data for this market");
     if (!rtMarket) throw new Error("No RT market found for this maturity");
+    if (!maturity) throw new Error("No maturity selected");
 
     setTxStatus("loading");
     setTxStep("depositing");
@@ -273,6 +274,19 @@ export default function ReviewQuote() {
     // Swap-level minReceive is measured against the gross swap output;
     // the fixed taker fee is transferred from that wSOL post-swap.
     const minReceive = Math.max(grossSellAmount * (1 - slippage / 100), 0);
+
+    // Refresh the epoch-synced clock right before signing — the mount-time
+    // value can be minutes stale by the time the user clicks, and the chain
+    // clock keeps advancing. An out-of-date nowTs overshoots the actual
+    // mint by ~1 atom per second of drift, which fails the Manifest swap.
+    const freshNowTs = await fetchEpochSyncedNowTs(connection).catch(
+      () => Date.now() / 1000,
+    );
+    const freshRtAmount = estimateRtFromStake({
+      amountSol: parsedAmount,
+      maturity,
+      nowTs: freshNowTs,
+    });
 
     try {
       if (selectedStakeAccountPubkey === "liquid-sol") {
@@ -292,7 +306,7 @@ export default function ReviewQuote() {
           wallet,
           marketPubkey: rtMarket.marketPubkey,
           rtMint: bondParams.yieldTokenMint,
-          orderSizeTokens: rtAmount,
+          orderSizeTokens: freshRtAmount,
           minReceiveTokens: minReceive,
           expectedSolOut: grossSellAmount,
         });
@@ -316,7 +330,7 @@ export default function ReviewQuote() {
           validatorVoteAccount: bondParams.voteAccount,
           stakeAccountPubkey: selectedStakeAccountPubkey,
           amountSol: parsedAmount,
-          rtAmountToSell: rtAmount,
+          rtAmountToSell: freshRtAmount,
           stakeBalanceSol: selectedStakeAccountBalance,
           marketPubkey: rtMarket.marketPubkey,
           minReceiveTokens: minReceive,
@@ -350,7 +364,7 @@ export default function ReviewQuote() {
     connection,
     wallet,
     parsedAmount,
-    rtAmount,
+    maturity,
     selectedStakeAccountBalance,
     sellAmount,
     grossSellAmount,
