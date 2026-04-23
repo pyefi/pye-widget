@@ -68,12 +68,14 @@ export default function ChooseAmount() {
   const rafRef = useRef<number | null>(null);
   useEffect(() => () => { if (rafRef.current != null) cancelAnimationFrame(rafRef.current); }, []);
 
+  const truncate4 = (v: number) => (Math.floor(v * 10000) / 10000).toFixed(4);
+
   const rampToAmount = (target: number) => {
     if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
     const start = parsed;
     if (Math.abs(target - start) < 1e-9) return;
     const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-    if (reduced) { setDepositAmount(target.toFixed(4)); return; }
+    if (reduced) { setDepositAmount(truncate4(target)); return; }
 
     const duration = 500;
     const startTime = performance.now();
@@ -82,7 +84,7 @@ export default function ChooseAmount() {
     const tick = (now: number) => {
       const t = Math.min(1, (now - startTime) / duration);
       const v = start + (target - start) * ease(t);
-      const s = v.toFixed(4);
+      const s = truncate4(v);
       if (s !== lastWritten) {
         lastWritten = s;
         setDepositAmount(s);
@@ -165,7 +167,7 @@ export default function ChooseAmount() {
           step={stepSize}
           value={sliderValue}
           onChange={(e) => {
-            const s = parseFloat(e.target.value).toFixed(4);
+            const s = truncate4(parseFloat(e.target.value));
             if (s !== depositAmount) setDepositAmount(s);
           }}
           style={{ "--pye-slider-pct": `${sliderPct}%` } as React.CSSProperties}
