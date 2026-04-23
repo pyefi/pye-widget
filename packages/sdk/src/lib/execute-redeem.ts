@@ -100,8 +100,9 @@ export async function executeRedeem({
   const globalSettingsPda = deriveGlobalSettings();
   const stakeAccountPda = deriveStakeAccount(bond);
 
-  const ownerPt = getAssociatedTokenAddressSync(ptMint, owner);
-  const ownerYt = getAssociatedTokenAddressSync(ytMint, owner);
+  // allowOwnerOffCurve: true for PDA-backed wallets (Squads vaults, etc.)
+  const ownerPt = getAssociatedTokenAddressSync(ptMint, owner, true);
+  const ownerYt = getAssociatedTokenAddressSync(ytMint, owner, true);
 
   const [bondData, latestBlockhash] = await Promise.all([
     fetchBondData(connection, bond),

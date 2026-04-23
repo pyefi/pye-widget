@@ -173,12 +173,14 @@ export async function executeDepositAndSell({
     );
   }
 
-  // Derive ATAs
-  const ownerPt   = getAssociatedTokenAddressSync(ptMint, owner);
-  const ownerYt   = getAssociatedTokenAddressSync(ytMint, owner);
+  // Derive ATAs — `allowOwnerOffCurve: true` so PDA-backed wallets
+  // (Squads multisig vaults, other smart-account adapters) don't trip
+  // TokenOwnerOffCurveError during address derivation.
+  const ownerPt   = getAssociatedTokenAddressSync(ptMint, owner, true);
+  const ownerYt   = getAssociatedTokenAddressSync(ytMint, owner, true);
   const feeWalletPt = getAssociatedTokenAddressSync(ptMint, protocolFeeWallet, true);
   const feeWalletYt = getAssociatedTokenAddressSync(ytMint, protocolFeeWallet, true);
-  const wsolAta   = getAssociatedTokenAddressSync(NATIVE_MINT, owner, false, TOKEN_PROGRAM_ID);
+  const wsolAta   = getAssociatedTokenAddressSync(NATIVE_MINT, owner, true, TOKEN_PROGRAM_ID);
   const treasuryWsol = getAssociatedTokenAddressSync(
     NATIVE_MINT, PYE_TREASURY_WALLET, true, TOKEN_PROGRAM_ID,
   );
