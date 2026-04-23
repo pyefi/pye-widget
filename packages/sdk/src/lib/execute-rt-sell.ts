@@ -21,6 +21,11 @@ export interface ExecuteRtSellParams {
   wallet: WalletContextState;
   marketPubkey: string;
   rtMint: string;
+  /**
+   * Amount of RT tokens to sell. This must match what the user actually holds
+   * in their RT ATA — for a fresh deposit, compute with `estimateRtFromStake`,
+   * not `amountSol`, since the Bonds program mints less than 1:1.
+   */
   orderSizeTokens: number;
   minReceiveTokens: number;
   /** Gross SOL out (pre-fee) used to size the Pye taker-fee transfer. */

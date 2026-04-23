@@ -85,6 +85,13 @@ export interface ExecuteDepositAndSellParams {
   stakeBalanceSol: number;
   // sell
   marketPubkey: string;
+  /**
+   * Expected RT tokens the Bonds program will mint to the user for this
+   * deposit. The Bonds program mints RT proportional to remaining time in the
+   * issuance window, so this is always ≤ amountSol — compute with
+   * `estimateRtFromStake` using an epoch-synced `nowTs`.
+   */
+  rtAmountToSell: number;
   minReceiveTokens: number;
   /** Gross SOL out (pre-fee) used to size the Pye taker-fee transfer. */
   expectedSolOut: number;
@@ -122,6 +129,7 @@ export async function executeDepositAndSell({
   amountSol,
   stakeBalanceSol,
   marketPubkey,
+  rtAmountToSell,
   minReceiveTokens,
   expectedSolOut,
   altPubkey,
@@ -190,10 +198,13 @@ export async function executeDepositAndSell({
   const totalLamports  = Math.round(stakeBalanceSol * 1e9);
   const isPartial      = amountLamports < totalLamports;
 
-  // Swap parameters — RT is 1:1 with deposited SOL
+  // Swap parameters — RT minted is proportional to remaining issuance window,
+  // so the caller computes the expected RT with `estimateRtFromStake` and
+  // passes it in. Using amountSol here would overshoot what the Bonds program
+  // actually mints and cause Manifest to reject the swap.
   const baseDecimals  = manifestClient.market.baseDecimals();
   const quoteDecimals = manifestClient.market.quoteDecimals();
-  const inAtoms  = BigInt(Math.round(amountSol * 10 ** baseDecimals));
+  const inAtoms  = BigInt(Math.round(rtAmountToSell * 10 ** baseDecimals));
   const outAtoms = BigInt(Math.round(minReceiveTokens * 10 ** quoteDecimals));
 
   // ── Build instructions ─────────────────────────────────────────────────────
