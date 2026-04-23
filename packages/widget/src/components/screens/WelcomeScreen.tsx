@@ -83,14 +83,32 @@ function IconRedeem() {
   return (
     <div style={{
       flexShrink: 0, width: 44, height: 44, borderRadius: 10,
-      background: "color-mix(in srgb, #0d9c5e 20%, transparent)",
+      background: "color-mix(in srgb, var(--c-brand) 20%, transparent)",
       borderTop: "1px solid rgba(255,255,255,0.2)",
       boxShadow: "0 4px 8px rgba(0,0,0,0.07), inset 0 -1px 0 rgba(0,0,0,0.2)",
       display: "flex", alignItems: "center", justifyContent: "center",
     }}>
-      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" style={{ color: "#0d9c5e" }}>
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" style={{ color: "var(--c-brand)" }}>
         <circle cx="8" cy="8" r="5" stroke="currentColor" strokeWidth="1.5" />
         <circle cx="12" cy="12" r="5" stroke="currentColor" strokeWidth="1.5" fill="none" />
+      </svg>
+    </div>
+  );
+}
+
+function IconDocs() {
+  return (
+    <div style={{
+      flexShrink: 0, width: 44, height: 44, borderRadius: 10,
+      background: `color-mix(in srgb, ${c.secondary} 15%, transparent)`,
+      borderTop: "1px solid rgba(255,255,255,0.2)",
+      boxShadow: "0 4px 8px rgba(0,0,0,0.07), inset 0 -1px 0 rgba(0,0,0,0.2)",
+      display: "flex", alignItems: "center", justifyContent: "center",
+    }}>
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" style={{ color: c.secondary }}>
+        <path d="M4 3h8a2 2 0 0 1 2 2v12H6a2 2 0 0 1-2-2V3z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+        <path d="M4 15a2 2 0 0 1 2-2h8" stroke="currentColor" strokeWidth="1.5"/>
+        <path d="M7 7h4M7 10h3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
       </svg>
     </div>
   );
@@ -100,12 +118,12 @@ function IconSell() {
   return (
     <div style={{
       flexShrink: 0, width: 44, height: 44, borderRadius: 10,
-      background: "color-mix(in srgb, var(--c-brand) 20%, transparent)",
+      background: "color-mix(in srgb, #0d9c5e 20%, transparent)",
       borderTop: "1px solid rgba(255,255,255,0.2)",
       boxShadow: "0 4px 8px rgba(0,0,0,0.07), inset 0 -1px 0 rgba(0,0,0,0.2)",
       display: "flex", alignItems: "center", justifyContent: "center",
     }}>
-      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" style={{ color: "var(--c-brand)" }}>
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" style={{ color: "#0d9c5e" }}>
         <rect x="3" y="5" width="14" height="11" rx="2" stroke="currentColor" strokeWidth="1.5" />
         <path d="M3 9H17" stroke="currentColor" strokeWidth="1.5" />
         <circle cx="13" cy="12.5" r="1" fill="currentColor" />
@@ -214,6 +232,12 @@ export default function WelcomeScreen({ validatorName }: WelcomeScreenProps) {
               subColor={maturedPtSol > 0 ? c.green : undefined}
               disabled={!canRedeem}
               onClick={() => navigate("redeem-list")}
+            />
+            <ChoiceRow
+              icon={<IconDocs />}
+              label="Learn more"
+              sub="Read the docs"
+              onClick={() => window.open("https://docs.pye.fi/", "_blank", "noopener,noreferrer")}
             />
           </>
         )}
