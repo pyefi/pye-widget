@@ -37,9 +37,6 @@ export type { IndividualOrder, OrderBookSummary } from "./lib/manifest-parser";
 export { fetchLockupMetrics } from "./lib/fetch-lockup-metrics";
 export type { LockupMetrics, BondPayment, RewardBreakdown, TvlSnapshot } from "./lib/fetch-lockup-metrics";
 
-// Lib — Session connect intent (sessionStorage-scoped autoConnect gate)
-export { hasConnectIntent, markConnectIntent, clearConnectIntent } from "./lib/session-connect-intent";
-
 // Lib — Liquidity
 export { checkBuyLiquidity, checkSellLiquidity } from "./lib/liquidity";
 export type { LiquidityCheck } from "./lib/liquidity";
