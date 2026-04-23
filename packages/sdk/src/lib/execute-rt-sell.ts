@@ -10,9 +10,11 @@ import {
   TOKEN_PROGRAM_ID,
   createAssociatedTokenAccountIdempotentInstruction,
   createCloseAccountInstruction,
+  createTransferInstruction,
   getAssociatedTokenAddressSync,
 } from "@solana/spl-token";
 import type { WalletContextState } from "@solana/wallet-adapter-react";
+import { PYE_TREASURY_WALLET, calculateFeeLamports } from "../constants/fees";
 
 export interface ExecuteRtSellParams {
   connection: Connection;
@@ -21,6 +23,8 @@ export interface ExecuteRtSellParams {
   rtMint: string;
   orderSizeTokens: number;
   minReceiveTokens: number;
+  /** Gross SOL out (pre-fee) used to size the Pye taker-fee transfer. */
+  expectedSolOut: number;
 }
 
 export interface ExecuteRtSellResult {
@@ -39,6 +43,7 @@ export async function executeRtSell({
   rtMint,
   orderSizeTokens,
   minReceiveTokens,
+  expectedSolOut,
 }: ExecuteRtSellParams): Promise<ExecuteRtSellResult> {
   if (!wallet.publicKey || !wallet.sendTransaction) {
     throw new Error("Wallet not connected");
@@ -58,6 +63,9 @@ export async function executeRtSell({
 
   const rtAta = getAssociatedTokenAddressSync(rtMintPk, payer, false, TOKEN_PROGRAM_ID);
   const wsolAta = getAssociatedTokenAddressSync(NATIVE_MINT, payer, false, TOKEN_PROGRAM_ID);
+  const treasuryWsol = getAssociatedTokenAddressSync(
+    NATIVE_MINT, PYE_TREASURY_WALLET, true, TOKEN_PROGRAM_ID,
+  );
 
   const tx = new Transaction();
 
@@ -73,6 +81,12 @@ export async function executeRtSell({
       payer, wsolAta, payer, NATIVE_MINT,
     ),
   );
+  // Ensure treasury wSOL ATA exists so the fee transfer can land
+  tx.add(
+    createAssociatedTokenAccountIdempotentInstruction(
+      payer, treasuryWsol, PYE_TREASURY_WALLET, NATIVE_MINT,
+    ),
+  );
 
   // Sell RT (base) for wSOL (quote)
   tx.add(
@@ -84,7 +98,13 @@ export async function executeRtSell({
     }),
   );
 
-  // Unwrap wSOL → native SOL
+  // Pye taker fee on SOL out → transfer wSOL to treasury before unwrap
+  const feeLamports = calculateFeeLamports(expectedSolOut);
+  if (feeLamports > BigInt(0)) {
+    tx.add(createTransferInstruction(wsolAta, treasuryWsol, payer, feeLamports));
+  }
+
+  // Unwrap remaining wSOL → native SOL
   tx.add(createCloseAccountInstruction(wsolAta, payer, payer));
 
   const latestBlockhash = await connection.getLatestBlockhash("confirmed");

@@ -16,9 +16,11 @@ import {
   TOKEN_PROGRAM_ID,
   createAssociatedTokenAccountIdempotentInstruction,
   createCloseAccountInstruction,
+  createTransferInstruction,
   getAssociatedTokenAddressSync,
 } from "@solana/spl-token";
 import type { WalletContextState } from "@solana/wallet-adapter-react";
+import { PYE_TREASURY_WALLET, calculateFeeLamports } from "../constants/fees";
 
 // ─── Shared constants (mirrors execute-stake-deposit.ts) ──────────────────────
 
@@ -84,6 +86,8 @@ export interface ExecuteDepositAndSellParams {
   // sell
   marketPubkey: string;
   minReceiveTokens: number;
+  /** Gross SOL out (pre-fee) used to size the Pye taker-fee transfer. */
+  expectedSolOut: number;
   // v0 lookup table containing this validator's static accounts
   altPubkey: string;
 }
@@ -101,10 +105,11 @@ export interface ExecuteDepositAndSellResult {
  * Instruction order:
  *   1. ComputeBudget (limit + price)
  *   2. StakeProgram.split (only if partial deposit)
- *   3. createATA: ownerPt, ownerYt (RT), feeWalletPt, feeWalletYt, wSOL
+ *   3. createATA: ownerPt, ownerYt (RT), feeWalletPt, feeWalletYt, wSOL, treasuryWsol
  *   4. Bonds deposit → mints PT + RT into ownerPt / ownerYt
  *   5. Manifest swapIx → sells RT for wSOL
- *   6. closeAccount → unwraps wSOL to native SOL
+ *   6. transfer → Pye taker fee (wSOL) from owner's wsolAta to treasuryWsol
+ *   7. closeAccount → unwraps remaining wSOL to native SOL
  */
 export async function executeDepositAndSell({
   connection,
@@ -118,6 +123,7 @@ export async function executeDepositAndSell({
   stakeBalanceSol,
   marketPubkey,
   minReceiveTokens,
+  expectedSolOut,
   altPubkey,
 }: ExecuteDepositAndSellParams): Promise<ExecuteDepositAndSellResult> {
   if (!wallet.publicKey || !wallet.sendTransaction) {
@@ -165,15 +171,20 @@ export async function executeDepositAndSell({
   const feeWalletPt = getAssociatedTokenAddressSync(ptMint, protocolFeeWallet, true);
   const feeWalletYt = getAssociatedTokenAddressSync(ytMint, protocolFeeWallet, true);
   const wsolAta   = getAssociatedTokenAddressSync(NATIVE_MINT, owner, false, TOKEN_PROGRAM_ID);
+  const treasuryWsol = getAssociatedTokenAddressSync(
+    NATIVE_MINT, PYE_TREASURY_WALLET, true, TOKEN_PROGRAM_ID,
+  );
 
   // Pre-check which ATAs already exist so we can skip their createIdempotent ixs.
   // Each skipped ix shaves ~11 bytes off the tx; fee-wallet ATAs are almost
   // always present in steady state.
   const ataInfos = await connection.getMultipleAccountsInfo([
-    ownerPt, ownerYt, feeWalletPt, feeWalletYt, wsolAta,
+    ownerPt, ownerYt, feeWalletPt, feeWalletYt, wsolAta, treasuryWsol,
   ]);
-  const [ownerPtExists, ownerYtExists, feeWalletPtExists, feeWalletYtExists, wsolAtaExists] =
-    ataInfos.map((info) => info !== null);
+  const [
+    ownerPtExists, ownerYtExists, feeWalletPtExists, feeWalletYtExists,
+    wsolAtaExists, treasuryWsolExists,
+  ] = ataInfos.map((info) => info !== null);
 
   const amountLamports = Math.round(amountSol * 1e9);
   const totalLamports  = Math.round(stakeBalanceSol * 1e9);
@@ -221,6 +232,7 @@ export async function executeDepositAndSell({
   if (!feeWalletPtExists)   instructions.push(createAssociatedTokenAccountIdempotentInstruction(owner, feeWalletPt, protocolFeeWallet, ptMint));
   if (!feeWalletYtExists)   instructions.push(createAssociatedTokenAccountIdempotentInstruction(owner, feeWalletYt, protocolFeeWallet, ytMint));
   if (!wsolAtaExists)       instructions.push(createAssociatedTokenAccountIdempotentInstruction(owner, wsolAta,     owner,             NATIVE_MINT));
+  if (!treasuryWsolExists)  instructions.push(createAssociatedTokenAccountIdempotentInstruction(owner, treasuryWsol, PYE_TREASURY_WALLET, NATIVE_MINT));
 
   // Bonds deposit instruction — mints PT + RT into ownerPt / ownerYt
   const isTransientSet = !transientStakeAccount.equals(PublicKey.default);
@@ -267,6 +279,16 @@ export async function executeDepositAndSell({
     }),
   );
 
+  // Pye taker fee on SOL out → transfer wSOL to treasury before unwrap.
+  // Fee is sized off the quoted gross amount (expectedSolOut); this amount is
+  // guaranteed present because swap minReceive > fee for any valid slippage.
+  const feeLamports = calculateFeeLamports(expectedSolOut);
+  if (feeLamports > BigInt(0)) {
+    instructions.push(
+      createTransferInstruction(wsolAta, treasuryWsol, owner, feeLamports),
+    );
+  }
+
   // Unwrap wSOL → native SOL
   instructions.push(createCloseAccountInstruction(wsolAta, owner, owner));
 
@@ -287,7 +309,8 @@ export async function executeDepositAndSell({
     console.log(
       `[executeDepositAndSell] v0 tx size=${serialized.length}B ` +
       `(limit=1232) alt=${altPubkey.slice(0, 8)}... skipped=[ownerPt:${ownerPtExists},ownerYt:${ownerYtExists},` +
-      `feeWalletPt:${feeWalletPtExists},feeWalletYt:${feeWalletYtExists},wsolAta:${wsolAtaExists}]`,
+      `feeWalletPt:${feeWalletPtExists},feeWalletYt:${feeWalletYtExists},` +
+      `wsolAta:${wsolAtaExists},treasuryWsol:${treasuryWsolExists}] feeLamports=${feeLamports}`,
     );
   } catch (err) {
     console.warn("[executeDepositAndSell] could not measure tx size:", err);
