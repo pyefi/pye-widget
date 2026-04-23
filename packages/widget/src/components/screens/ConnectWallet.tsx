@@ -89,8 +89,17 @@ export default function ConnectWallet() {
     select(adapter.adapter.name);
   };
 
+  // Dedupe by adapter name — wallet-adapter-react merges explicit adapters
+  // with Wallet Standard auto-discovery, and for some wallets (e.g.
+  // MetaMask's Solana snap) the same name shows up twice, causing React
+  // duplicate-key warnings and flaky select() behavior since `select(name)`
+  // can bind to whichever instance the provider picks first.
+  const uniqueWallets = Array.from(
+    new Map(wallets.map((w) => [w.adapter.name, w])).values(),
+  );
+
   // Sort: detected wallets first
-  const sortedWallets = [...wallets].sort((a, b) => {
+  const sortedWallets = [...uniqueWallets].sort((a, b) => {
     const aDetected = a.readyState === "Installed" ? 0 : 1;
     const bDetected = b.readyState === "Installed" ? 0 : 1;
     return aDetected - bDetected;
