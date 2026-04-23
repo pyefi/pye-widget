@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { address as toAddress } from "@solana/kit";
 import { useWalletStore } from "./providers";
+import { markConnectIntent, clearConnectIntent } from "../lib/session-connect-intent";
 
 function shortenAddress(address: string): string {
   return address.slice(0, 4) + "..." + address.slice(-4);
@@ -15,6 +16,10 @@ export default function WalletSyncer() {
   const { publicKey, connected, connecting } = useWallet();
   const { connection } = useConnection();
   const fetchedKeyRef = useRef<string | null>(null);
+  // Tracks whether this mount has ever seen a connected state. Gates
+  // clearConnectIntent() so the initial "not yet connected" render
+  // doesn't wipe the sessionStorage flag before WalletProvider reads it.
+  const hasConnectedRef = useRef(false);
 
   const setWalletStatus = useWalletStore((s) => s.setWalletStatus);
   const setWalletPublicKey = useWalletStore((s) => s.setWalletPublicKey);
@@ -54,11 +59,17 @@ export default function WalletSyncer() {
       setWalletStatus("connected");
       setWalletPublicKey(toAddress(base58));
       setDisplayAddress(shortenAddress(base58));
+      hasConnectedRef.current = true;
+      markConnectIntent();
       if (fetchedKeyRef.current !== base58) {
         fetchedKeyRef.current = base58;
         fetchBalance();
       }
     } else {
+      if (hasConnectedRef.current) {
+        clearConnectIntent();
+        hasConnectedRef.current = false;
+      }
       resetWallet();
       fetchedKeyRef.current = null;
     }
