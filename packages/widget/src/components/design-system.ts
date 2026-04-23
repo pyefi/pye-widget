@@ -102,6 +102,26 @@ export const THEME_CSS = `
     }
   }
 
+  /* ─── Skeleton shimmer ───────────────────────────────────────── */
+  @keyframes pye-skeleton-pulse {
+    0%, 100% { opacity: 0.55; }
+    50%      { opacity: 0.85; }
+  }
+  .pye-skeleton {
+    animation: pye-skeleton-pulse 1.4s ease-in-out infinite;
+    background: linear-gradient(
+      90deg,
+      var(--c-lowered) 0%,
+      var(--c-shadow) 50%,
+      var(--c-lowered) 100%
+    );
+    background-size: 200% 100%;
+    border-radius: 4px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .pye-skeleton { animation: none; opacity: 0.7; }
+  }
+
   /* ─── Step transition: subtle translate + fade on mount ──────── */
   @keyframes pye-step-in {
     0%   { transform: translateY(8px); opacity: 0; }
