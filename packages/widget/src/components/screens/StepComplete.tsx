@@ -1,6 +1,6 @@
 import { useWidgetStore } from "../../stores/widget-store";
 import { maturities } from "@pye/sdk";
-import { c, font, displayFont, pointsMap, formatSolAmount } from "../design-system";
+import { c, font, displayFont, formatSolAmount } from "../design-system";
 import { Body, CTA, Tooltip, Spacer, SuccessHeader } from "../shared/Layout";
 import { Odometer } from "../shared/Odometer";
 
@@ -17,10 +17,6 @@ export default function StepComplete() {
   // Resolve maturity from real SDK data
   const maturity = selectedMaturityId ? maturities[selectedMaturityId] : null;
   const matures = maturity?.human_readable ?? "Sep 30, 2026";
-
-  // Points label
-  const monthToQuarter: Record<string, string> = { JUN: "Q3", SEP: "Q4", DEC: "Q1", MAR: "Q2" };
-  const quarterId = maturity ? (monthToQuarter[maturity.month] ?? null) : null;
 
   const solscanUrl = txSignature
     ? `https://solscan.io/tx/${txSignature}`
@@ -82,6 +78,23 @@ export default function StepComplete() {
               </svg>
             </a>
           </div>
+        </div>
+
+        {/* Wallet visibility notice */}
+        <div style={{
+          background: c.raised,
+          borderTop: `1px solid ${c.highlight}`,
+          boxShadow: `inset 0 -1px 0 ${c.shadow}`,
+          borderRadius: 8, padding: 12,
+          display: "flex", alignItems: "flex-start", gap: 10,
+        }}>
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0, marginTop: 2 }}>
+            <circle cx="8" cy="8" r="6.5" stroke={c.secondary} strokeWidth="1.2"/>
+            <path d="M8 7.5v3.5M8 5v.5" stroke={c.secondary} strokeWidth="1.4" strokeLinecap="round"/>
+          </svg>
+          <p style={font(12, c.secondary)}>
+            Your PT tokens may be hidden in your wallet — enable them via <span style={{ color: c.primary }}>Manage Tokens</span> to see your balance.
+          </p>
         </div>
 
         <Spacer />

@@ -8,7 +8,7 @@ import {
   applyTradingFee,
 } from "@pye/sdk";
 import { useMarketStore } from "@pye/sdk/react";
-import { c, font, displayFont, MARKET_RATE, formatSolAmount } from "../design-system";
+import { c, font, displayFont, MARKET_RATE, formatSolAmount, POINTS_ENABLED } from "../design-system";
 import { CTA, Tooltip, Spacer } from "../shared/Layout";
 import { Odometer } from "../shared/Odometer";
 
@@ -140,7 +140,7 @@ export default function ChooseDuration() {
                 <span style={font(15, isSelected ? c.primary : c.secondary, isSelected ? 500 : 400)}>
                   {q.label}
                 </span>
-                {q.pts && (
+                {POINTS_ENABLED && q.pts && (
                   <span style={font(13, c.purple)}>{q.pts}</span>
                 )}
               </div>
