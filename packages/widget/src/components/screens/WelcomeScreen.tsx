@@ -3,7 +3,7 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { useWidgetStore } from "../../stores/widget-store";
 import { useBalanceStore, useWalletStore } from "@pye/sdk/react";
 import { buildPtLookup, maturities } from "@pye/sdk";
-import { Body, Spacer } from "../shared/Layout";
+import { Body, Spacer, SkeletonRow } from "../shared/Layout";
 import { c, font, displayFont, formatSolAmount } from "../design-system";
 
 const LAMPORTS_PER_SOL = 1_000_000_000;
@@ -122,6 +122,7 @@ export default function WelcomeScreen({ validatorName }: WelcomeScreenProps) {
   const navigate = useWidgetStore((s) => s.navigate);
   const walletBalances = useBalanceStore((s) => s.walletBalances);
   const userStakeAccounts = useBalanceStore((s) => s.userStakeAccounts);
+  const userStakeAccountsLoading = useBalanceStore((s) => s.userStakeAccountsLoading);
   const walletPublicKey = useWalletStore((s) => s.publicKey);
   const { disconnect } = useWallet();
 
@@ -156,6 +157,12 @@ export default function WelcomeScreen({ validatorName }: WelcomeScreenProps) {
   const canRedeem = totalPtSol > 0;
   const canSell = activeStakeSol > 0;
 
+  // Show skeletons only on the very first fetch when we have nothing to display.
+  // Once stake accounts or balances are known (even if zero), render real rows.
+  const hasAnyBalance = Object.values(walletBalances).some((v) => v > 0);
+  const isInitialLoading =
+    userStakeAccountsLoading && userStakeAccounts.length === 0 && !hasAnyBalance;
+
   const redeemSub = !canRedeem
     ? "No PT positions"
     : maturedPtSol > 0
@@ -173,32 +180,43 @@ export default function WelcomeScreen({ validatorName }: WelcomeScreenProps) {
           Welcome back
         </p>
         <p style={font(15, c.secondary)}>
-          {canRedeem && canSell
-            ? "We found active staked SOL positions and PTs ready to redeem. What would you like to do?"
-            : canRedeem
-              ? "We found PTs ready to redeem. What would you like to do?"
-              : canSell
-                ? "We found active staked SOL positions. Sell your future rewards upfront."
-                : `Stake SOL with ${validatorName ?? "your validator"} to get started.`}
+          {isInitialLoading
+            ? "Loading your positions…"
+            : canRedeem && canSell
+              ? "We found active staked SOL positions and PTs ready to redeem. What would you like to do?"
+              : canRedeem
+                ? "We found PTs ready to redeem. What would you like to do?"
+                : canSell
+                  ? "We found active staked SOL positions. Sell your future rewards upfront."
+                  : `Stake SOL with ${validatorName ?? "your validator"} to get started.`}
         </p>
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 8 }}>
-        <ChoiceRow
-          icon={<IconSell />}
-          label="Sell future rewards"
-          sub={sellSub}
-          disabled={!canSell}
-          onClick={() => navigate("select-position")}
-        />
-        <ChoiceRow
-          icon={<IconRedeem />}
-          label="Redeem PTs"
-          sub={redeemSub}
-          subColor={maturedPtSol > 0 ? c.green : undefined}
-          disabled={!canRedeem}
-          onClick={() => navigate("redeem-list")}
-        />
+        {isInitialLoading ? (
+          <>
+            <SkeletonRow />
+            <SkeletonRow />
+          </>
+        ) : (
+          <>
+            <ChoiceRow
+              icon={<IconSell />}
+              label="Sell future rewards"
+              sub={sellSub}
+              disabled={!canSell}
+              onClick={() => navigate("select-position")}
+            />
+            <ChoiceRow
+              icon={<IconRedeem />}
+              label="Redeem PTs"
+              sub={redeemSub}
+              subColor={maturedPtSol > 0 ? c.green : undefined}
+              disabled={!canRedeem}
+              onClick={() => navigate("redeem-list")}
+            />
+          </>
+        )}
       </div>
 
       <Spacer />
