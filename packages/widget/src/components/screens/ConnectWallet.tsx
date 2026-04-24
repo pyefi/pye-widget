@@ -51,7 +51,7 @@ function WalletRow({ name, iconUrl, connecting, onConnect }: WalletRowProps) {
 // ─── Main component ──────────────────────────────────────────────────────────
 
 export default function ConnectWallet() {
-  const { wallets, wallet, select, connect } = useWallet();
+  const { wallets, wallet, select, connect, disconnect } = useWallet();
   const navigate = useWidgetStore((s) => s.navigate);
   const walletStatus = useWalletStore((s) => s.status);
   const connecting = useWidgetStore((s) => s.connectingWallet);
@@ -71,18 +71,39 @@ export default function ConnectWallet() {
   // to work for browser-extension adapters because autoConnect pre-selected
   // them on mount, but adapters like WalletConnect (no extension, requires
   // interaction) exposed the race. Fix: select, let React flush, then
-  // connect from this effect once `wallet` reflects our pick.
+  // connect from this effect once `wallet` reflects our pick. Timeout guards
+  // against the wallet change never arriving (e.g. WalletConnect adapter
+  // stuck mid-disconnect after the user X'd the QR modal).
   useEffect(() => {
     if (!pendingWalletName) return;
-    if (wallet?.adapter.name !== pendingWalletName) return;
+    if (wallet?.adapter.name !== pendingWalletName) {
+      const timer = setTimeout(() => {
+        setConnecting(null);
+        setPendingWalletName(null);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
     connect()
       .catch(() => setConnecting(null))
       .finally(() => setPendingWalletName(null));
   }, [pendingWalletName, wallet, connect, setConnecting]);
 
-  const handleConnect = (walletName: string) => {
+  const handleConnect = async (walletName: string) => {
     const adapter = wallets.find((w) => w.adapter.name === walletName);
     if (!adapter) return;
+
+    // Cancelling the AppKit QR modal doesn't reject WalletConnect's pending
+    // `connect()`, so the adapter stays mid-pairing. Calling `select()` next
+    // makes wallet-adapter-react run disconnect on the previous adapter,
+    // which then hangs and blocks the switch. Pre-empt it: kick off a
+    // disconnect ourselves but race it against a short timeout so a stuck
+    // adapter can't freeze the flow.
+    if (wallet && wallet.adapter.name !== walletName) {
+      await Promise.race([
+        disconnect().catch(() => {}),
+        new Promise((r) => setTimeout(r, 1000)),
+      ]);
+    }
 
     setConnecting(walletName);
     setPendingWalletName(walletName);
