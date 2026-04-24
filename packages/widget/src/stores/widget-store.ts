@@ -45,8 +45,6 @@ export interface WidgetState {
   redeemingMint: string | null;
   /** Error surfaced by the redeem flow */
   redeemError: string | null;
-  /** Wallet name currently connecting */
-  connectingWallet: string | null;
   /** SOL amount received from redeem, set after transaction completes */
   redeemAmountSol: number | null;
   /** Redeem transaction signature */
@@ -64,7 +62,6 @@ export interface WidgetActions {
   setSellAmountSol(amount: number): void;
   setRedeemingMint(mint: string | null): void;
   setRedeemError(error: string | null): void;
-  setConnectingWallet(name: string | null): void;
   setRedeemAmountSol(amount: number): void;
   setRedeemTxSignature(sig: string): void;
   setTxStep(step: WidgetState["txStep"]): void;
@@ -105,7 +102,6 @@ const initialState: WidgetState = {
 
   redeemingMint: null,
   redeemError: null,
-  connectingWallet: null,
   redeemAmountSol: null,
   redeemTxSignature: null,
 };
@@ -185,12 +181,6 @@ export function createWidgetStore() {
       setRedeemError(error) {
         set((s) => {
           s.redeemError = error;
-        });
-      },
-
-      setConnectingWallet(name) {
-        set((s) => {
-          s.connectingWallet = name;
         });
       },
 
