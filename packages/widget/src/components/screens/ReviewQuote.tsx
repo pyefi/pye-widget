@@ -146,6 +146,7 @@ export default function ReviewQuote() {
   }, [connection]);
 
   const navigate = useWidgetStore((s) => s.navigate);
+  const demo = useWidgetStore((s) => s.demo);
   const txStatus = useWidgetStore((s) => s.txStatus);
   const txStep = useWidgetStore((s) => s.txStep);
   const txError = useWidgetStore((s) => s.txError);
@@ -237,12 +238,13 @@ export default function ReviewQuote() {
     selectedStakeAccountPubkey === "liquid-sol" ||
     (selectedStakeAccountPubkey !== null &&
       userStakeAccounts.some((a) => a.pubkey === selectedStakeAccountPubkey));
-  const canSign =
-    !!selectedStakeAccountPubkey &&
-    !!selectedMaturityId &&
-    !isLoading &&
-    hasLiquidity &&
-    selectedStakeStillOwned;
+  const canSign = demo
+    ? !!selectedStakeAccountPubkey && !!selectedMaturityId && !isLoading
+    : !!selectedStakeAccountPubkey &&
+      !!selectedMaturityId &&
+      !isLoading &&
+      hasLiquidity &&
+      selectedStakeStillOwned;
 
   // Resolve bond from the stake account's actual validator (not from market key)
   // Fall back to market-key-based resolution for liquid SOL (no stake account)
@@ -264,6 +266,23 @@ export default function ReviewQuote() {
 
   const handleSign = useCallback(async () => {
     if (!selectedStakeAccountPubkey || !selectedMaturityId) return;
+
+    if (demo) {
+      setTxStatus("loading");
+      setTxStep("depositing");
+      await new Promise((r) => setTimeout(r, 600));
+      setTxStep("selling");
+      await new Promise((r) => setTimeout(r, 800));
+      setTxStep("complete");
+      setSellAmountSol(sellAmount);
+      const chars = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+      let fakeSig = "";
+      for (let i = 0; i < 64; i++) fakeSig += chars.charAt(Math.floor(Math.random() * chars.length));
+      setTxStatus("success", fakeSig);
+      navigate("complete");
+      return;
+    }
+
     if (!bondParams) throw new Error("Could not resolve bond data for this market");
     if (!rtMarket) throw new Error("No RT market found for this maturity");
     if (!maturity) throw new Error("No maturity selected");
@@ -355,6 +374,7 @@ export default function ReviewQuote() {
       fetchUserStakeAccounts(connection, owner).then(setUserStakeAccounts).catch(() => {});
     }
   }, [
+    demo,
     rtMarket,
     bondParams,
     selectedStakeAccount,
@@ -549,8 +569,8 @@ export default function ReviewQuote() {
         </div>
       </div>
 
-      {/* Liquidity warning */}
-      {!hasLiquidity && rtAmount > 0 && (
+      {/* Liquidity warning (suppressed in demo mode — happy path) */}
+      {!demo && !hasLiquidity && rtAmount > 0 && (
         <div style={{
           background: "rgba(255,181,77,0.15)",
           borderTop: "1px solid rgba(255,255,255,0.2)",

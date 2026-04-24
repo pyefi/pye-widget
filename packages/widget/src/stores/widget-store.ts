@@ -51,6 +51,9 @@ export interface WidgetState {
   redeemAmountSol: number | null;
   /** Redeem transaction signature */
   redeemTxSignature: string | null;
+
+  /** Internal — widget is running in demo mode (no wallet, mocked data and tx). */
+  demo: boolean;
 }
 
 export interface WidgetActions {
@@ -108,12 +111,15 @@ const initialState: WidgetState = {
   connectingWallet: null,
   redeemAmountSol: null,
   redeemTxSignature: null,
+
+  demo: false,
 };
 
-export function createWidgetStore() {
+export function createWidgetStore(overrides?: Partial<WidgetState>) {
   return createStore<WidgetStoreType>()(
     immer((set) => ({
       ...initialState,
+      ...overrides,
 
       navigate(screen) {
         set((s) => {
@@ -226,7 +232,10 @@ export function createWidgetStore() {
       },
 
       reset() {
-        set(() => ({ ...initialState }));
+        set((s) => {
+          const keepDemo = s.demo;
+          Object.assign(s, initialState, { demo: keepDemo });
+        });
       },
 
       resetForWalletChange() {

@@ -1,4 +1,4 @@
-import { useRef, useMemo } from "react";
+import { useRef, useMemo, type ReactNode } from "react";
 import {
   ConnectionProvider,
   WalletProvider,
@@ -24,6 +24,7 @@ import {
 import { THEME_CSS } from "./components/design-system";
 import WidgetShell from "./components/WidgetShell";
 import WalletChangeWatcher from "./components/WalletChangeWatcher";
+import DemoSeeder from "./demo-mode/DemoSeeder";
 import type { PyeWidgetProps } from "./types";
 
 function resolveValidatorName(voteAccount?: string): string | undefined {
@@ -41,6 +42,7 @@ export default function PyeWidget({
   voteAccount,
   theme = "pye-light",
   onClose,
+  demo = false,
 }: PyeWidgetProps) {
   const configuredRef = useRef(false);
   if (!configuredRef.current) {
@@ -62,21 +64,32 @@ export default function PyeWidget({
 
   const widgetStoreRef = useRef<ReturnType<typeof createWidgetStore>>(undefined);
   if (!widgetStoreRef.current) {
-    widgetStoreRef.current = createWidgetStore();
+    widgetStoreRef.current = createWidgetStore({ demo });
   }
+
+  // In demo mode we still mount ConnectionProvider + WalletProvider so the
+  // wallet-adapter-react hooks have their contexts — but we skip the real
+  // syncers and mount a DemoSeeder that pre-populates the SDK stores instead.
+  const innerSyncers: ReactNode = demo ? (
+    <DemoSeeder />
+  ) : (
+    <>
+      <WalletSyncer />
+      <BalanceSyncer />
+      <MarketSyncer />
+      <ApySyncer />
+    </>
+  );
 
   return (
     <div data-theme={theme}>
       <style>{THEME_CSS}</style>
       <ConnectionProvider endpoint={rpcUrl}>
-        <WalletProvider wallets={wallets} autoConnect>
+        <WalletProvider wallets={wallets} autoConnect={!demo}>
           <PyeSDKProvider>
-            <WalletSyncer />
-            <BalanceSyncer />
-            <MarketSyncer />
-            <ApySyncer />
+            {innerSyncers}
             <WidgetStoreContext.Provider value={widgetStoreRef.current}>
-              <WalletChangeWatcher />
+              {!demo && <WalletChangeWatcher />}
               <WidgetShell validatorName={validatorName} />
             </WidgetStoreContext.Provider>
           </PyeSDKProvider>

@@ -1,0 +1,133 @@
+/*
+ * ITC Garamond Narrow (same file the marketing site uses).
+ */
+@font-face {
+  font-family: "ITC Garamond Narrow";
+  src: url("/garamond-narrow.otf") format("opentype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+/*
+ * Tokens ported directly from the marketing landing page
+ * (src/app/globals.css — `--landing-*`). Only the values used on this
+ * page are declared.
+ */
+
+:root {
+  --layer-base: #ECEAE8;          /* landing-bg */
+  --surface-default: #F1EFED;     /* foundry surface-default */
+  --surface-raised: #f2efed;      /* landing-card-bg */
+  --surface-lowered: #ECEAE8;
+  --surface-lowered-2: #E6E3E0;
+  --elevation-highlight: #fdfeff; /* landing-highlight */
+  --elevation-shadow: #E0DDD9;    /* foundry elevation-shadow */
+
+  --typo-primary: #24201C;
+  --typo-secondary: #5C5752;
+
+  --brand-purple: #9A4DFF;
+
+  --scrim: rgba(36,32,28,0.4);
+}
+
+[data-theme-mode="dark"] {
+  --layer-base: #1A1720;          /* marketing base-primary (page bg) */
+  --surface-default: #1F1C26;     /* foundry surface-default dark */
+  --surface-raised: #2A2634;      /* foundry surface-raised dark */
+  --surface-lowered: #1A1720;
+  --surface-lowered-2: #110F14;
+  --elevation-highlight: #3C364A; /* foundry elevation-highlight dark */
+  --elevation-shadow: #0A090C;    /* foundry elevation-shadow dark */
+
+  --typo-primary: #FFFFFF;
+  --typo-secondary: #D7D4DD;
+
+  --brand-purple: #9A4DFF;
+
+  --scrim: rgba(0,0,0,0.6);
+}
+
+html, body {
+  background: var(--layer-base);
+  color: var(--typo-primary);
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+/* Shiki: let the wrapper own background/padding so the snippet container
+ * (surfaceLowered2, rounded bottom corners) stays intact. */
+.shiki-container pre.shiki {
+  background: transparent !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  overflow: visible;
+}
+.shiki-container pre.shiki,
+.shiki-container pre.shiki code {
+  font-family: inherit;
+  font-size: inherit;
+}
+
+/* CTA hover states — inline styles set the base; these override on :hover. */
+.btn-primary, .btn-secondary {
+  transition: filter 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+.btn-primary:hover { filter: brightness(1.12); }
+.btn-secondary:hover {
+  box-shadow:
+    inset 0 1px 0 var(--elevation-highlight),
+    inset 0 -1px 0 var(--elevation-shadow),
+    0 4px 8px rgba(0, 0, 0, 0.07) !important;
+}
+
+/* Break that only fires on desktop-width viewports. */
+.desktop-break { display: none; }
+@media (min-width: 768px) {
+  .desktop-break { display: block; }
+}
+
+/* Responsive layout — inline styles carry the desktop values; these
+ * classes collapse to single-column / tighter spacing on narrow viewports. */
+.demo-main {
+  padding: 48px 24px 96px;
+  display: flex;
+  flex-direction: column;
+  gap: 80px;
+}
+.demo-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 32px;
+  align-items: start;
+}
+.demo-controls {
+  position: sticky;
+  top: 80px;
+}
+@media (max-width: 900px) {
+  .demo-main { padding: 24px 16px 64px; gap: 56px; }
+  .demo-grid { grid-template-columns: 1fr; gap: 20px; }
+  .demo-controls { position: static; top: auto; }
+}
+
+/* NavBar — hide secondary links on narrow screens; logo + toggle + CTA stay. */
+@media (max-width: 640px) {
+  .nav-secondary-link { display: none !important; }
+}
+
+/* WidgetFrame — reduce padding on mobile so the widget fits. */
+.widget-frame-body {
+  padding: 48px 32px;
+}
+@media (max-width: 640px) {
+  .widget-frame-body { padding: 32px 12px; }
+}
+
+/* Hero CTAs wrap on very narrow screens instead of overflowing. */
+.hero-ctas { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 10px; }
+
+/* Pye wordmark — swap light/dark variants based on theme mode. */
+.logo-dark { display: none; }
+[data-theme-mode="dark"] .logo-light { display: none; }
+[data-theme-mode="dark"] .logo-dark { display: block; }
