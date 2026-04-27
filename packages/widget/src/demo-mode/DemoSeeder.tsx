@@ -1,6 +1,8 @@
 import { useEffect } from "react";
 import { address as toAddress } from "@solana/kit";
+import { createClient } from "@supabase/supabase-js";
 import { useWalletStore, useBalanceStore } from "@pye/sdk/react";
+import { getPyeConfig } from "@pye/sdk";
 import { demoWallet, buildDemoStakeAccounts, buildDemoWalletBalances } from "./demo-data";
 
 /**
@@ -31,9 +33,38 @@ export default function DemoSeeder() {
     setDisplayAddress(demoWallet.displayAddress);
     setBalanceLamports(demoWallet.balanceLamports);
 
-    setUserStakeAccounts(buildDemoStakeAccounts());
+    const accounts = buildDemoStakeAccounts();
+    setUserStakeAccounts(accounts);
     setUserStakeAccountsLoading(false);
     setWalletBalances(buildDemoWalletBalances());
+
+    // Hydrate validator logos from Supabase just like the real fetch path.
+    // Fails silently if the demo site isn't configured with real Supabase
+    // creds — logos simply won't show, which is the current baseline.
+    let cancelled = false;
+    (async () => {
+      const voteAccounts = Array.from(new Set(accounts.map((a) => a.validatorVoteAccount)));
+      if (voteAccounts.length === 0) return;
+      try {
+        const config = getPyeConfig();
+        const supabase = createClient(config.supabaseUrl, config.supabaseAnonKey);
+        const { data, error } = await supabase
+          .from("validator_metadata_configs")
+          .select("vote_pubkey, base_image_url")
+          .in("vote_pubkey", voteAccounts);
+        if (error || !data || cancelled) return;
+        const logoByVote = new Map<string, string | null>();
+        for (const row of data) logoByVote.set(row.vote_pubkey, row.base_image_url ?? null);
+        const hydrated = accounts.map((a) => ({
+          ...a,
+          validatorLogo: logoByVote.get(a.validatorVoteAccount) ?? null,
+        }));
+        setUserStakeAccounts(hydrated);
+      } catch {
+        // noop — leave accounts as-is
+      }
+    })();
+    return () => { cancelled = true; };
   }, [
     setWalletStatus,
     setWalletPublicKey,

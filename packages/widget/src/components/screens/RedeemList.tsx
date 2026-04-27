@@ -89,6 +89,7 @@ export default function RedeemList() {
   const walletBalances = useBalanceStore((s) => s.walletBalances);
   const navigate = useWidgetStore((s) => s.navigate);
 
+  const demo = useWidgetStore((s) => s.demo);
   const redeemingMint = useWidgetStore((s) => s.redeemingMint);
   const setRedeemingMint = useWidgetStore((s) => s.setRedeemingMint);
   const redeemError = useWidgetStore((s) => s.redeemError);
@@ -135,6 +136,19 @@ export default function RedeemList() {
   const handleRedeem = useCallback(async (p: Position) => {
     setRedeemError(null);
     setRedeemingMint(p.ptMint);
+
+    if (demo) {
+      await new Promise((r) => setTimeout(r, 600));
+      const chars = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+      let fakeSig = "";
+      for (let i = 0; i < 64; i++) fakeSig += chars.charAt(Math.floor(Math.random() * chars.length));
+      setRedeemAmountSol(p.ptAmountLamports / LAMPORTS_PER_SOL);
+      setRedeemTxSignature(fakeSig);
+      setRedeemingMint(null);
+      navigate("redeem-complete");
+      return;
+    }
+
     try {
       const { signature } = await executeRedeem({
         connection,
@@ -163,7 +177,7 @@ export default function RedeemList() {
         .then(setUserStakeAccounts)
         .catch(() => {});
     }
-  }, [connection, wallet, setRedeemError, setRedeemingMint, setRedeemAmountSol, setRedeemTxSignature, navigate, setBalanceLamports, setWalletBalances, setUserStakeAccounts]);
+  }, [demo, connection, wallet, setRedeemError, setRedeemingMint, setRedeemAmountSol, setRedeemTxSignature, navigate, setBalanceLamports, setWalletBalances, setUserStakeAccounts]);
 
   return (
     <Body padding={0} style={{ borderTop: "none" }}>
