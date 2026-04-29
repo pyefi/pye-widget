@@ -71,8 +71,9 @@ export async function executeRtSell({
   const inAtoms  = BigInt(Math.max(rawInAtoms - safetyBuffer, 0));
   const outAtoms = BigInt(Math.floor(minReceiveTokens * 10 ** quoteDecimals));
 
-  const rtAta = getAssociatedTokenAddressSync(rtMintPk, payer, false, TOKEN_PROGRAM_ID);
-  const wsolAta = getAssociatedTokenAddressSync(NATIVE_MINT, payer, false, TOKEN_PROGRAM_ID);
+  // allowOwnerOffCurve: true for PDA-backed wallets (Squads vaults, etc.)
+  const rtAta = getAssociatedTokenAddressSync(rtMintPk, payer, true, TOKEN_PROGRAM_ID);
+  const wsolAta = getAssociatedTokenAddressSync(NATIVE_MINT, payer, true, TOKEN_PROGRAM_ID);
   const treasuryWsol = getAssociatedTokenAddressSync(
     NATIVE_MINT, PYE_TREASURY_WALLET, true, TOKEN_PROGRAM_ID,
   );
