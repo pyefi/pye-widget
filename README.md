@@ -1,6 +1,6 @@
 # Pye Widget
 
-Embeddable Solana staking widget that lets users sell future staking rewards for upfront SOL. Available as a React component or a drop-in CDN script.
+Embeddable Solana staking widget that lets users sell future staking rewards for upfront SOL. Available as a React component.
 
 ## Monorepo Structure
 
@@ -8,9 +8,12 @@ Embeddable Solana staking widget that lets users sell future staking rewards for
 pye-widget/
   packages/
     sdk/          # @pyefi/sdk — core SDK (stores, data fetching, tx execution)
-    widget/       # @pyefi/widget — React widget component + CDN bundle
+    widget/       # @pyefi/widget — React widget component
   examples/
-    react-demo/   # React integration example
+    react-universal/         # Vite + React, all validators
+    react-single-validator/  # Vite + React, scoped to one validator
+    nextjs-universal/        # Next.js, all validators
+    nextjs-single-validator/ # Next.js, scoped to one validator
 ```
 
 ## Prerequisites
@@ -35,9 +38,7 @@ pnpm build
 This builds all packages in dependency order:
 
 1. `@pyefi/sdk` — compiled with tsup to `packages/sdk/dist/`
-2. `@pyefi/widget` — bundled with Vite to `packages/widget/dist/`
-   - `pye-widget.es.js` — ES module for React imports
-   - `pye-widget.iife.js` — self-contained CDN bundle
+2. `@pyefi/widget` — bundled with Vite to `packages/widget/dist/pye-widget.es.js`
 
 ## Development
 
@@ -51,7 +52,7 @@ Starts all packages in parallel via Turborepo:
 |---------|-----------|-------------|
 | `@pyefi/sdk` | `tsup --watch` | Rebuilds SDK on file changes |
 | `@pyefi/widget` | `vite build --watch` | Rebuilds widget bundle on changes |
-| `react-demo` | `vite` | Dev server at `http://localhost:5173` |
+| examples | `vite` / `next dev` | Per-example dev servers |
 
 ---
 
@@ -60,17 +61,21 @@ Starts all packages in parallel via Turborepo:
 ### Install
 
 ```bash
-npm install @pyefi/sdk @pyefi/widget
+npm install @pyefi/widget
 # or
-pnpm add @pyefi/sdk @pyefi/widget
+pnpm add @pyefi/widget
 ```
+
+`@pyefi/sdk` is installed transitively — only add it explicitly if you want to build a custom UI on top of the SDK.
 
 ### Peer dependencies
 
 The widget requires these peer dependencies in your project:
 
 ```bash
-npm install react react-dom @solana/web3.js @solana/wallet-adapter-react
+npm install react react-dom @solana/web3.js \
+  @solana/wallet-adapter-base @solana/wallet-adapter-react \
+  @solana/wallet-adapter-wallets
 ```
 
 ### Basic example
@@ -117,57 +122,14 @@ function App() {
 pye-light | pye-dark | neutral-light | neutral-dark | midnight | rose | graphite | sand
 ```
 
-### Buffer polyfill
+### Buffer polyfill (rare fallback)
 
-If your bundler doesn't provide a Node.js `Buffer` polyfill (common with Vite), add this at your app's entry point:
+The widget self-installs a `globalThis.Buffer` polyfill on import, so you usually don't need to do anything. If you hit `Cannot read properties of undefined (reading 'isBuffer')` on a fresh-scaffold Vite app, add this at your app entry as a fallback:
 
 ```ts
 import { Buffer } from "buffer";
 (window as any).Buffer = Buffer;
 ```
-
----
-
-## Usage: CDN
-
-Add a single `<script>` tag to any HTML page. No build step required.
-
-```html
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Pye Widget</title>
-</head>
-<body>
-  <div id="pye-widget"></div>
-
-  <script
-    data-pye-widget
-    data-rpc-url="https://mainnet.helius-rpc.com/?api-key=YOUR_KEY"
-    data-supabase-url="https://your-project.supabase.co"
-    data-supabase-anon-key="your-supabase-anon-key"
-    data-vote-account="he1iusunGwqrNtafDtLdhsUQDFvo13z9sUa36PauBtk"
-    data-theme="pye-dark"
-    src="https://cdn.example.com/pye-widget.iife.js"
-  ></script>
-</body>
-</html>
-```
-
-The script auto-mounts into `#pye-widget`. If the element doesn't exist, it creates one.
-
-### Data attributes
-
-| Attribute | Required | Default | Description |
-|-----------|----------|---------|-------------|
-| `data-pye-widget` | Yes | — | Identifies the script tag (no value needed) |
-| `data-rpc-url` | No | `https://api.mainnet-beta.solana.com` | Solana RPC endpoint |
-| `data-supabase-url` | Yes | — | Supabase project URL |
-| `data-supabase-anon-key` | Yes | — | Supabase anonymous key |
-| `data-vote-account` | No | — | Filter to a specific validator |
-| `data-theme` | No | `"dark"` | Visual theme |
 
 ---
 
