@@ -2,15 +2,15 @@
 
 Embeddable Solana yield-trading widget by [Pye Finance](https://pye.fi). Lets users sell future staking rewards for upfront SOL.
 
-Available as a React component or a drop-in CDN script.
-
 ## Install
 
 ```bash
-pnpm add @pyefi/widget @pyefi/sdk
+pnpm add @pyefi/widget
 # or
-npm install @pyefi/widget @pyefi/sdk
+npm install @pyefi/widget
 ```
+
+`@pyefi/sdk` is installed transitively — you don't need to add it separately unless you also want to build a custom UI.
 
 You also need these peer dependencies in your app:
 
