@@ -3,8 +3,8 @@ import { Buffer } from "buffer";
 
 import { useState, useEffect } from "react";
 import { createRoot } from "react-dom/client";
-import { PyeWidget } from "@pye/widget";
-import type { WidgetTheme } from "@pye/widget";
+import { PyeWidget } from "@pyefi/widget";
+import type { WidgetTheme } from "@pyefi/widget";
 
 const THEMES: { value: WidgetTheme; label: string }[] = [
   { value: "pye-light", label: "Pye Light" },

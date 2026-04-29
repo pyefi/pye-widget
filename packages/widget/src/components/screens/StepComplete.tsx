@@ -1,5 +1,5 @@
 import { useWidgetStore } from "../../stores/widget-store";
-import { maturities } from "@pye/sdk";
+import { maturities } from "@pyefi/sdk";
 import { c, font, formatSolAmount } from "../design-system";
 import { Body, CTA, Tooltip, Spacer, SuccessHeader } from "../shared/Layout";
 import { Odometer } from "../shared/Odometer";

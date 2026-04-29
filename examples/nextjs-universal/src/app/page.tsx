@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { PyeWidget } from "@pye/widget";
-import type { WidgetTheme } from "@pye/widget";
+import { PyeWidget } from "@pyefi/widget";
+import type { WidgetTheme } from "@pyefi/widget";
 
 const THEMES: { value: WidgetTheme; label: string }[] = [
   { value: "pye-light", label: "Pye Light" },

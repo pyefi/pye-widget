@@ -7,8 +7,8 @@ Embeddable Solana staking widget that lets users sell future staking rewards for
 ```
 pye-widget/
   packages/
-    sdk/          # @pye/sdk — core SDK (stores, data fetching, tx execution)
-    widget/       # @pye/widget — React widget component + CDN bundle
+    sdk/          # @pyefi/sdk — core SDK (stores, data fetching, tx execution)
+    widget/       # @pyefi/widget — React widget component + CDN bundle
   examples/
     react-demo/   # React integration example
 ```
@@ -34,8 +34,8 @@ pnpm build
 
 This builds all packages in dependency order:
 
-1. `@pye/sdk` — compiled with tsup to `packages/sdk/dist/`
-2. `@pye/widget` — bundled with Vite to `packages/widget/dist/`
+1. `@pyefi/sdk` — compiled with tsup to `packages/sdk/dist/`
+2. `@pyefi/widget` — bundled with Vite to `packages/widget/dist/`
    - `pye-widget.es.js` — ES module for React imports
    - `pye-widget.iife.js` — self-contained CDN bundle
 
@@ -49,8 +49,8 @@ Starts all packages in parallel via Turborepo:
 
 | Package | What runs | Description |
 |---------|-----------|-------------|
-| `@pye/sdk` | `tsup --watch` | Rebuilds SDK on file changes |
-| `@pye/widget` | `vite build --watch` | Rebuilds widget bundle on changes |
+| `@pyefi/sdk` | `tsup --watch` | Rebuilds SDK on file changes |
+| `@pyefi/widget` | `vite build --watch` | Rebuilds widget bundle on changes |
 | `react-demo` | `vite` | Dev server at `http://localhost:5173` |
 
 ---
@@ -60,9 +60,9 @@ Starts all packages in parallel via Turborepo:
 ### Install
 
 ```bash
-npm install @pye/sdk @pye/widget
+npm install @pyefi/sdk @pyefi/widget
 # or
-pnpm add @pye/sdk @pye/widget
+pnpm add @pyefi/sdk @pyefi/widget
 ```
 
 ### Peer dependencies
@@ -76,7 +76,7 @@ npm install react react-dom @solana/web3.js @solana/wallet-adapter-react
 ### Basic example
 
 ```tsx
-import { PyeWidget } from "@pye/widget";
+import { PyeWidget } from "@pyefi/widget";
 
 function App() {
   const [open, setOpen] = useState(false);
@@ -191,14 +191,14 @@ Pass a validator vote account to scope the widget to a single validator's market
 
 ---
 
-## SDK (`@pye/sdk`)
+## SDK (`@pyefi/sdk`)
 
 The SDK can be used independently for building custom UIs.
 
 ### Configuration
 
 ```ts
-import { configurePyeSDK } from "@pye/sdk";
+import { configurePyeSDK } from "@pyefi/sdk";
 
 configurePyeSDK({
   rpcUrl: "https://mainnet.helius-rpc.com/?api-key=YOUR_KEY",
@@ -210,7 +210,7 @@ configurePyeSDK({
 ### React hooks
 
 ```tsx
-import { PyeSDKProvider, useMarketStore, useBalanceStore, useWalletStore } from "@pye/sdk/react";
+import { PyeSDKProvider, useMarketStore, useBalanceStore, useWalletStore } from "@pyefi/sdk/react";
 
 function App() {
   return (

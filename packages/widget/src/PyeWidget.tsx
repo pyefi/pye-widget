@@ -13,14 +13,14 @@ import {
 import { WalletAdapterNetwork } from "@solana/wallet-adapter-base";
 
 const WALLET_CONNECT_PROJECT_ID = "7b89b9d2ef5d0298961c3eeb879793b0";
-import { configurePyeSDK, validators } from "@pye/sdk";
+import { configurePyeSDK, validators } from "@pyefi/sdk";
 import {
   PyeSDKProvider,
   WalletSyncer,
   BalanceSyncer,
   MarketSyncer,
   ApySyncer,
-} from "@pye/sdk/react";
+} from "@pyefi/sdk/react";
 import {
   createWidgetStore,
   WidgetStoreContext,

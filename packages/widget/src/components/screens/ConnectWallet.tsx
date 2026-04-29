@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useWidgetStore } from "../../stores/widget-store";
-import { useWalletStore } from "@pye/sdk/react";
+import { useWalletStore } from "@pyefi/sdk/react";
 import { c, font } from "../design-system";
 import { StepTitle, RowGroup, Spacer } from "../shared/Layout";
 import { WalletDot } from "../Icons";
