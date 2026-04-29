@@ -243,6 +243,9 @@ importers:
 
   packages/sdk:
     dependencies:
+      buffer:
+        specifier: ^6.0.3
+        version: 6.0.3
       immer:
         specifier: ^10.0.0
         version: 10.2.0
@@ -286,6 +289,9 @@ importers:
       '@pyefi/sdk':
         specifier: workspace:*
         version: link:../sdk
+      buffer:
+        specifier: ^6.0.3
+        version: 6.0.3
       immer:
         specifier: ^10.0.0
         version: 10.2.0
