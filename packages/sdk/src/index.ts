@@ -1,3 +1,5 @@
+import "./buffer-polyfill";
+
 // Config
 export { configurePyeSDK, getPyeConfig } from "./config";
 export type { PyeSDKConfig } from "./config";

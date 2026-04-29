@@ -1,6 +1,6 @@
 {
   "name": "@pyefi/sdk",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Core SDK for the Pye Finance Solana yield protocol — stores, data fetching, transaction execution.",
   "keywords": [
     "solana",
@@ -49,6 +49,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "buffer": "^6.0.3",
     "zustand": "^5.0.0",
     "immer": "^10.0.0"
   },

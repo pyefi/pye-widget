@@ -1,3 +1,5 @@
+import "./buffer-polyfill";
+
 export {
   PyeSDKProvider,
   WalletStoreProvider,
