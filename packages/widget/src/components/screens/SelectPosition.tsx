@@ -1,5 +1,5 @@
 import { useWidgetStore } from "../../stores/widget-store";
-import { useBalanceStore } from "@pye/sdk/react";
+import { useBalanceStore } from "@pyefi/sdk/react";
 // TODO(SIMD-185): restore getPyeConfig, SolIcon, useWalletStore imports when re-enabling liquid SOL deposit
 import { StepTitle, RowGroup, Spacer, SelectableRow } from "../shared/Layout";
 

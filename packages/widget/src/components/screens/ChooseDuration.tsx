@@ -9,8 +9,8 @@ import {
   applyTradingFee,
   estimateRtFromStake,
   fetchEpochSyncedNowTs,
-} from "@pye/sdk";
-import { useMarketStore } from "@pye/sdk/react";
+} from "@pyefi/sdk";
+import { useMarketStore } from "@pyefi/sdk/react";
 import { c, font, displayFont, MARKET_RATE, formatSolAmount, POINTS_ENABLED } from "../design-system";
 import { CTA, Tooltip, Spacer } from "../shared/Layout";
 import { Odometer } from "../shared/Odometer";

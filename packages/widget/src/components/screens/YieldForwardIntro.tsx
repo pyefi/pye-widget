@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useWidgetStore } from "../../stores/widget-store";
-import { useWalletStore, useMarketStore, useApyStore } from "@pye/sdk/react";
-import { maturities, getPyeConfig } from "@pye/sdk";
+import { useWalletStore, useMarketStore, useApyStore } from "@pyefi/sdk/react";
+import { maturities, getPyeConfig } from "@pyefi/sdk";
 import { c, font, displayFont, formatSolAmount } from "../design-system";
 import { Spacer, CTA } from "../shared/Layout";
 

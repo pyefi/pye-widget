@@ -3,7 +3,7 @@
   "private": true,
   "scripts": {
     "build": "turbo run build",
-    "dev": "turbo run dev --filter=@pye/sdk --filter=@pye/widget --filter=nextjs-single-validator --filter=nextjs-universal",
+    "dev": "turbo run dev --filter=@pyefi/sdk --filter=@pyefi/widget --filter=nextjs-single-validator --filter=nextjs-universal",
     "typecheck": "turbo run typecheck"
   },
   "devDependencies": {

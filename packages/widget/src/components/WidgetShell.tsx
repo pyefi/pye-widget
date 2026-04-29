@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { useWalletStore } from "@pye/sdk/react";
+import { useWalletStore } from "@pyefi/sdk/react";
 import { useWidgetStore, type WidgetScreen } from "../stores/widget-store";
 import { Widget, Body, Footer, StepHeader } from "./shared/Layout";
 import WelcomeScreen from "./screens/WelcomeScreen";

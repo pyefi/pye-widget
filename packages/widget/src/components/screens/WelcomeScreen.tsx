@@ -1,8 +1,8 @@
 import { useMemo } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useWidgetStore } from "../../stores/widget-store";
-import { useBalanceStore, useWalletStore } from "@pye/sdk/react";
-import { buildPtLookup, maturities } from "@pye/sdk";
+import { useBalanceStore, useWalletStore } from "@pyefi/sdk/react";
+import { buildPtLookup, maturities } from "@pyefi/sdk";
 import { Body, Spacer, SkeletonRow } from "../shared/Layout";
 import { c, font, displayFont, formatSolAmount } from "../design-system";
 

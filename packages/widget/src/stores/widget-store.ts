@@ -2,7 +2,7 @@ import { createStore } from "zustand/vanilla";
 import { immer } from "zustand/middleware/immer";
 import { createContext, useContext } from "react";
 import { useStore } from "zustand";
-import type { MaturityId } from "@pye/sdk";
+import type { MaturityId } from "@pyefi/sdk";
 
 export type WidgetScreen =
   | "yield-forward-intro"
