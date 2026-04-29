@@ -17,11 +17,13 @@ export async function fetchBalances(
 
   const mintAddresses = allTokenAddresses().filter((a) => a !== SOL_MINT);
 
+  // allowOwnerOffCurve: true so PDA wallets (Squads vaults, etc.) don't
+  // crash this read path on widget load.
   const atas = mintAddresses.map((mint) =>
     getAssociatedTokenAddressSync(
       new PublicKey(mint),
       owner,
-      false,
+      true,
       TOKEN_PROGRAM_ID,
     ),
   );
@@ -57,7 +59,7 @@ export async function fetchBalancesForMints(
     getAssociatedTokenAddressSync(
       new PublicKey(mint),
       owner,
-      false,
+      true,
       TOKEN_PROGRAM_ID,
     ),
   );

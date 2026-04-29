@@ -55,8 +55,9 @@ export async function executeSwap({
     Math.round(maxPayTokens * (1 + slippageBps / 10_000) * 10 ** quoteDecimals),
   );
 
-  const baseAta = getAssociatedTokenAddressSync(baseMint, payer, false, TOKEN_PROGRAM_ID);
-  const wsolAta = getAssociatedTokenAddressSync(NATIVE_MINT, payer, false, TOKEN_PROGRAM_ID);
+  // allowOwnerOffCurve: true for PDA-backed wallets (Squads vaults, etc.)
+  const baseAta = getAssociatedTokenAddressSync(baseMint, payer, true, TOKEN_PROGRAM_ID);
+  const wsolAta = getAssociatedTokenAddressSync(NATIVE_MINT, payer, true, TOKEN_PROGRAM_ID);
 
   const tx = new Transaction();
 
