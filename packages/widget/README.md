@@ -67,23 +67,6 @@ import { Buffer } from "buffer";
 (window as any).Buffer = Buffer;
 ```
 
-## Usage (CDN)
-
-```html
-<div id="pye-widget"></div>
-<script
-  data-pye-widget
-  data-rpc-url="https://your-rpc-endpoint"
-  data-supabase-url="https://your-project.supabase.co"
-  data-supabase-anon-key="your-supabase-anon-key"
-  data-vote-account="he1iusunGwqrNtafDtLdhsUQDFvo13z9sUa36PauBtk"
-  data-theme="pye-dark"
-  src="https://unpkg.com/@pyefi/widget/dist/pye-widget.iife.js"
-></script>
-```
-
-The script auto-mounts into `#pye-widget`.
-
 ## Documentation
 
 Full docs and architecture: [github.com/pyefi/pye-widget](https://github.com/pyefi/pye-widget).
