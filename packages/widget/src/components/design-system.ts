@@ -65,6 +65,11 @@ export const THEME_CSS = `
     --c-brand-text:    #000000;
     --fill-0:          #ffffff;
   }
+  /* WalletConnect / Reown AppKit modal stacks at --w3m-z-index (default 999),
+     but host pages typically wrap the widget in a scrim around z-index 9999,
+     which would cover the QR modal. Bump it above any realistic scrim. */
+  w3m-modal, wcm-modal { --w3m-z-index: 2147483647; }
+
   /* ─── Hover rules (replaces JS useState hover state) ─────────────── */
   .pye-hoverable {
     transition: background 160ms cubic-bezier(0.2,0.9,0.2,1),

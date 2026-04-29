@@ -6,8 +6,6 @@ import { c, font } from "../design-system";
 import { StepTitle, RowGroup, Spacer } from "../shared/Layout";
 import { WalletDot } from "../Icons";
 
-// ─── Sub-component: WalletRow ────────────────────────────────────────────────
-
 interface WalletRowProps {
   name: string;
   iconUrl?: string;
@@ -42,47 +40,39 @@ function WalletRow({ name, iconUrl, connecting, onConnect }: WalletRowProps) {
         <p style={font(15, c.primary)}>{name}</p>
       </div>
       <p style={font(14, isConnecting ? c.purple : c.secondary)}>
-        {isConnecting ? "Connecting\u2026" : "Detected"}
+        {isConnecting ? "Connecting…" : "Detected"}
       </p>
     </div>
   );
 }
 
-// ─── Main component ──────────────────────────────────────────────────────────
-
 export default function ConnectWallet() {
-  const { wallets, select, connect } = useWallet();
+  const { wallets, wallet, select, connecting } = useWallet();
   const navigate = useWidgetStore((s) => s.navigate);
   const walletStatus = useWalletStore((s) => s.status);
-  const connecting = useWidgetStore((s) => s.connectingWallet);
-  const setConnecting = useWidgetStore((s) => s.setConnectingWallet);
 
-  // Auto-advance when wallet connects
   useEffect(() => {
-    if (walletStatus === "connected") {
-      navigate("welcome");
-    }
+    if (walletStatus === "connected") navigate("welcome");
   }, [walletStatus, navigate]);
 
-  const handleConnect = async (walletName: string) => {
-    const adapter = wallets.find((w) => w.adapter.name === walletName);
-    if (!adapter) return;
+  const connectingName = connecting ? wallet?.adapter.name ?? null : null;
 
-    setConnecting(walletName);
-    try {
-      select(adapter.adapter.name);
-      await connect();
-    } catch {
-      setConnecting(null);
-    }
-  };
-
-  // Sort: detected wallets first
-  const sortedWallets = [...wallets].sort((a, b) => {
+  // Dedupe: wallet-adapter-react merges explicit adapters with Wallet Standard
+  // auto-discovery, so some wallets (e.g. MetaMask's Solana snap) show up
+  // twice and trip a React duplicate-key warning.
+  const uniqueWallets = Array.from(
+    new Map(wallets.map((w) => [w.adapter.name, w])).values(),
+  );
+  const sortedWallets = [...uniqueWallets].sort((a, b) => {
     const aDetected = a.readyState === "Installed" ? 0 : 1;
     const bDetected = b.readyState === "Installed" ? 0 : 1;
     return aDetected - bDetected;
   });
+
+  const handleConnect = (name: string) => {
+    const w = wallets.find((w) => w.adapter.name === name);
+    if (w) select(w.adapter.name);
+  };
 
   return (
     <>
@@ -96,7 +86,7 @@ export default function ConnectWallet() {
             key={w.adapter.name}
             name={w.adapter.name}
             iconUrl={w.adapter.icon}
-            connecting={connecting}
+            connecting={connectingName}
             onConnect={handleConnect}
           />
         ))}
