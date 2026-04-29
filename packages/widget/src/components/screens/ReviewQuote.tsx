@@ -18,8 +18,8 @@ import {
   applyTradingFee,
   estimateRtFromStake,
   fetchEpochSyncedNowTs,
-} from "@pye/sdk";
-import { useMarketStore, useBalanceStore, useWalletStore } from "@pye/sdk/react";
+} from "@pyefi/sdk";
+import { useMarketStore, useBalanceStore, useWalletStore } from "@pyefi/sdk/react";
 import { c, font, MARKET_RATE, pointsMap, formatSolAmount, POINTS_ENABLED } from "../design-system";
 import { StepTitle, CTA, Tooltip, Spacer } from "../shared/Layout";
 import { Odometer } from "../shared/Odometer";

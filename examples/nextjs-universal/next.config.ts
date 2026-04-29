@@ -6,7 +6,7 @@ import type { NextConfig } from "next";
 loadEnvConfig(path.resolve(__dirname, "../.."));
 
 const nextConfig: NextConfig = {
-  transpilePackages: ["@pye/sdk", "@pye/widget"],
+  transpilePackages: ["@pyefi/sdk", "@pyefi/widget"],
   webpack: (config) => {
     config.resolve.fallback = {
       ...config.resolve.fallback,

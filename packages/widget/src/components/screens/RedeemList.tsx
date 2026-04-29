@@ -11,8 +11,8 @@ import {
   type ValidatorId,
   type MaturityId,
   type Bond,
-} from "@pye/sdk";
-import { useBalanceStore, useWalletStore } from "@pye/sdk/react";
+} from "@pyefi/sdk";
+import { useBalanceStore, useWalletStore } from "@pyefi/sdk/react";
 import { Body } from "../shared/Layout";
 import { c, font, formatSolAmount } from "../design-system";
 

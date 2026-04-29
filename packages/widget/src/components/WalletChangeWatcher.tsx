@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { useWalletStore } from "@pye/sdk/react";
+import { useWalletStore } from "@pyefi/sdk/react";
 import { useWidgetStore } from "../stores/widget-store";
 
 /**
