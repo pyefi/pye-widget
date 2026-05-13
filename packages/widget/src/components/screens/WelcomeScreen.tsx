@@ -96,24 +96,6 @@ function IconRedeem() {
   );
 }
 
-function IconDocs() {
-  return (
-    <div style={{
-      flexShrink: 0, width: 44, height: 44, borderRadius: 10,
-      background: `color-mix(in srgb, ${c.secondary} 15%, transparent)`,
-      borderTop: "1px solid rgba(255,255,255,0.2)",
-      boxShadow: "0 4px 8px rgba(0,0,0,0.07), inset 0 -1px 0 rgba(0,0,0,0.2)",
-      display: "flex", alignItems: "center", justifyContent: "center",
-    }}>
-      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" style={{ color: c.secondary }}>
-        <path d="M4 3h8a2 2 0 0 1 2 2v12H6a2 2 0 0 1-2-2V3z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
-        <path d="M4 15a2 2 0 0 1 2-2h8" stroke="currentColor" strokeWidth="1.5"/>
-        <path d="M7 7h4M7 10h3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-      </svg>
-    </div>
-  );
-}
-
 function IconSell() {
   return (
     <div style={{
@@ -184,8 +166,8 @@ export default function WelcomeScreen({ validatorName }: WelcomeScreenProps) {
   const redeemSub = !canRedeem
     ? "No PT positions"
     : maturedPtSol > 0
-      ? `${formatSolAmount(maturedPtSol)} PT ready to redeem`
-      : `${formatSolAmount(totalPtSol)} PT locked`;
+      ? `${formatSolAmount(maturedPtSol)} SOL ready to redeem`
+      : `${formatSolAmount(totalPtSol)} SOL locked`;
 
   const sellSub = canSell
     ? `${formatSolAmount(activeStakeSol, 2)} SOL across active stake`
@@ -196,17 +178,6 @@ export default function WelcomeScreen({ validatorName }: WelcomeScreenProps) {
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         <p style={{ ...displayFont(32, c.primary), letterSpacing: "-0.02em", lineHeight: 1.5 }}>
           Welcome back
-        </p>
-        <p style={font(15, c.secondary)}>
-          {isInitialLoading
-            ? "Loading your positions…"
-            : canRedeem && canSell
-              ? "We found active staked SOL positions and PTs ready to redeem. What would you like to do?"
-              : canRedeem
-                ? "We found PTs ready to redeem. What would you like to do?"
-                : canSell
-                  ? "We found active staked SOL positions. Sell your future rewards upfront."
-                  : `Stake SOL with ${validatorName ?? "your validator"} to get started.`}
         </p>
       </div>
 
@@ -227,17 +198,11 @@ export default function WelcomeScreen({ validatorName }: WelcomeScreenProps) {
             />
             <ChoiceRow
               icon={<IconRedeem />}
-              label="Redeem PTs"
+              label="Redeem"
               sub={redeemSub}
               subColor={maturedPtSol > 0 ? c.green : undefined}
               disabled={!canRedeem}
               onClick={() => navigate("redeem-list")}
-            />
-            <ChoiceRow
-              icon={<IconDocs />}
-              label="Learn more"
-              sub="Read the docs"
-              onClick={() => window.open("https://docs.pye.fi/", "_blank", "noopener,noreferrer")}
             />
           </>
         )}

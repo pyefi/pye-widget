@@ -70,8 +70,6 @@ export default function YieldForwardIntro() {
 
       <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <p style={font(12, c.primary)}>Example: Stake {EXAMPLE_SOL} SOL for 6 months</p>
-
           {/* Comparison cards */}
           <div style={{ display: "flex", gap: 8 }}>
             {/* Left -- sell today */}
@@ -109,10 +107,6 @@ export default function YieldForwardIntro() {
             onClick={() => navigate(isConnected ? "select-position" : "connect-wallet")}
             purple
           />
-          <a href="https://docs.pye.fi/" target="_blank" rel="noopener noreferrer"
-            style={{ ...font(12, c.secondary), textDecoration: "none" }}>
-            Learn more — read the docs
-          </a>
         </div>
       </div>
     </>

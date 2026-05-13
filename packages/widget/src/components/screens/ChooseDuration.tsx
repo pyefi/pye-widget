@@ -116,8 +116,9 @@ export default function ChooseDuration() {
         : parsedAmount * (MARKET_RATE / 100) * yearsRemaining;
     // User-facing yield is net of Pye's taker fee
     const netYield = applyTradingFee(grossYield);
+    const daysToMaturity = Math.max(0, Math.ceil((maturityTs - effectiveNowTs) / 86400));
 
-    return { matId, ...info, bestBid, grossYield, netYield };
+    return { matId, ...info, bestBid, grossYield, netYield, daysToMaturity };
   });
 
   const feePct = (PYE_TRADING_FEE_BPS / 100).toFixed(2);
@@ -164,12 +165,29 @@ export default function ChooseDuration() {
                   transition: "background 0.1s",
                 }}
               >
-                <span style={font(15, isSelected ? c.primary : c.secondary, isSelected ? 500 : 400)}>
-                  {q.label}
-                </span>
-                {POINTS_ENABLED && q.pts && (
-                  <span style={font(13, c.purple)}>{q.pts}</span>
-                )}
+                <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                  <span style={font(15, isSelected ? c.primary : c.secondary, isSelected ? 500 : 400)}>
+                    {q.label}
+                  </span>
+                  <span style={font(12, c.muted)}>
+                    {q.daysToMaturity} {q.daysToMaturity === 1 ? "day" : "days"}
+                  </span>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
+                  <span
+                    style={{
+                      ...font(15, c.green, 500),
+                      fontVariantNumeric: "lining-nums tabular-nums",
+                    }}
+                  >
+                    {q.netYield < 0.0001
+                      ? "< 0.0001 SOL"
+                      : `+${formatSolAmount(q.netYield, 3)} SOL`}
+                  </span>
+                  {POINTS_ENABLED && q.pts && (
+                    <span style={font(12, c.purple)}>{q.pts}</span>
+                  )}
+                </div>
               </div>
             );
           })}
