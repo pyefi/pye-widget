@@ -2,17 +2,19 @@ import { useMemo, useCallback } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { useWidgetStore } from "../../stores/widget-store";
 import {
-  buildPtLookup,
   maturities,
-  validators,
   executeRedeem,
   fetchBalances,
   fetchUserStakeAccounts,
-  type ValidatorId,
-  type MaturityId,
-  type Bond,
+  type BondRow,
+  type CanonicalMaturity,
 } from "@pyefi/sdk";
-import { useBalanceStore, useWalletStore } from "@pyefi/sdk/react";
+import {
+  useBalanceStore,
+  useWalletStore,
+  useLockupStore,
+  useValidatorStore,
+} from "@pyefi/sdk/react";
 import { Body } from "../shared/Layout";
 import { c, font, formatSolAmount } from "../design-system";
 
@@ -20,9 +22,9 @@ const LAMPORTS_PER_SOL = 1_000_000_000;
 
 interface Position {
   ptMint: string;
-  validatorId: ValidatorId;
-  maturityId: MaturityId;
-  bond: Bond;
+  voteAccount: string;
+  canonicalLabel: CanonicalMaturity;
+  bond: BondRow;
   ptAmount: number;
   ptAmountLamports: number;
   maturityTimestamp: number;
@@ -88,6 +90,8 @@ export default function RedeemList() {
   const wallet = useWallet();
   const walletBalances = useBalanceStore((s) => s.walletBalances);
   const navigate = useWidgetStore((s) => s.navigate);
+  const bonds = useLockupStore((s) => s.bonds);
+  const validators = useValidatorStore((s) => s.validators);
 
   const redeemingMint = useWidgetStore((s) => s.redeemingMint);
   const setRedeemingMint = useWidgetStore((s) => s.setRedeemingMint);
@@ -99,38 +103,40 @@ export default function RedeemList() {
   const setUserStakeAccounts = useBalanceStore((s) => s.setUserStakeAccounts);
   const setBalanceLamports = useWalletStore((s) => s.setBalanceLamports);
 
-  const ptLookup = buildPtLookup();
-
   const positions: Position[] = useMemo(() => {
+    const ptMintToBond = new Map<string, BondRow>();
+    for (const bond of Object.values(bonds)) {
+      ptMintToBond.set(bond.pt_mint, bond);
+    }
     const now = Date.now() / 1000;
     const result: Position[] = [];
     for (const [mint, amount] of Object.entries(walletBalances)) {
       if (amount <= 0) continue;
-      const entry = ptLookup.get(mint);
-      if (!entry) continue;
-      const maturity = maturities[entry.maturityId];
-      const matTs = Number(maturity.maturity_timestamp);
+      const bond = ptMintToBond.get(mint);
+      if (!bond) continue;
+      const matTs = bond.maturity_ts;
       const isMatured = now >= matTs;
       const daysLeft = isMatured ? 0 : Math.ceil((matTs * 1000 - Date.now()) / (1000 * 60 * 60 * 24));
-      const validator = validators[entry.validatorId];
+      const validator = validators[bond.validator_vote_account];
+      const maturityLabel = maturities[bond.canonical_label]?.human_readable ?? bond.canonical_label;
       result.push({
         ptMint: mint,
-        validatorId: entry.validatorId,
-        maturityId: entry.maturityId,
-        bond: entry.bond,
+        voteAccount: bond.validator_vote_account,
+        canonicalLabel: bond.canonical_label,
+        bond,
         ptAmount: amount / LAMPORTS_PER_SOL,
         ptAmountLamports: amount,
         maturityTimestamp: matTs,
-        maturityLabel: maturity.human_readable,
+        maturityLabel,
         isMatured,
         daysLeft,
-        validatorName: validator?.name ?? entry.validatorId,
-        validatorPtIcon: validator?.pt_sol ?? "",
+        validatorName: validator?.name ?? bond.validator_vote_account,
+        validatorPtIcon: validator?.pt_image_url ?? "",
       });
     }
     result.sort((a, b) => a.maturityTimestamp - b.maturityTimestamp);
     return result;
-  }, [walletBalances, ptLookup]);
+  }, [walletBalances, bonds, validators]);
 
   const handleRedeem = useCallback(async (p: Position) => {
     setRedeemError(null);
@@ -140,8 +146,8 @@ export default function RedeemList() {
         connection,
         wallet,
         bondPubkey: p.bond.pubkey,
-        principalTokenMint: p.bond.pt_address,
-        yieldTokenMint: p.bond.rt_address,
+        principalTokenMint: p.bond.pt_mint,
+        yieldTokenMint: p.bond.rt_mint,
         ptAmountLamports: p.ptAmountLamports,
         rtAmountLamports: 0,
       });

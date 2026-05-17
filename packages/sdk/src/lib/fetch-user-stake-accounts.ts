@@ -1,6 +1,5 @@
 import { Connection, PublicKey } from "@solana/web3.js";
 import { createClient } from "@supabase/supabase-js";
-import { validators, type ValidatorId } from "../constants/validators";
 import { getPyeConfig } from "../config";
 import type {
   UserStakeAccount,
@@ -10,19 +9,6 @@ import type {
 const STAKE_PROGRAM_ID = new PublicKey(
   "Stake11111111111111111111111111111111111111",
 );
-
-// Build reverse lookup: vote_account → { id, name, icon }
-const voteAccountToValidator = new Map<
-  string,
-  { id: ValidatorId; name: string; icon: string }
->();
-for (const [id, v] of Object.entries(validators)) {
-  voteAccountToValidator.set(v.vote_account, {
-    id: id as ValidatorId,
-    name: v.name,
-    icon: v.pt_sol,
-  });
-}
 
 export async function fetchUserStakeAccounts(
   connection: Connection,
@@ -89,8 +75,6 @@ export async function fetchUserStakeAccounts(
     // If a specific vote account is configured, skip accounts delegated elsewhere
     if (filterVoteAccount && delegation.voter !== filterVoteAccount) continue;
 
-    const validatorInfo = voteAccountToValidator.get(delegation.voter);
-
     const activationEpoch = BigInt(delegation.activationEpoch ?? "0");
     const deactivationEpoch = BigInt(
       delegation.deactivationEpoch ?? U64_MAX.toString(),
@@ -110,8 +94,8 @@ export async function fetchUserStakeAccounts(
     results.push({
       pubkey: pubkey.toBase58(),
       validatorVoteAccount: delegation.voter,
-      validatorName: validatorInfo?.name ?? "Unknown Validator",
-      validatorIcon: validatorInfo?.icon ?? "/solana-token.png",
+      validatorName: "Unknown Validator",
+      validatorIcon: "/solana-token.png",
       validatorLogo: null,
       validatorAltPubkey: null,
       lamports: Number(delegation.stake ?? account.lamports),
@@ -126,22 +110,31 @@ export async function fetchUserStakeAccounts(
     const supabase = createClient(config.supabaseUrl, config.supabaseAnonKey);
     const { data, error } = await supabase
       .from("validator_metadata_configs")
-      .select("vote_pubkey, base_image_url, alt_pubkey")
+      .select("vote_pubkey, name, pt_image_url, base_image_url, alt_pubkey")
       .in("vote_pubkey", voteAccounts);
     if (error) {
       console.warn("[fetchUserStakeAccounts] metadata fetch failed:", error);
     } else if (data) {
-      const metaByVote = new Map<string, { logo: string | null; alt: string | null }>();
+      const metaByVote = new Map<
+        string,
+        { name: string; icon: string; logo: string | null; alt: string | null }
+      >();
       for (const row of data) {
         metaByVote.set(row.vote_pubkey, {
+          name: row.name,
+          icon: row.pt_image_url,
           logo: row.base_image_url ?? null,
           alt: row.alt_pubkey ?? null,
         });
       }
       for (const r of results) {
         const meta = metaByVote.get(r.validatorVoteAccount);
-        r.validatorLogo = meta?.logo ?? null;
-        r.validatorAltPubkey = meta?.alt ?? null;
+        if (meta) {
+          r.validatorName = meta.name;
+          r.validatorIcon = meta.icon;
+          r.validatorLogo = meta.logo;
+          r.validatorAltPubkey = meta.alt;
+        }
       }
     }
   }

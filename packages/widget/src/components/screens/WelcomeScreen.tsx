@@ -1,8 +1,13 @@
 import { useMemo } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useWidgetStore } from "../../stores/widget-store";
-import { useBalanceStore, useWalletStore } from "@pyefi/sdk/react";
-import { buildPtLookup, maturities } from "@pyefi/sdk";
+import {
+  useBalanceStore,
+  useWalletStore,
+  useLockupStore,
+  useValidatorStore,
+} from "@pyefi/sdk/react";
+import { getPyeConfig } from "@pyefi/sdk";
 import { Body, Spacer, SkeletonRow } from "../shared/Layout";
 import { c, font, displayFont, formatSolAmount } from "../design-system";
 
@@ -132,36 +137,43 @@ function IconSell() {
   );
 }
 
-interface WelcomeScreenProps {
-  validatorName?: string;
-}
-
-export default function WelcomeScreen({ validatorName }: WelcomeScreenProps) {
+export default function WelcomeScreen() {
   const navigate = useWidgetStore((s) => s.navigate);
   const walletBalances = useBalanceStore((s) => s.walletBalances);
   const userStakeAccounts = useBalanceStore((s) => s.userStakeAccounts);
   const userStakeAccountsLoading = useBalanceStore((s) => s.userStakeAccountsLoading);
   const walletPublicKey = useWalletStore((s) => s.publicKey);
+  const bonds = useLockupStore((s) => s.bonds);
+  const validators = useValidatorStore((s) => s.validators);
   const { disconnect } = useWallet();
 
-  const ptLookup = buildPtLookup();
+  // Look up the configured validator's display name (single-validator widgets only).
+  const configuredVoteAccount = (() => {
+    try { return getPyeConfig().voteAccount; } catch { return undefined; }
+  })();
+  const validatorName = configuredVoteAccount
+    ? validators[configuredVoteAccount]?.name
+    : undefined;
 
   // Sum of all ptSOL positions (matured + unmatured) and matured-only subtotal
   const { totalPtSol, maturedPtSol } = useMemo(() => {
+    const ptMintToBond = new Map<string, (typeof bonds)[string]>();
+    for (const bond of Object.values(bonds)) {
+      ptMintToBond.set(bond.pt_mint, bond);
+    }
     const now = Date.now() / 1000;
     let total = 0;
     let matured = 0;
     for (const [mint, amount] of Object.entries(walletBalances)) {
       if (amount <= 0) continue;
-      const entry = ptLookup.get(mint);
-      if (!entry) continue;
+      const bond = ptMintToBond.get(mint);
+      if (!bond) continue;
       const sol = amount / LAMPORTS_PER_SOL;
       total += sol;
-      const matTs = Number(maturities[entry.maturityId].maturity_timestamp);
-      if (now >= matTs) matured += sol;
+      if (now >= bond.maturity_ts) matured += sol;
     }
     return { totalPtSol: total, maturedPtSol: matured };
-  }, [walletBalances, ptLookup]);
+  }, [walletBalances, bonds]);
 
   // Sum SOL across active stake accounts
   const activeStakeSol = useMemo(() => {

@@ -4,13 +4,12 @@ import { useWidgetStore } from "../../stores/widget-store";
 import {
   maturities,
   type MaturityId,
-  lookupBondByVoteAccount,
   PYE_TRADING_FEE_BPS,
   applyTradingFee,
   estimateRtFromStake,
   fetchEpochSyncedNowTs,
 } from "@pyefi/sdk";
-import { useMarketStore } from "@pyefi/sdk/react";
+import { useMarketStore, useLockupStore } from "@pyefi/sdk/react";
 import { c, font, displayFont, MARKET_RATE, formatSolAmount, POINTS_ENABLED } from "../design-system";
 import { CTA, Tooltip, Spacer } from "../shared/Layout";
 import { Odometer } from "../shared/Odometer";
@@ -46,6 +45,7 @@ export default function ChooseDuration() {
   const depositAmount = useWidgetStore((s) => s.depositAmount);
   const selectedValidatorVoteAccount = useWidgetStore((s) => s.selectedValidatorVoteAccount);
   const markets = useMarketStore((s) => s.markets);
+  const bonds = useLockupStore((s) => s.bonds);
 
   // Epoch-synced wall-clock seconds — matches the on-chain "now" used by the
   // Bonds program when computing RT issuance, so our preview number stays in
@@ -59,15 +59,17 @@ export default function ChooseDuration() {
 
   const availableMaturities = useMemo(() => getAvailableMaturities(), []);
 
-  // Resolve the validator ID for validator-specific market lookup
-  const stakeValidatorId = useMemo(() => {
-    if (!selectedValidatorVoteAccount) return null;
+  // Validator-specific market lookup is keyed by the stake account's
+  // vote_account in the new schema, so we use it directly. We still keep
+  // the "has any bond" check so we can fall back to a generic lookup if
+  // this validator has no bonds yet.
+  const hasAnyBondForStakeValidator = useMemo(() => {
+    if (!selectedValidatorVoteAccount) return false;
     for (const matId of availableMaturities) {
-      const lookup = lookupBondByVoteAccount(selectedValidatorVoteAccount, matId);
-      if (lookup) return lookup.validatorId;
+      if (bonds[`${selectedValidatorVoteAccount}:${matId}`]) return true;
     }
-    return null;
-  }, [selectedValidatorVoteAccount, availableMaturities]);
+    return false;
+  }, [selectedValidatorVoteAccount, availableMaturities, bonds]);
 
   // Default to first available duration if none selected
   useEffect(() => {
@@ -90,8 +92,8 @@ export default function ChooseDuration() {
 
     // Look up RT market data — bids represent what buyers will pay per RT
     // Use validator-specific key when available; fall back to generic lookup
-    const rtMarketKey = stakeValidatorId
-      ? `${stakeValidatorId}-${matId}-RT`
+    const rtMarketKey = hasAnyBondForStakeValidator && selectedValidatorVoteAccount
+      ? `${selectedValidatorVoteAccount}-${matId}-RT`
       : Object.keys(markets).find((k) => k.endsWith(`-${matId}-RT`));
     const rtMarket = rtMarketKey ? markets[rtMarketKey] ?? null : null;
     const bestBid = rtMarket?.bestBidPrice ?? null;
