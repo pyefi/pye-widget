@@ -6,6 +6,7 @@ import {
   executeRedeem,
   fetchBalances,
   fetchUserStakeAccounts,
+  writeCachedWalletBalances,
   type BondRow,
   type CanonicalMaturity,
 } from "@pyefi/sdk";
@@ -163,7 +164,10 @@ export default function RedeemList() {
         .then(setBalanceLamports)
         .catch(() => {});
       fetchBalances(connection, owner)
-        .then(setWalletBalances)
+        .then((bals) => {
+          setWalletBalances(bals);
+          writeCachedWalletBalances(owner.toBase58(), bals);
+        })
         .catch(() => {});
       fetchUserStakeAccounts(connection, owner)
         .then(setUserStakeAccounts)

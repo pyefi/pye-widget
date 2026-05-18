@@ -9,6 +9,7 @@ import {
   checkSellLiquidity,
   fetchBalances,
   fetchUserStakeAccounts,
+  writeCachedWalletBalances,
   PYE_TRADING_FEE_BPS,
   applyTradingFee,
   estimateRtFromStake,
@@ -348,7 +349,12 @@ export default function ReviewQuote() {
     } finally {
       const owner = wallet.publicKey!;
       connection.getBalance(owner, "confirmed").then(setBalanceLamports).catch(() => {});
-      fetchBalances(connection, owner).then(setWalletBalances).catch(() => {});
+      fetchBalances(connection, owner)
+        .then((bals) => {
+          setWalletBalances(bals);
+          writeCachedWalletBalances(owner.toBase58(), bals);
+        })
+        .catch(() => {});
       fetchUserStakeAccounts(connection, owner).then(setUserStakeAccounts).catch(() => {});
     }
   }, [

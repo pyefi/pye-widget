@@ -9,6 +9,10 @@ import {
   readCachedStakeAccounts,
   writeCachedStakeAccounts,
 } from "../lib/stake-accounts-cache";
+import {
+  readCachedWalletBalances,
+  writeCachedWalletBalances,
+} from "../lib/wallet-balances-cache";
 
 const POLL_INTERVAL_MS = 5 * 60 * 1000;
 
@@ -51,9 +55,13 @@ export default function BalanceSyncer() {
 
       // Hydrate from cache synchronously so WelcomeScreen can render enabled rows
       // before the expensive getParsedProgramAccounts scan finishes.
-      const cached = readCachedStakeAccounts(publicKey);
-      if (cached && cached.length > 0) {
-        setUserStakeAccounts(cached);
+      const cachedStakes = readCachedStakeAccounts(publicKey);
+      if (cachedStakes && cachedStakes.length > 0) {
+        setUserStakeAccounts(cachedStakes);
+      }
+      const cachedBalances = readCachedWalletBalances(publicKey);
+      if (cachedBalances) {
+        setWalletBalances(cachedBalances);
       }
     }
 
@@ -81,6 +89,7 @@ export default function BalanceSyncer() {
       .then((walletBals) => {
         if (prevPublicKeyRef.current !== pkAtStart) return;
         setWalletBalances(walletBals);
+        writeCachedWalletBalances(pkAtStart, walletBals);
       })
       .catch((err) => {
         console.error("[BalanceSyncer] wallet-balances fetch failed:", err);
@@ -115,6 +124,7 @@ export default function BalanceSyncer() {
         .then((walletBals) => {
           if (prevPublicKeyRef.current !== pkAtStart) return;
           setWalletBalances(walletBals);
+          writeCachedWalletBalances(pkAtStart, walletBals);
         })
         .catch((err) => {
           console.error("[BalanceSyncer] wallet-balances poll failed:", err);

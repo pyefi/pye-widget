@@ -56,6 +56,7 @@ export type {
 // Lib — Data fetching
 export { fetchUserStakeAccounts } from "./lib/fetch-user-stake-accounts";
 export { fetchBalances, fetchBalancesForMints } from "./lib/fetch-balances";
+export { readCachedWalletBalances, writeCachedWalletBalances } from "./lib/wallet-balances-cache";
 export { fetchExchangeBalances } from "./lib/fetch-exchange-balances";
 export type { ExchangeBalancesResult } from "./lib/fetch-exchange-balances";
 export { fetchManifestMarkets, buildMarketLookup } from "./lib/market-service";
