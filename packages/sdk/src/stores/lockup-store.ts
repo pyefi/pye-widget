@@ -73,7 +73,7 @@ export function createLockupStore() {
           const { data, error } = await supabase
             .from("solo_validator_bonds")
             .select(
-              "pubkey, validator_vote_account, pt_mint, rt_mint, maturity_ts, canonical_label, is_hidden",
+              "pubkey, validator_vote_account, pt_mint:principal_token_mint, rt_mint:yield_token_mint, maturity_ts, canonical_label, is_hidden",
             )
             .not("canonical_label", "is", null)
             .eq("is_hidden", false);
@@ -89,8 +89,13 @@ export function createLockupStore() {
             s.lastFetched = Date.now();
           });
         } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
-          console.error("[LockupStore] fetch failed:", msg);
+          const msg =
+            err instanceof Error
+              ? err.message
+              : err && typeof err === "object" && "message" in err
+                ? String((err as { message: unknown }).message)
+                : JSON.stringify(err);
+          console.error("[LockupStore] fetch failed:", msg, err);
           set((s) => {
             s.error = msg;
           });

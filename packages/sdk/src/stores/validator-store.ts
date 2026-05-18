@@ -79,8 +79,13 @@ export function createValidatorStore() {
             s.lastFetched = Date.now();
           });
         } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
-          console.error("[ValidatorStore] fetch failed:", msg);
+          const msg =
+            err instanceof Error
+              ? err.message
+              : err && typeof err === "object" && "message" in err
+                ? String((err as { message: unknown }).message)
+                : JSON.stringify(err);
+          console.error("[ValidatorStore] fetch failed:", msg, err);
           set((s) => {
             s.error = msg;
           });
