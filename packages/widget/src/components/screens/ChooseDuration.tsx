@@ -9,7 +9,7 @@ import {
   estimateRtFromStake,
   fetchEpochSyncedNowTs,
 } from "@pyefi/sdk";
-import { useMarketStore, useLockupStore } from "@pyefi/sdk/react";
+import { useMarketStore } from "@pyefi/sdk/react";
 import { c, font, displayFont, MARKET_RATE, formatSolAmount, POINTS_ENABLED } from "../design-system";
 import { CTA, Tooltip, Spacer } from "../shared/Layout";
 import { Odometer } from "../shared/Odometer";
@@ -45,7 +45,6 @@ export default function ChooseDuration() {
   const depositAmount = useWidgetStore((s) => s.depositAmount);
   const selectedValidatorVoteAccount = useWidgetStore((s) => s.selectedValidatorVoteAccount);
   const markets = useMarketStore((s) => s.markets);
-  const bonds = useLockupStore((s) => s.bonds);
 
   // Epoch-synced wall-clock seconds — matches the on-chain "now" used by the
   // Bonds program when computing RT issuance, so our preview number stays in
@@ -57,23 +56,25 @@ export default function ChooseDuration() {
     });
   }, [connection]);
 
-  const availableMaturities = useMemo(() => getAvailableMaturities(), []);
+  // Only show maturities that have a canonical RT market for the selected
+  // validator. Without a market we have no real price to quote against, so
+  // hiding the row is more honest than showing a fabricated fallback rate.
+  const availableMaturities = useMemo(() => {
+    const timeFiltered = getAvailableMaturities();
+    if (!selectedValidatorVoteAccount) return [];
+    return timeFiltered.filter((matId) =>
+      Boolean(markets[`${selectedValidatorVoteAccount}-${matId}-RT`]),
+    );
+  }, [selectedValidatorVoteAccount, markets]);
 
-  // Validator-specific market lookup is keyed by the stake account's
-  // vote_account in the new schema, so we use it directly. We still keep
-  // the "has any bond" check so we can fall back to a generic lookup if
-  // this validator has no bonds yet.
-  const hasAnyBondForStakeValidator = useMemo(() => {
-    if (!selectedValidatorVoteAccount) return false;
-    for (const matId of availableMaturities) {
-      if (bonds[`${selectedValidatorVoteAccount}:${matId}`]) return true;
-    }
-    return false;
-  }, [selectedValidatorVoteAccount, availableMaturities, bonds]);
-
-  // Default to first available duration if none selected
+  // Default to first available duration if none selected, or clear if the
+  // current selection is no longer available (e.g. markets refreshed).
   useEffect(() => {
-    if (!selectedMaturityId && availableMaturities.length > 0) {
+    if (availableMaturities.length === 0) {
+      if (selectedMaturityId) setSelectedMaturity(null);
+      return;
+    }
+    if (!selectedMaturityId || !availableMaturities.includes(selectedMaturityId)) {
       setSelectedMaturity(availableMaturities[0]);
     }
   }, [selectedMaturityId, setSelectedMaturity, availableMaturities]);
@@ -90,12 +91,8 @@ export default function ChooseDuration() {
       pts: null,
     };
 
-    // Look up RT market data — bids represent what buyers will pay per RT
-    // Use validator-specific key when available; fall back to generic lookup
-    const rtMarketKey = hasAnyBondForStakeValidator && selectedValidatorVoteAccount
-      ? `${selectedValidatorVoteAccount}-${matId}-RT`
-      : Object.keys(markets).find((k) => k.endsWith(`-${matId}-RT`));
-    const rtMarket = rtMarketKey ? markets[rtMarketKey] ?? null : null;
+    // availableMaturities already guarantees a validator-specific market.
+    const rtMarket = markets[`${selectedValidatorVoteAccount}-${matId}-RT`];
     const bestBid = rtMarket?.bestBidPrice ?? null;
 
     // Bonds program mints RT proportional to remaining issuance window, so
@@ -140,6 +137,24 @@ export default function ChooseDuration() {
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        {quarters.length === 0 && (
+          <div
+            style={{
+              background: c.lowered,
+              borderRadius: 8,
+              padding: 12,
+              borderTop: `1px solid ${c.shadow}`,
+              boxShadow: `inset 0 -1px 0 ${c.highlight}`,
+            }}
+          >
+            <p style={font(14, c.primary, 500)}>No durations available</p>
+            <p style={font(13, c.secondary)}>
+              There aren't any active markets for this validator yet. Check
+              back soon.
+            </p>
+          </div>
+        )}
+
         {/* Duration rows — full width, one per row */}
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {quarters.map((q) => {

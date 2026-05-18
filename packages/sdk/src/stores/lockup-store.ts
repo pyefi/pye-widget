@@ -23,6 +23,8 @@ export interface BondRow {
   maturity_ts: number;
   canonical_label: CanonicalMaturity;
   is_hidden: boolean;
+  /** Only `standard = true` bonds may be swapped. Nullable in DB. */
+  standard: boolean | null;
 }
 
 export interface LockupState {
@@ -73,7 +75,7 @@ export function createLockupStore() {
           const { data, error } = await supabase
             .from("solo_validator_bonds")
             .select(
-              "pubkey, validator_vote_account, pt_mint:principal_token_mint, rt_mint:yield_token_mint, maturity_ts, canonical_label, is_hidden",
+              "pubkey, validator_vote_account, pt_mint:principal_token_mint, rt_mint:yield_token_mint, maturity_ts, canonical_label, is_hidden, standard",
             )
             .not("canonical_label", "is", null)
             .eq("is_hidden", false);

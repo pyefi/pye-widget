@@ -257,6 +257,14 @@ export default function ReviewQuote() {
     if (!rtMarket) throw new Error("No RT market found for this maturity");
     if (!maturity) throw new Error("No maturity selected");
 
+    const swapBond =
+      stakeBond ?? bonds[`${bondParams.voteAccount}:${selectedMaturityId}`];
+    if (swapBond?.standard !== true) {
+      throw new Error(
+        "Sell Yield is not yet enabled for this maturity. This bond hasn't been promoted to standard yet — please contact the Pye team.",
+      );
+    }
+
     setTxStatus("loading");
     setTxStep("depositing");
 
@@ -346,6 +354,8 @@ export default function ReviewQuote() {
   }, [
     rtMarket,
     bondParams,
+    stakeBond,
+    bonds,
     selectedStakeAccount,
     selectedStakeAccountPubkey,
     selectedMaturityId,
