@@ -175,14 +175,19 @@ export default function WelcomeScreen() {
     return { totalPtSol: total, maturedPtSol: matured };
   }, [walletBalances, bonds]);
 
-  // Sum SOL across active stake accounts
+  // Sum SOL across active stake accounts on widget-allowed validators only —
+  // matches the filter applied in SelectPosition so the headline number can't
+  // exceed what the user is actually able to sell.
   const activeStakeSol = useMemo(() => {
     let lamports = 0;
     for (const acc of userStakeAccounts) {
-      if (acc.state === "active") lamports += acc.lamports;
+      if (acc.state !== "active") continue;
+      if (!acc.validatorVoteAccount) continue;
+      if (validators[acc.validatorVoteAccount]?.widget !== true) continue;
+      lamports += acc.lamports;
     }
     return lamports / LAMPORTS_PER_SOL;
-  }, [userStakeAccounts]);
+  }, [userStakeAccounts, validators]);
 
   const canRedeem = totalPtSol > 0;
   const canSell = activeStakeSol > 0;

@@ -1,5 +1,5 @@
 import { useWidgetStore } from "../../stores/widget-store";
-import { useBalanceStore } from "@pyefi/sdk/react";
+import { useBalanceStore, useValidatorStore } from "@pyefi/sdk/react";
 // TODO(SIMD-185): restore getPyeConfig, SolIcon, useWalletStore imports when re-enabling liquid SOL deposit
 import { StepTitle, RowGroup, Spacer, SelectableRow } from "../shared/Layout";
 
@@ -10,8 +10,14 @@ export default function SelectPosition() {
   const selectStakeAccount = useWidgetStore((s) => s.selectStakeAccount);
 
   const userStakeAccounts = useBalanceStore((s) => s.userStakeAccounts);
+  const validators = useValidatorStore((s) => s.validators);
 
-  const activeAccounts = userStakeAccounts.filter((a) => a.state === "active");
+  const activeAccounts = userStakeAccounts.filter(
+    (a) =>
+      a.state === "active" &&
+      !!a.validatorVoteAccount &&
+      validators[a.validatorVoteAccount]?.widget === true,
+  );
 
   const handleSelectStake = (pubkey: string, lamports: number, validatorName?: string, validatorIcon?: string, validatorVoteAccount?: string, validatorAltPubkey?: string | null) => {
     selectStakeAccount(pubkey, lamports / LAMPORTS_PER_SOL, validatorName, validatorIcon, validatorVoteAccount, validatorAltPubkey);
