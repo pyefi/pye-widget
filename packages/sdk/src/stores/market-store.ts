@@ -4,7 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import type { MatchedMarket } from "../lib/market-service";
 import { fetchManifestMarkets, buildMarketLookup } from "../lib/market-service";
 import type { OrderBookSummary } from "../lib/manifest-parser";
-import { allowedLockups } from "../constants/lockups";
+import type { CanonicalMaturity } from "./lockup-store";
 import { getPyeConfig } from "../config";
 
 function getSupabase() {
@@ -13,11 +13,11 @@ function getSupabase() {
 }
 
 export interface MarketState {
-  /** Lookup keyed by "validatorId-maturityId-PT/RT" */
+  /** Lookup keyed by "${voteAccount}-${canonicalLabel}-${PT|RT}" */
   markets: Record<string, MatchedMarket>;
   /** Reverse map: marketPubkey → store key */
   pubkeyIndex: Record<string, string>;
-  /** RT backing per unit, keyed by bond pubkey */
+  /** RT backing per unit, keyed by bond pubkey. Populated by fetchRtBacking. */
   rtBacking: Record<string, number>;
   loading: boolean;
   lastFetched: number | null;
@@ -27,8 +27,8 @@ export interface MarketActions {
   fetchMarkets: () => Promise<void>;
   fetchRtBacking: () => Promise<void>;
   getMarket: (
-    validatorId: string,
-    maturityId: string,
+    voteAccount: string,
+    canonicalLabel: CanonicalMaturity,
     tokenType: "PT" | "RT",
   ) => MatchedMarket | null;
   updateMarketOrderBook: (
@@ -39,23 +39,10 @@ export interface MarketActions {
 
 export type MarketStore = MarketState & MarketActions;
 
-function buildInitialRtBacking(): Record<string, number> {
-  const backing: Record<string, number> = {};
-  const allowed = allowedLockups();
-  for (const mats of Object.values(allowed)) {
-    if (!mats) continue;
-    for (const bond of Object.values(mats)) {
-      if (!bond) continue;
-      backing[bond.pubkey] = 0;
-    }
-  }
-  return backing;
-}
-
 const initialState: MarketState = {
   markets: {},
   pubkeyIndex: {},
-  rtBacking: buildInitialRtBacking(),
+  rtBacking: {},
   loading: false,
   lastFetched: null,
 };
@@ -126,8 +113,8 @@ export function createMarketStore() {
         });
       },
 
-      getMarket(validatorId, maturityId, tokenType) {
-        const key = `${validatorId}-${maturityId}-${tokenType}`;
+      getMarket(voteAccount, canonicalLabel, tokenType) {
+        const key = `${voteAccount}-${canonicalLabel}-${tokenType}`;
         return get().markets[key] ?? null;
       },
 

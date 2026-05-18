@@ -40,9 +40,9 @@ export interface BalanceState {
   exchangeBalances: Balances;
   /** PT/RT open-orders balances keyed by mint address */
   openOrdersBalances: Balances;
-  /** Per-market SOL (quote) withdrawable balances, keyed by "validatorId-maturityId-tokenType" */
+  /** Per-market SOL (quote) withdrawable balances, keyed by "voteAccount-canonicalLabel-tokenType" */
   solBalances: Balances;
-  /** Per-market SOL (quote) open-orders balances, keyed by "validatorId-maturityId-tokenType" */
+  /** Per-market SOL (quote) open-orders balances, keyed by "voteAccount-canonicalLabel-tokenType" */
   solOpenOrdersBalances: Balances;
   /** Individual open orders for the connected trader */
   openOrders: OpenOrder[];

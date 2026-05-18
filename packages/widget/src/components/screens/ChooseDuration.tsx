@@ -4,7 +4,6 @@ import { useWidgetStore } from "../../stores/widget-store";
 import {
   maturities,
   type MaturityId,
-  lookupBondByVoteAccount,
   PYE_TRADING_FEE_BPS,
   applyTradingFee,
   estimateRtFromStake,
@@ -57,21 +56,25 @@ export default function ChooseDuration() {
     });
   }, [connection]);
 
-  const availableMaturities = useMemo(() => getAvailableMaturities(), []);
+  // Only show maturities that have a canonical RT market for the selected
+  // validator. Without a market we have no real price to quote against, so
+  // hiding the row is more honest than showing a fabricated fallback rate.
+  const availableMaturities = useMemo(() => {
+    const timeFiltered = getAvailableMaturities();
+    if (!selectedValidatorVoteAccount) return [];
+    return timeFiltered.filter((matId) =>
+      Boolean(markets[`${selectedValidatorVoteAccount}-${matId}-RT`]),
+    );
+  }, [selectedValidatorVoteAccount, markets]);
 
-  // Resolve the validator ID for validator-specific market lookup
-  const stakeValidatorId = useMemo(() => {
-    if (!selectedValidatorVoteAccount) return null;
-    for (const matId of availableMaturities) {
-      const lookup = lookupBondByVoteAccount(selectedValidatorVoteAccount, matId);
-      if (lookup) return lookup.validatorId;
-    }
-    return null;
-  }, [selectedValidatorVoteAccount, availableMaturities]);
-
-  // Default to first available duration if none selected
+  // Default to first available duration if none selected, or clear if the
+  // current selection is no longer available (e.g. markets refreshed).
   useEffect(() => {
-    if (!selectedMaturityId && availableMaturities.length > 0) {
+    if (availableMaturities.length === 0) {
+      if (selectedMaturityId) setSelectedMaturity(null);
+      return;
+    }
+    if (!selectedMaturityId || !availableMaturities.includes(selectedMaturityId)) {
       setSelectedMaturity(availableMaturities[0]);
     }
   }, [selectedMaturityId, setSelectedMaturity, availableMaturities]);
@@ -88,12 +91,8 @@ export default function ChooseDuration() {
       pts: null,
     };
 
-    // Look up RT market data — bids represent what buyers will pay per RT
-    // Use validator-specific key when available; fall back to generic lookup
-    const rtMarketKey = stakeValidatorId
-      ? `${stakeValidatorId}-${matId}-RT`
-      : Object.keys(markets).find((k) => k.endsWith(`-${matId}-RT`));
-    const rtMarket = rtMarketKey ? markets[rtMarketKey] ?? null : null;
+    // availableMaturities already guarantees a validator-specific market.
+    const rtMarket = markets[`${selectedValidatorVoteAccount}-${matId}-RT`];
     const bestBid = rtMarket?.bestBidPrice ?? null;
 
     // Bonds program mints RT proportional to remaining issuance window, so
@@ -138,6 +137,24 @@ export default function ChooseDuration() {
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        {quarters.length === 0 && (
+          <div
+            style={{
+              background: c.lowered,
+              borderRadius: 8,
+              padding: 12,
+              borderTop: `1px solid ${c.shadow}`,
+              boxShadow: `inset 0 -1px 0 ${c.highlight}`,
+            }}
+          >
+            <p style={font(14, c.primary, 500)}>No durations available</p>
+            <p style={font(13, c.secondary)}>
+              There aren't any active markets for this validator yet. Check
+              back soon.
+            </p>
+          </div>
+        )}
+
         {/* Duration rows — full width, one per row */}
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {quarters.map((q) => {

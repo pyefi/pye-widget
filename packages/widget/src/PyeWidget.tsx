@@ -13,13 +13,15 @@ import {
 import { WalletAdapterNetwork } from "@solana/wallet-adapter-base";
 
 const WALLET_CONNECT_PROJECT_ID = "7b89b9d2ef5d0298961c3eeb879793b0";
-import { configurePyeSDK, validators } from "@pyefi/sdk";
+import { configurePyeSDK } from "@pyefi/sdk";
 import {
   PyeSDKProvider,
   WalletSyncer,
   BalanceSyncer,
   MarketSyncer,
   ApySyncer,
+  ValidatorSyncer,
+  LockupSyncer,
 } from "@pyefi/sdk/react";
 import {
   createWidgetStore,
@@ -29,14 +31,6 @@ import { THEME_CSS } from "./components/design-system";
 import WidgetShell from "./components/WidgetShell";
 import WalletChangeWatcher from "./components/WalletChangeWatcher";
 import type { PyeWidgetProps } from "./types";
-
-function resolveValidatorName(voteAccount?: string): string | undefined {
-  if (!voteAccount) return undefined;
-  for (const v of Object.values(validators)) {
-    if (v.vote_account === voteAccount) return v.name;
-  }
-  return undefined;
-}
 
 export default function PyeWidget({
   rpcUrl,
@@ -51,8 +45,6 @@ export default function PyeWidget({
     configurePyeSDK({ rpcUrl, supabaseUrl, supabaseAnonKey, voteAccount });
     configuredRef.current = true;
   }
-
-  const validatorName = useMemo(() => resolveValidatorName(voteAccount), [voteAccount]);
 
   const wallets = useMemo(
     () => [
@@ -89,11 +81,13 @@ export default function PyeWidget({
           <PyeSDKProvider>
             <WalletSyncer />
             <BalanceSyncer />
+            <ValidatorSyncer />
+            <LockupSyncer />
             <MarketSyncer />
             <ApySyncer />
             <WidgetStoreContext.Provider value={widgetStoreRef.current}>
               <WalletChangeWatcher />
-              <WidgetShell validatorName={validatorName} />
+              <WidgetShell />
             </WidgetStoreContext.Provider>
           </PyeSDKProvider>
         </WalletProvider>

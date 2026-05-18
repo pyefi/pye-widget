@@ -13,10 +13,6 @@ import RedeemList from "./screens/RedeemList";
 import StepComplete from "./screens/StepComplete";
 import RedeemComplete from "./screens/RedeemComplete";
 
-interface WidgetShellProps {
-  validatorName?: string;
-}
-
 const STEP_CONFIG: Partial<Record<WidgetScreen, { step: number; total: number }>> = {
   "select-position": { step: 1, total: 4 },
   "choose-amount": { step: 2, total: 4 },
@@ -38,7 +34,7 @@ function HeaderlessShell({ screen, children }: { screen: WidgetScreen; children:
   );
 }
 
-export default function WidgetShell({ validatorName }: WidgetShellProps) {
+export default function WidgetShell() {
   const screen = useWidgetStore((s) => s.screen);
   const goBack = useWidgetStore((s) => s.goBack);
   const reset = useWidgetStore((s) => s.reset);
@@ -80,7 +76,7 @@ export default function WidgetShell({ validatorName }: WidgetShellProps) {
   }
 
   if (screen === "welcome") {
-    return <Widget><WelcomeScreen validatorName={validatorName} /><Footer /></Widget>;
+    return <Widget><WelcomeScreen /><Footer /></Widget>;
   }
 
   if (screen === "yield-forward-intro") {

@@ -4,6 +4,8 @@ import { createWalletStore, type WalletStore } from "../stores/wallet-store";
 import { createBalanceStore, type BalanceStore } from "../stores/balance-store";
 import { createMarketStore, type MarketStore } from "../stores/market-store";
 import { createApyStore, type ApyStore } from "../stores/apy-store";
+import { createValidatorStore, type ValidatorStore } from "../stores/validator-store";
+import { createLockupStore, type LockupStore } from "../stores/lockup-store";
 
 // ── Wallet Store ──
 
@@ -105,17 +107,71 @@ export function useApyStore<T>(selector: (state: ApyStore) => T): T {
   return useStore(store, selector);
 }
 
+// ── Validator Store ──
+
+type ValidatorStoreApi = ReturnType<typeof createValidatorStore>;
+const ValidatorStoreContext = createContext<ValidatorStoreApi | null>(null);
+
+export function ValidatorStoreProvider({ children }: { children: ReactNode }) {
+  const storeRef = useRef<ValidatorStoreApi>(undefined);
+  if (!storeRef.current) {
+    storeRef.current = createValidatorStore();
+  }
+  return (
+    <ValidatorStoreContext.Provider value={storeRef.current}>
+      {children}
+    </ValidatorStoreContext.Provider>
+  );
+}
+
+export function useValidatorStore<T>(selector: (state: ValidatorStore) => T): T {
+  const store = useContext(ValidatorStoreContext);
+  if (!store) {
+    throw new Error("useValidatorStore must be used within ValidatorStoreProvider");
+  }
+  return useStore(store, selector);
+}
+
+// ── Lockup Store ──
+
+type LockupStoreApi = ReturnType<typeof createLockupStore>;
+const LockupStoreContext = createContext<LockupStoreApi | null>(null);
+
+export function LockupStoreProvider({ children }: { children: ReactNode }) {
+  const storeRef = useRef<LockupStoreApi>(undefined);
+  if (!storeRef.current) {
+    storeRef.current = createLockupStore();
+  }
+  return (
+    <LockupStoreContext.Provider value={storeRef.current}>
+      {children}
+    </LockupStoreContext.Provider>
+  );
+}
+
+export function useLockupStore<T>(selector: (state: LockupStore) => T): T {
+  const store = useContext(LockupStoreContext);
+  if (!store) {
+    throw new Error("useLockupStore must be used within LockupStoreProvider");
+  }
+  return useStore(store, selector);
+}
+
 // ── Composed Provider ──
 
 export function PyeSDKProvider({ children }: { children: ReactNode }) {
   return (
     <WalletStoreProvider>
       <BalanceStoreProvider>
-        <MarketStoreProvider>
-          <ApyStoreProvider>
-            {children}
-          </ApyStoreProvider>
-        </MarketStoreProvider>
+        <ValidatorStoreProvider>
+          <LockupStoreProvider>
+            <MarketStoreProvider>
+              <ApyStoreProvider>
+                {children}
+              </ApyStoreProvider>
+            </MarketStoreProvider>
+          </LockupStoreProvider>
+        </ValidatorStoreProvider>
       </BalanceStoreProvider>
     </WalletStoreProvider>
   );
