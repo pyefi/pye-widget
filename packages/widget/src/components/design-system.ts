@@ -178,8 +178,6 @@ export function brandTextColor(hex: string): string {
   return lum > 0.179 ? "#000000" : "#ffffff";
 }
 
-export const MARKET_RATE = 0.85;
-
 /** Format a SOL amount showing at least 2 significant digits, never scientific notation. */
 export function formatSolAmount(value: number, minDecimals = 4): string {
   if (value === 0) return "0";
