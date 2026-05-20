@@ -177,7 +177,7 @@ export default function WelcomeScreen(_props: WelcomeScreenProps) {
     <Body style={{ borderRadius: "10px 10px 0 0" }}>
       <StepTitle
         title="Manage your rewards"
-        subtitle="Your stake and positions at a glance. Sell future rewards or redeem matured ones."
+        subtitle="Your stake and positions at a glance. Sell future rewards or redeem SOL that has matured."
       />
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {isInitialLoading ? (
