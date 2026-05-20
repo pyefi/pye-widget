@@ -3,6 +3,7 @@ import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { useWidgetStore } from "../../stores/widget-store";
 import {
   maturities,
+  canSellYield,
   executeStakeDeposit,
   executeRtSell,
   executeDepositAndSell,
@@ -21,6 +22,7 @@ import {
   useBalanceStore,
   useWalletStore,
   useLockupStore,
+  useValidatorStore,
 } from "@pyefi/sdk/react";
 import { c, font, pointsMap, formatSolAmount, POINTS_ENABLED } from "../design-system";
 import { StepTitle, CTA, Tooltip, Spacer } from "../shared/Layout";
@@ -140,6 +142,7 @@ export default function ReviewQuote() {
 
   const markets = useMarketStore((s) => s.markets);
   const bonds = useLockupStore((s) => s.bonds);
+  const validators = useValidatorStore((s) => s.validators);
   const userStakeAccounts = useBalanceStore((s) => s.userStakeAccounts);
   const setWalletBalances = useBalanceStore((s) => s.setWalletBalances);
   const setUserStakeAccounts = useBalanceStore((s) => s.setUserStakeAccounts);
@@ -261,12 +264,22 @@ export default function ReviewQuote() {
     if (!rtMarket) throw new Error("No RT market found for this maturity");
     if (!maturity) throw new Error("No maturity selected");
 
-    const swapBond =
-      stakeBond ?? bonds[`${bondParams.voteAccount}:${selectedMaturityId}`];
-    if (swapBond?.standard !== true) {
-      throw new Error(
-        "Sell Yield is not yet enabled for this maturity. This bond hasn't been promoted to standard yet — please contact the Pye team.",
+    // Safety net — ChooseDuration already gates this, but re-check at sign time
+    // so a stale or mid-flight state can't slip a doomed swap through.
+    const gate = canSellYield({
+      validatorVoteAccount: bondParams.voteAccount,
+      maturityId: selectedMaturityId,
+      amountSol: parsedAmount,
+      nowTs: nowTs ?? Date.now() / 1000,
+      validators,
+      bonds,
+      markets,
+    });
+    if (!gate.ok) {
+      console.error(
+        `[Pye] ${gate.code}: validator ${bondParams.voteAccount}, maturity ${selectedMaturityId} — ${gate.reason}`,
       );
+      throw new Error(`${gate.reason} (${gate.code})`);
     }
 
     setTxStatus("loading");
@@ -316,12 +329,10 @@ export default function ReviewQuote() {
         setTxStatus("success", rtSellResult.signature);
         navigate("complete");
       } else {
-        // Stake account path — single bundled v0 transaction (requires ALT)
-        if (!selectedValidatorAltPubkey) {
-          throw new Error(
-            "Sell Yield is not yet enabled for this validator. An Address Lookup Table hasn't been deployed yet — please contact the Pye team.",
-          );
-        }
+        // Stake account path — single bundled v0 transaction.
+        // ALT presence is guaranteed by the canSellYield safety net above;
+        // the non-null assertion narrows the widget-store union for TS.
+        const altPubkey = selectedValidatorAltPubkey!;
         const result = await executeDepositAndSell({
           connection,
           wallet,
@@ -336,7 +347,7 @@ export default function ReviewQuote() {
           marketPubkey: rtMarket.marketPubkey,
           minReceiveTokens: minReceive,
           expectedSolOut: grossSellAmount,
-          altPubkey: selectedValidatorAltPubkey,
+          altPubkey,
         });
         setTxStep("complete");
         setSellAmountSol(sellAmount);
@@ -365,6 +376,9 @@ export default function ReviewQuote() {
     bondParams,
     stakeBond,
     bonds,
+    validators,
+    markets,
+    nowTs,
     selectedStakeAccount,
     selectedStakeAccountPubkey,
     selectedMaturityId,

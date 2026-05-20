@@ -70,6 +70,18 @@ export type { LockupMetrics, BondPayment, RewardBreakdown, TvlSnapshot } from ".
 export { checkBuyLiquidity, checkSellLiquidity } from "./lib/liquidity";
 export type { LiquidityCheck } from "./lib/liquidity";
 
+// Lib — Gating
+export {
+  canSellYield,
+  validatorAvailability,
+  SELL_YIELD_CODES,
+} from "./lib/can-sell-yield";
+export type {
+  SellYieldStatus,
+  SellYieldCode,
+  CanSellYieldParams,
+} from "./lib/can-sell-yield";
+
 // Lib — RT estimation
 export { estimateRtFromStake, fetchEpochSyncedNowTs } from "./lib/estimate-rt";
 export type { EstimateRtFromStakeParams } from "./lib/estimate-rt";

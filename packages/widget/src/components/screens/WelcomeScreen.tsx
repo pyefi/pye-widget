@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useWidgetStore } from "../../stores/widget-store";
 import {
@@ -7,7 +7,7 @@ import {
   useLockupStore,
   useValidatorStore,
 } from "@pyefi/sdk/react";
-import { getPyeConfig } from "@pyefi/sdk";
+import { getPyeConfig, validatorAvailability } from "@pyefi/sdk";
 import { Body, Spacer, SkeletonRow } from "../shared/Layout";
 import { c, font, displayFont, formatSolAmount } from "../design-system";
 
@@ -187,6 +187,24 @@ export default function WelcomeScreen() {
       lamports += acc.lamports;
     }
     return lamports / LAMPORTS_PER_SOL;
+  }, [userStakeAccounts, validators]);
+
+  // Telemetry: log each active stake whose validator isn't sellable so the
+  // Pye team can spot misconfigured / pending validators showing demand.
+  const loggedRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (Object.keys(validators).length === 0) return; // wait until validators load
+    for (const acc of userStakeAccounts) {
+      if (acc.state !== "active" || !acc.validatorVoteAccount) continue;
+      const status = validatorAvailability(acc.validatorVoteAccount, validators);
+      if (status.ok) continue;
+      const key = `${status.code}:${acc.validatorVoteAccount}`;
+      if (loggedRef.current.has(key)) continue;
+      loggedRef.current.add(key);
+      console.warn(
+        `[Pye] ${status.code}: stake ${acc.pubkey} on validator ${acc.validatorVoteAccount} — ${status.reason}`,
+      );
+    }
   }, [userStakeAccounts, validators]);
 
   const canRedeem = totalPtSol > 0;

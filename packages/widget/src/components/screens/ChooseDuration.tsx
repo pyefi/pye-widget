@@ -1,19 +1,39 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useConnection } from "@solana/wallet-adapter-react";
 import { useWidgetStore } from "../../stores/widget-store";
 import {
   maturities,
   type MaturityId,
+  type SellYieldCode,
+  type SellYieldStatus,
   PYE_TRADING_FEE_BPS,
+  SELL_YIELD_CODES,
   applyTradingFee,
+  canSellYield,
   checkSellLiquidity,
   estimateRtFromStake,
   fetchEpochSyncedNowTs,
 } from "@pyefi/sdk";
-import { useMarketStore } from "@pyefi/sdk/react";
+import {
+  useMarketStore,
+  useValidatorStore,
+  useLockupStore,
+} from "@pyefi/sdk/react";
 import { c, font, displayFont, formatSolAmount, POINTS_ENABLED } from "../design-system";
 import { CTA, Tooltip, Spacer } from "../shared/Layout";
 import { Odometer } from "../shared/Odometer";
+
+/** Short user-facing headlines per gate failure code. Reason text from
+ *  canSellYield is shown beneath this as the detail line. */
+const GATE_HEADLINE: Record<SellYieldCode, string> = {
+  [SELL_YIELD_CODES.VALIDATOR_NOT_CONFIGURED]: "Validator not supported",
+  [SELL_YIELD_CODES.VALIDATOR_WIDGET_DISABLED]: "Validator not enabled",
+  [SELL_YIELD_CODES.VALIDATOR_ALT_MISSING]: "Setup pending",
+  [SELL_YIELD_CODES.BOND_MISSING]: "Not available",
+  [SELL_YIELD_CODES.BOND_NOT_STANDARD]: "Setup pending",
+  [SELL_YIELD_CODES.MARKET_MISSING]: "Market not open",
+  [SELL_YIELD_CODES.LIQUIDITY_INSUFFICIENT]: "Insufficient liquidity",
+};
 
 /** Map SDK maturity IDs to Dan's display format */
 const QUARTER_INFO: Record<MaturityId, { label: string; pts: string | null }> =
@@ -46,6 +66,8 @@ export default function ChooseDuration() {
   const depositAmount = useWidgetStore((s) => s.depositAmount);
   const selectedValidatorVoteAccount = useWidgetStore((s) => s.selectedValidatorVoteAccount);
   const markets = useMarketStore((s) => s.markets);
+  const validators = useValidatorStore((s) => s.validators);
+  const bonds = useLockupStore((s) => s.bonds);
 
   // Epoch-synced wall-clock seconds — matches the on-chain "now" used by the
   // Bonds program when computing RT issuance, so our preview number stays in
@@ -85,43 +107,69 @@ export default function ChooseDuration() {
   // first render before the RPC call resolves.
   const effectiveNowTs = nowTs ?? Date.now() / 1000;
 
-  // Build display quarters from available maturities
+  // Build display quarters from available maturities. canSellYield is the
+  // single source of truth for gating — it covers alt_pubkey, standard, and
+  // liquidity. We re-compute the price from the same liquidity check when
+  // the status is ok, so the displayed yield matches the gate decision.
   const quarters = availableMaturities.map((matId) => {
     const info = QUARTER_INFO[matId] ?? {
       label: maturities[matId]?.human_readable ?? matId,
       pts: null,
     };
 
-    // availableMaturities already guarantees a validator-specific market.
-    const rtMarket = markets[`${selectedValidatorVoteAccount}-${matId}-RT`];
     const maturity = maturities[matId];
+    const status: SellYieldStatus = selectedValidatorVoteAccount
+      ? canSellYield({
+          validatorVoteAccount: selectedValidatorVoteAccount,
+          maturityId: matId,
+          amountSol: parsedAmount,
+          nowTs: effectiveNowTs,
+          validators,
+          bonds,
+          markets,
+        })
+      : {
+          ok: false,
+          code: SELL_YIELD_CODES.VALIDATOR_NOT_CONFIGURED,
+          reason: "No validator selected.",
+        };
 
-    // Bonds program mints RT proportional to remaining issuance window, so
-    // we scale the deposit by time remaining to get the RT the user will
-    // actually receive. Using `parsedAmount` here would overstate the quote.
-    const estimatedRt = estimateRtFromStake({
-      amountSol: parsedAmount,
-      maturity,
-      nowTs: effectiveNowTs,
-    });
-
-    // Quote against the actual bid stack — same check ReviewQuote uses. If the
-    // book is empty or shallow for this amount, hasLiquidity is false and we
-    // surface that to the user instead of fabricating a yield number.
-    const liquidityCheck = rtMarket?.bids?.length
-      ? checkSellLiquidity(rtMarket.bids, estimatedRt)
-      : null;
-    const hasLiquidity = liquidityCheck?.isSufficientLiquidity ?? false;
-    const grossYield =
-      hasLiquidity && liquidityCheck?.expectedFillPrice != null
-        ? liquidityCheck.expectedFillPrice * estimatedRt
-        : 0;
+    let grossYield = 0;
+    if (status.ok) {
+      const rtMarket = markets[`${selectedValidatorVoteAccount}-${matId}-RT`];
+      const estimatedRt = estimateRtFromStake({
+        amountSol: parsedAmount,
+        maturity,
+        nowTs: effectiveNowTs,
+      });
+      const liq = rtMarket?.bids?.length
+        ? checkSellLiquidity(rtMarket.bids, estimatedRt)
+        : null;
+      grossYield = (liq?.expectedFillPrice ?? 0) * estimatedRt;
+    }
     const netYield = applyTradingFee(grossYield);
 
-    return { matId, ...info, hasLiquidity, grossYield, netYield };
+    return { matId, ...info, status, grossYield, netYield };
   });
 
   const feePct = (PYE_TRADING_FEE_BPS / 100).toFixed(2);
+
+  // Telemetry: log each (validator, maturity, code) gate failure once per
+  // session — useful for support and for spotting validators that have demand
+  // but aren't yet fully set up.
+  const loggedRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!selectedValidatorVoteAccount) return;
+    for (const q of quarters) {
+      if (q.status.ok) continue;
+      const key = `${q.status.code}:${selectedValidatorVoteAccount}:${q.matId}`;
+      if (loggedRef.current.has(key)) continue;
+      loggedRef.current.add(key);
+      console.warn(
+        `[Pye] ${q.status.code}: validator ${selectedValidatorVoteAccount}, maturity ${q.matId} — ${q.status.reason}`,
+      );
+    }
+  }, [quarters, selectedValidatorVoteAccount]);
 
   const sel = quarters.find((q) => q.matId === selectedMaturityId);
 
@@ -161,6 +209,11 @@ export default function ChooseDuration() {
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {quarters.map((q) => {
             const isSelected = selectedMaturityId === q.matId;
+            const gateCode = q.status.ok ? null : q.status.code;
+            const isGated = gateCode !== null;
+            const labelColor = isGated
+              ? c.muted
+              : isSelected ? c.primary : c.secondary;
             return (
               <div
                 key={q.matId}
@@ -181,14 +234,27 @@ export default function ChooseDuration() {
                     ? `inset 0 -1px 0 ${c.highlight}`
                     : `inset 0 -1px 0 ${c.shadow}`,
                   transition: "background 0.1s",
+                  opacity: isGated ? 0.7 : 1,
                 }}
               >
-                <span style={font(15, isSelected ? c.primary : c.secondary, isSelected ? 500 : 400)}>
+                <span style={font(15, labelColor, isSelected ? 500 : 400)}>
                   {q.label}
                 </span>
-                {POINTS_ENABLED && q.pts && (
+                {gateCode ? (
+                  <span
+                    style={{
+                      ...font(12, c.muted),
+                      padding: "2px 8px",
+                      borderRadius: 4,
+                      background: c.lowered,
+                      flexShrink: 0,
+                    }}
+                  >
+                    {GATE_HEADLINE[gateCode] ?? "Not available"}
+                  </span>
+                ) : POINTS_ENABLED && q.pts ? (
                   <span style={font(13, c.purple)}>{q.pts}</span>
-                )}
+                ) : null}
               </div>
             );
           })}
@@ -209,7 +275,7 @@ export default function ChooseDuration() {
             }}
           >
             <p style={font(14, c.secondary)}>You receive today</p>
-            {sel.hasLiquidity ? (
+            {sel.status.ok ? (
               <>
                 <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
                   {sel.netYield < 0.0001 ? (
@@ -236,11 +302,11 @@ export default function ChooseDuration() {
             ) : (
               <>
                 <p style={{ ...displayFont(22, c.muted), lineHeight: 1.2 }}>
-                  Insufficient liquidity
+                  {GATE_HEADLINE[sel.status.code] ?? "Not available"}
                 </p>
-                <p style={font(12, c.muted)}>
-                  The order book for this maturity doesn't have enough bids to
-                  fill your amount yet. Try a smaller amount or check back soon.
+                <p style={font(12, c.muted)}>{sel.status.reason}</p>
+                <p style={{ ...font(10, c.muted), letterSpacing: "0.02em", marginTop: 4 }}>
+                  {sel.status.code}
                 </p>
               </>
             )}
@@ -253,7 +319,7 @@ export default function ChooseDuration() {
       <CTA
         label="Review"
         onClick={() => navigate("review-quote")}
-        disabled={!selectedMaturityId || !sel?.hasLiquidity}
+        disabled={!selectedMaturityId || !sel?.status.ok}
         purple
       />
     </>

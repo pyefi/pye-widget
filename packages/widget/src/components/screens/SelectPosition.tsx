@@ -1,5 +1,7 @@
+import { useEffect, useRef } from "react";
 import { useWidgetStore } from "../../stores/widget-store";
 import { useBalanceStore, useValidatorStore } from "@pyefi/sdk/react";
+import { validatorAvailability } from "@pyefi/sdk";
 // TODO(SIMD-185): restore getPyeConfig, SolIcon, useWalletStore imports when re-enabling liquid SOL deposit
 import { StepTitle, RowGroup, Spacer, SelectableRow } from "../shared/Layout";
 
@@ -18,6 +20,23 @@ export default function SelectPosition() {
       !!a.validatorVoteAccount &&
       validators[a.validatorVoteAccount]?.widget === true,
   );
+
+  // Telemetry: log every active stake we silently hide because its validator
+  // isn't configured / widget-enabled. Paste-friendly for support.
+  const loggedRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    for (const acc of userStakeAccounts) {
+      if (acc.state !== "active" || !acc.validatorVoteAccount) continue;
+      const status = validatorAvailability(acc.validatorVoteAccount, validators);
+      if (status.ok) continue;
+      const key = `${status.code}:${acc.validatorVoteAccount}`;
+      if (loggedRef.current.has(key)) continue;
+      loggedRef.current.add(key);
+      console.warn(
+        `[Pye] ${status.code}: stake ${acc.pubkey} on validator ${acc.validatorVoteAccount} — ${status.reason}`,
+      );
+    }
+  }, [userStakeAccounts, validators]);
 
   const handleSelectStake = (pubkey: string, lamports: number, validatorName?: string, validatorIcon?: string, validatorVoteAccount?: string, validatorAltPubkey?: string | null) => {
     selectStakeAccount(pubkey, lamports / LAMPORTS_PER_SOL, validatorName, validatorIcon, validatorVoteAccount, validatorAltPubkey);
