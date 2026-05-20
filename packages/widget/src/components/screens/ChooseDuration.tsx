@@ -6,7 +6,6 @@ import {
   type MaturityId,
   type SellYieldCode,
   type SellYieldStatus,
-  PYE_TRADING_FEE_BPS,
   SELL_YIELD_CODES,
   applyTradingFee,
   canSellYield,
@@ -20,7 +19,7 @@ import {
   useLockupStore,
 } from "@pyefi/sdk/react";
 import { c, font, displayFont, formatSolAmount, POINTS_ENABLED } from "../design-system";
-import { CTA, Tooltip, Spacer } from "../shared/Layout";
+import { CTA, Tooltip } from "../shared/Layout";
 import { Odometer } from "../shared/Odometer";
 
 /** Short user-facing headlines per gate failure code. Reason text from
@@ -148,11 +147,13 @@ export default function ChooseDuration() {
       grossYield = (liq?.expectedFillPrice ?? 0) * estimatedRt;
     }
     const netYield = applyTradingFee(grossYield);
+    const daysToMaturity = Math.max(
+      0,
+      Math.ceil((Number(maturity.maturity_timestamp) - effectiveNowTs) / 86400),
+    );
 
-    return { matId, ...info, status, grossYield, netYield };
+    return { matId, ...info, status, grossYield, netYield, daysToMaturity };
   });
-
-  const feePct = (PYE_TRADING_FEE_BPS / 100).toFixed(2);
 
   // Telemetry: log each (validator, maturity, code) gate failure once per
   // session — useful for support and for spotting validators that have demand
@@ -237,9 +238,14 @@ export default function ChooseDuration() {
                   opacity: isGated ? 0.7 : 1,
                 }}
               >
-                <span style={font(15, labelColor, isSelected ? 500 : 400)}>
-                  {q.label}
-                </span>
+                <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                  <span style={font(15, labelColor, isSelected ? 500 : 400)}>
+                    {q.label}
+                  </span>
+                  <span style={font(12, c.muted)}>
+                    {q.daysToMaturity} {q.daysToMaturity === 1 ? "day" : "days"}
+                  </span>
+                </div>
                 {gateCode ? (
                   <span
                     style={{
@@ -252,9 +258,23 @@ export default function ChooseDuration() {
                   >
                     {GATE_HEADLINE[gateCode] ?? "Not available"}
                   </span>
-                ) : POINTS_ENABLED && q.pts ? (
-                  <span style={font(13, c.purple)}>{q.pts}</span>
-                ) : null}
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
+                    <span
+                      style={{
+                        ...font(15, c.green, 500),
+                        fontVariantNumeric: "lining-nums tabular-nums",
+                      }}
+                    >
+                      {q.netYield < 0.0001
+                        ? "< 0.0001 SOL"
+                        : `+${formatSolAmount(q.netYield, 3)} SOL`}
+                    </span>
+                    {POINTS_ENABLED && q.pts && (
+                      <span style={font(12, c.purple)}>{q.pts}</span>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })}
@@ -276,29 +296,24 @@ export default function ChooseDuration() {
           >
             <p style={font(14, c.secondary)}>You receive today</p>
             {sel.status.ok ? (
-              <>
-                <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-                  {sel.netYield < 0.0001 ? (
-                    <p
-                      style={{
-                        ...displayFont(32, c.green),
-                        lineHeight: 1.2,
-                        fontVariantNumeric: "lining-nums tabular-nums",
-                      }}
-                    >
-                      &lt; 0.0001 SOL
-                    </p>
-                  ) : (
-                    <Odometer
-                      value={`+${formatSolAmount(sel.netYield, 3)} SOL`}
-                      style={{ ...displayFont(32, c.green), lineHeight: 1.2 }}
-                    />
-                  )}
-                </div>
-                <p style={font(12, c.muted)}>
-                  Quote includes a {feePct}% Pye protocol fee.
-                </p>
-              </>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                {sel.netYield < 0.0001 ? (
+                  <p
+                    style={{
+                      ...displayFont(32, c.green),
+                      lineHeight: 1.2,
+                      fontVariantNumeric: "lining-nums tabular-nums",
+                    }}
+                  >
+                    &lt; 0.0001 SOL
+                  </p>
+                ) : (
+                  <Odometer
+                    value={`+${formatSolAmount(sel.netYield, 3)} SOL`}
+                    style={{ ...displayFont(32, c.green), lineHeight: 1.2 }}
+                  />
+                )}
+              </div>
             ) : (
               <>
                 <p style={{ ...displayFont(22, c.muted), lineHeight: 1.2 }}>
@@ -315,7 +330,6 @@ export default function ChooseDuration() {
 
       </div>
 
-      <Spacer />
       <CTA
         label="Review"
         onClick={() => navigate("review-quote")}

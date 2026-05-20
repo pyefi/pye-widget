@@ -8,8 +8,8 @@ import {
   useValidatorStore,
 } from "@pyefi/sdk/react";
 import { getPyeConfig, validatorAvailability } from "@pyefi/sdk";
-import { Body, Spacer, SkeletonRow } from "../shared/Layout";
-import { c, font, displayFont, formatSolAmount } from "../design-system";
+import { Body, Spacer, SkeletonRow, StepTitle } from "../shared/Layout";
+import { c, font, formatSolAmount } from "../design-system";
 
 const LAMPORTS_PER_SOL = 1_000_000_000;
 
@@ -45,7 +45,7 @@ function ChoiceRow({
     >
       {icon}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
-        <p style={font(15, c.primary, 600)}>{label}</p>
+        <p style={font(15, c.primary)}>{label}</p>
         <p style={font(14, subColor ?? c.secondary)}>{sub}</p>
       </div>
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
@@ -96,24 +96,6 @@ function IconRedeem() {
       <svg width="20" height="20" viewBox="0 0 20 20" fill="none" style={{ color: "var(--c-brand)" }}>
         <circle cx="8" cy="8" r="5" stroke="currentColor" strokeWidth="1.5" />
         <circle cx="12" cy="12" r="5" stroke="currentColor" strokeWidth="1.5" fill="none" />
-      </svg>
-    </div>
-  );
-}
-
-function IconDocs() {
-  return (
-    <div style={{
-      flexShrink: 0, width: 44, height: 44, borderRadius: 10,
-      background: `color-mix(in srgb, ${c.secondary} 15%, transparent)`,
-      borderTop: "1px solid rgba(255,255,255,0.2)",
-      boxShadow: "0 4px 8px rgba(0,0,0,0.07), inset 0 -1px 0 rgba(0,0,0,0.2)",
-      display: "flex", alignItems: "center", justifyContent: "center",
-    }}>
-      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" style={{ color: c.secondary }}>
-        <path d="M4 3h8a2 2 0 0 1 2 2v12H6a2 2 0 0 1-2-2V3z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
-        <path d="M4 15a2 2 0 0 1 2-2h8" stroke="currentColor" strokeWidth="1.5"/>
-        <path d="M7 7h4M7 10h3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
       </svg>
     </div>
   );
@@ -219,8 +201,8 @@ export default function WelcomeScreen() {
   const redeemSub = !canRedeem
     ? "No PT positions"
     : maturedPtSol > 0
-      ? `${formatSolAmount(maturedPtSol)} PT ready to redeem`
-      : `${formatSolAmount(totalPtSol)} PT locked`;
+      ? `${formatSolAmount(maturedPtSol)} SOL ready to redeem`
+      : `${formatSolAmount(totalPtSol)} SOL locked`;
 
   const sellSub = canSell
     ? `${formatSolAmount(activeStakeSol, 2)} SOL across active stake`
@@ -228,24 +210,11 @@ export default function WelcomeScreen() {
 
   return (
     <Body style={{ borderRadius: "10px 10px 0 0" }}>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        <p style={{ ...displayFont(32, c.primary), letterSpacing: "-0.02em", lineHeight: 1.5 }}>
-          Welcome back
-        </p>
-        <p style={font(15, c.secondary)}>
-          {isInitialLoading
-            ? "Loading your positions…"
-            : canRedeem && canSell
-              ? "We found active staked SOL positions and PTs ready to redeem. What would you like to do?"
-              : canRedeem
-                ? "We found PTs ready to redeem. What would you like to do?"
-                : canSell
-                  ? "We found active staked SOL positions. Sell your future rewards upfront."
-                  : `Stake SOL with ${validatorName ?? "your validator"} to get started.`}
-        </p>
-      </div>
-
-      <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 8 }}>
+      <StepTitle
+        title="Manage your rewards"
+        subtitle="Your stake and positions at a glance. Sell future rewards or redeem SOL that has matured."
+      />
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {isInitialLoading ? (
           <>
             <SkeletonRow />
@@ -262,17 +231,11 @@ export default function WelcomeScreen() {
             />
             <ChoiceRow
               icon={<IconRedeem />}
-              label="Redeem PTs"
+              label="Redeem"
               sub={redeemSub}
               subColor={maturedPtSol > 0 ? c.green : undefined}
               disabled={!canRedeem}
               onClick={() => navigate("redeem-list")}
-            />
-            <ChoiceRow
-              icon={<IconDocs />}
-              label="Learn more"
-              sub="Read the docs"
-              onClick={() => window.open("https://docs.pye.fi/", "_blank", "noopener,noreferrer")}
             />
           </>
         )}

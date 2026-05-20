@@ -1,119 +1,74 @@
-import { useMemo } from "react";
 import { useWidgetStore } from "../../stores/widget-store";
-import { useWalletStore, useMarketStore, useApyStore } from "@pyefi/sdk/react";
-import { maturities, getPyeConfig } from "@pyefi/sdk";
-import { c, font, displayFont, formatSolAmount } from "../design-system";
-import { Spacer, CTA } from "../shared/Layout";
+import { useWalletStore } from "@pyefi/sdk/react";
+import { c, font, displayFont } from "../design-system";
+import { CTA } from "../shared/Layout";
 
-const FALLBACK_APY = 0.07;
-const EXAMPLE_SOL = 100;
+function BenefitRow({ icon, title, body }: { icon: React.ReactNode; title: string; body: string }) {
+  return (
+    <div style={{
+      display: "flex",
+      alignItems: "center",
+      gap: 12,
+      padding: "10px 4px",
+    }}>
+      <div style={{
+        flexShrink: 0,
+        width: 40,
+        height: 40,
+        borderRadius: 8,
+        background: c.raised,
+        borderTop: `1px solid ${c.highlight}`,
+        boxShadow: `inset 0 -1px 0 ${c.shadow}`,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        color: c.primary,
+      }}>{icon}</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
+        <p style={font(13, c.primary, 600)}>{title}</p>
+        <p style={font(12, c.secondary)}>{body}</p>
+      </div>
+    </div>
+  );
+}
+
+const BoltIcon = (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+);
+const ShieldIcon = (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+);
+const ClockIcon = (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+);
 
 export default function YieldForwardIntro() {
   const navigate = useWidgetStore((s) => s.navigate);
   const walletStatus = useWalletStore((s) => s.status);
   const isConnected = walletStatus === "connected";
-  const markets = useMarketStore((s) => s.markets);
-  const apyByVoteAccount = useApyStore((s) => s.apyByVoteAccount);
-
-  // Use configured vote account APY, or average all fetched APYs, or fallback
-  const apy = useMemo(() => {
-    const config = getPyeConfig();
-    if (config.voteAccount && apyByVoteAccount[config.voteAccount] != null) {
-      return apyByVoteAccount[config.voteAccount];
-    }
-    const values = Object.values(apyByVoteAccount);
-    if (values.length > 0) {
-      return values.reduce((a, b) => a + b, 0) / values.length;
-    }
-    return FALLBACK_APY;
-  }, [apyByVoteAccount]);
-
-  // Find the ~6 month maturity (Q3) RT best bid for the example
-  const { sellToday, holdToUnlock, maturityLabel } = useMemo(() => {
-    // Look for any Q3 RT market — try all keys since validatorId varies
-    let bestBid: number | null = null;
-    for (const [key, market] of Object.entries(markets)) {
-      if (key.endsWith("-q32026-RT") && market.bestBidPrice != null) {
-        bestBid = market.bestBidPrice;
-        break;
-      }
-    }
-
-    // "Hold to unlock" = estimated staking yield for the period using real APY
-    const matTs = Number(maturities.q32026.maturity_timestamp);
-    const nowS = Date.now() / 1000;
-    const yearsToMaturity = Math.max(0, (matTs - nowS) / (365 * 24 * 60 * 60));
-    const hold = apy * yearsToMaturity * EXAMPLE_SOL;
-
-    // "Sell today" = RT price × example deposit
-    // Fallback: assume ~96% of hold value (4% discount) if no market data
-    const sell = bestBid != null
-      ? bestBid * EXAMPLE_SOL
-      : hold * 0.96;
-
-    return {
-      sellToday: sell,
-      holdToUnlock: hold,
-      maturityLabel: maturities.q32026.human_readable,
-    };
-  }, [markets, apy]);
-
-  const diff = holdToUnlock > 0 ? holdToUnlock - sellToday : null;
 
   return (
     <>
-      <p style={{ ...displayFont(45, c.primary), letterSpacing: "-0.02em" }}>
+      <p style={{ ...displayFont(32, c.primary, 600), letterSpacing: "-0.02em", lineHeight: 1.3 }}>
         Get your future staking rewards today.
       </p>
 
-      <Spacer />
+      <p style={font(15, c.secondary)}>
+        The simplest way to access your staking rewards early.
+      </p>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <p style={font(12, c.primary)}>Example: Stake {EXAMPLE_SOL} SOL for 6 months</p>
+      <div style={{ display: "flex", flexDirection: "column" }}>
+        <BenefitRow icon={BoltIcon} title="Instant Liquidity" body="Get SOL today for future rewards" />
+        <BenefitRow icon={ShieldIcon} title="Non-Custodial" body="Your stake stays with your validator" />
+        <BenefitRow icon={ClockIcon} title="Flexible Terms" body="Get rewards up to 9 months in advance" />
+      </div>
 
-          {/* Comparison cards */}
-          <div style={{ display: "flex", gap: 8 }}>
-            {/* Left -- sell today */}
-            <div style={{
-              flex: 1, borderRadius: 6, padding: 12,
-              background: c.raised,
-              borderTop: `1px solid ${c.highlight}`,
-              boxShadow: `0 4px 8px rgba(0,0,0,0.07), inset 0 -1px 0 ${c.shadow}`,
-            }}>
-              <p style={font(12, c.secondary)}>Sell rewards today</p>
-              <p style={{ ...displayFont(24, c.green), fontVariantNumeric: "lining-nums tabular-nums", lineHeight: 1.2, margin: "4px 0 2px" }}>
-                +{formatSolAmount(sellToday)} SOL
-              </p>
-              <p style={font(12, c.secondary)}>Yours now</p>
-            </div>
-            {/* Right -- hold to unlock */}
-            <div style={{
-              flex: 1, borderRadius: 6, padding: 12,
-              background: c.lowered,
-              borderTop: `1px solid ${c.shadow}`,
-              boxShadow: `inset 0 -1px 0 ${c.highlight}`,
-            }}>
-              <p style={font(12, c.secondary)}>Hold to unlock</p>
-              <p style={{ ...displayFont(24, c.primary), fontVariantNumeric: "lining-nums tabular-nums", lineHeight: 1.2, margin: "4px 0 2px" }}>
-                +{formatSolAmount(holdToUnlock)}
-              </p>
-              <p style={font(12, c.secondary)}>Available {maturityLabel}</p>
-            </div>
-          </div>
-        </div>
-
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
-          <CTA
-            label={isConnected ? "Continue" : "Connect Wallet"}
-            onClick={() => navigate(isConnected ? "select-position" : "connect-wallet")}
-            purple
-          />
-          <a href="https://docs.pye.fi/" target="_blank" rel="noopener noreferrer"
-            style={{ ...font(12, c.secondary), textDecoration: "none" }}>
-            Learn more — read the docs
-          </a>
-        </div>
+      <div style={{ marginTop: "auto" }}>
+        <CTA
+          label="Get Started"
+          onClick={() => navigate(isConnected ? "select-position" : "connect-wallet")}
+          purple
+        />
       </div>
     </>
   );
