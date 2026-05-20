@@ -50,7 +50,7 @@ export default function YieldForwardIntro() {
   return (
     <>
       <p style={{ ...displayFont(32, c.primary, 600), letterSpacing: "-0.02em", lineHeight: 1.3 }}>
-        Sell your future staking rewards. Get SOL now.
+        Get your future staking rewards today.
       </p>
 
       <p style={font(15, c.secondary)}>
@@ -60,7 +60,7 @@ export default function YieldForwardIntro() {
       <div style={{ display: "flex", flexDirection: "column" }}>
         <BenefitRow icon={BoltIcon} title="Instant Liquidity" body="Get SOL today for future rewards" />
         <BenefitRow icon={ShieldIcon} title="Non-Custodial" body="Your stake stays with your validator" />
-        <BenefitRow icon={ClockIcon} title="Flexible Terms" body="Choose your payout duration" />
+        <BenefitRow icon={ClockIcon} title="Flexible Terms" body="Get rewards up to 9 months in advance" />
       </div>
 
       <div style={{ marginTop: "auto" }}>
