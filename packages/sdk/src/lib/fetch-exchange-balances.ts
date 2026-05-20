@@ -1,9 +1,6 @@
 import { Connection, PublicKey } from "@solana/web3.js";
 import { Market } from "@cks-systems/manifest-sdk";
 import type { MatchedMarket } from "./market-service";
-import { allowedLockups } from "../constants/lockups";
-import type { ValidatorId } from "../constants/validators";
-import type { MaturityId } from "../constants/maturities";
 import type { OpenOrder } from "../stores/balance-store";
 
 export interface ExchangeBalancesResult {
@@ -30,17 +27,6 @@ export async function fetchExchangeBalances(
 
   if (markets.length === 0) return { exchangeBalances, openOrdersBalances, solBalances, solOpenOrdersBalances, openOrders, perMarketBaseBalances };
 
-  const lockups = allowedLockups();
-  function getMintAddress(
-    validatorId: ValidatorId,
-    maturityId: MaturityId,
-    tokenType: "PT" | "RT",
-  ): string | null {
-    const bond = lockups[validatorId]?.[maturityId];
-    if (!bond) return null;
-    return tokenType === "PT" ? bond.pt_address : bond.rt_address;
-  }
-
   const marketPubkeys = markets.map((m) => new PublicKey(m.marketPubkey));
   const accountInfos = await connection.getMultipleAccountsInfo(marketPubkeys);
 
@@ -51,7 +37,7 @@ export async function fetchExchangeBalances(
     const info = accountInfos[i];
     if (!info) continue;
 
-    const storeKey = `${entry.validatorId}-${entry.maturityId}-${entry.tokenType}`;
+    const storeKey = `${entry.voteAccount}-${entry.canonicalLabel}-${entry.tokenType}`;
 
     try {
       const market = Market.loadFromBuffer({
@@ -64,15 +50,9 @@ export async function fetchExchangeBalances(
       const baseWithdrawable = traderBalances.baseWithdrawableBalanceTokens;
       const baseOpenOrders = traderBalances.baseOpenOrdersBalanceTokens;
 
-      const mint = getMintAddress(
-        entry.validatorId,
-        entry.maturityId,
-        entry.tokenType,
-      );
-      if (mint) {
-        exchangeBalances[mint] = (exchangeBalances[mint] ?? 0) + baseWithdrawable;
-        openOrdersBalances[mint] = (openOrdersBalances[mint] ?? 0) + baseOpenOrders;
-      }
+      const mint = entry.mint;
+      exchangeBalances[mint] = (exchangeBalances[mint] ?? 0) + baseWithdrawable;
+      openOrdersBalances[mint] = (openOrdersBalances[mint] ?? 0) + baseOpenOrders;
       perMarketBaseBalances[entry.marketPubkey] = baseWithdrawable;
 
       const quoteWithdrawable = traderBalances.quoteWithdrawableBalanceTokens;

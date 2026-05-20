@@ -1,10 +1,15 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useWidgetStore } from "../../stores/widget-store";
-import { useBalanceStore, useWalletStore } from "@pyefi/sdk/react";
-import { buildPtLookup, maturities } from "@pyefi/sdk";
-import { Body, Spacer, SkeletonRow } from "../shared/Layout";
-import { c, font, displayFont, formatSolAmount } from "../design-system";
+import {
+  useBalanceStore,
+  useWalletStore,
+  useLockupStore,
+  useValidatorStore,
+} from "@pyefi/sdk/react";
+import { getPyeConfig, validatorAvailability } from "@pyefi/sdk";
+import { Body, Spacer, SkeletonRow, StepTitle } from "../shared/Layout";
+import { c, font, formatSolAmount } from "../design-system";
 
 const LAMPORTS_PER_SOL = 1_000_000_000;
 
@@ -40,7 +45,7 @@ function ChoiceRow({
     >
       {icon}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
-        <p style={font(15, c.primary, 600)}>{label}</p>
+        <p style={font(15, c.primary)}>{label}</p>
         <p style={font(14, subColor ?? c.secondary)}>{sub}</p>
       </div>
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
@@ -96,24 +101,6 @@ function IconRedeem() {
   );
 }
 
-function IconDocs() {
-  return (
-    <div style={{
-      flexShrink: 0, width: 44, height: 44, borderRadius: 10,
-      background: `color-mix(in srgb, ${c.secondary} 15%, transparent)`,
-      borderTop: "1px solid rgba(255,255,255,0.2)",
-      boxShadow: "0 4px 8px rgba(0,0,0,0.07), inset 0 -1px 0 rgba(0,0,0,0.2)",
-      display: "flex", alignItems: "center", justifyContent: "center",
-    }}>
-      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" style={{ color: c.secondary }}>
-        <path d="M4 3h8a2 2 0 0 1 2 2v12H6a2 2 0 0 1-2-2V3z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
-        <path d="M4 15a2 2 0 0 1 2-2h8" stroke="currentColor" strokeWidth="1.5"/>
-        <path d="M7 7h4M7 10h3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-      </svg>
-    </div>
-  );
-}
-
 function IconSell() {
   return (
     <div style={{
@@ -132,45 +119,75 @@ function IconSell() {
   );
 }
 
-interface WelcomeScreenProps {
-  validatorName?: string;
-}
-
-export default function WelcomeScreen({ validatorName }: WelcomeScreenProps) {
+export default function WelcomeScreen() {
   const navigate = useWidgetStore((s) => s.navigate);
   const walletBalances = useBalanceStore((s) => s.walletBalances);
   const userStakeAccounts = useBalanceStore((s) => s.userStakeAccounts);
   const userStakeAccountsLoading = useBalanceStore((s) => s.userStakeAccountsLoading);
   const walletPublicKey = useWalletStore((s) => s.publicKey);
+  const bonds = useLockupStore((s) => s.bonds);
+  const validators = useValidatorStore((s) => s.validators);
   const { disconnect } = useWallet();
 
-  const ptLookup = buildPtLookup();
+  // Look up the configured validator's display name (single-validator widgets only).
+  const configuredVoteAccount = (() => {
+    try { return getPyeConfig().voteAccount; } catch { return undefined; }
+  })();
+  const validatorName = configuredVoteAccount
+    ? validators[configuredVoteAccount]?.name
+    : undefined;
 
   // Sum of all ptSOL positions (matured + unmatured) and matured-only subtotal
   const { totalPtSol, maturedPtSol } = useMemo(() => {
+    const ptMintToBond = new Map<string, (typeof bonds)[string]>();
+    for (const bond of Object.values(bonds)) {
+      ptMintToBond.set(bond.pt_mint, bond);
+    }
     const now = Date.now() / 1000;
     let total = 0;
     let matured = 0;
     for (const [mint, amount] of Object.entries(walletBalances)) {
       if (amount <= 0) continue;
-      const entry = ptLookup.get(mint);
-      if (!entry) continue;
+      const bond = ptMintToBond.get(mint);
+      if (!bond) continue;
       const sol = amount / LAMPORTS_PER_SOL;
       total += sol;
-      const matTs = Number(maturities[entry.maturityId].maturity_timestamp);
-      if (now >= matTs) matured += sol;
+      if (now >= bond.maturity_ts) matured += sol;
     }
     return { totalPtSol: total, maturedPtSol: matured };
-  }, [walletBalances, ptLookup]);
+  }, [walletBalances, bonds]);
 
-  // Sum SOL across active stake accounts
+  // Sum SOL across active stake accounts on widget-allowed validators only —
+  // matches the filter applied in SelectPosition so the headline number can't
+  // exceed what the user is actually able to sell.
   const activeStakeSol = useMemo(() => {
     let lamports = 0;
     for (const acc of userStakeAccounts) {
-      if (acc.state === "active") lamports += acc.lamports;
+      if (acc.state !== "active") continue;
+      if (!acc.validatorVoteAccount) continue;
+      if (validators[acc.validatorVoteAccount]?.widget !== true) continue;
+      lamports += acc.lamports;
     }
     return lamports / LAMPORTS_PER_SOL;
-  }, [userStakeAccounts]);
+  }, [userStakeAccounts, validators]);
+
+  // Telemetry: log each active stake whose validator isn't sellable so the
+  // Pye team can spot misconfigured / pending validators showing demand.
+  const loggedRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (Object.keys(validators).length === 0) return; // wait until validators load
+    for (const acc of userStakeAccounts) {
+      if (acc.state !== "active" || !acc.validatorVoteAccount) continue;
+      const status = validatorAvailability(acc.validatorVoteAccount, validators);
+      if (status.ok) continue;
+      const key = `${status.code}:${acc.validatorVoteAccount}`;
+      if (loggedRef.current.has(key)) continue;
+      loggedRef.current.add(key);
+      console.warn(
+        `[Pye] ${status.code}: stake ${acc.pubkey} on validator ${acc.validatorVoteAccount} — ${status.reason}`,
+      );
+    }
+  }, [userStakeAccounts, validators]);
 
   const canRedeem = totalPtSol > 0;
   const canSell = activeStakeSol > 0;
@@ -184,8 +201,8 @@ export default function WelcomeScreen({ validatorName }: WelcomeScreenProps) {
   const redeemSub = !canRedeem
     ? "No PT positions"
     : maturedPtSol > 0
-      ? `${formatSolAmount(maturedPtSol)} PT ready to redeem`
-      : `${formatSolAmount(totalPtSol)} PT locked`;
+      ? `${formatSolAmount(maturedPtSol)} SOL ready to redeem`
+      : `${formatSolAmount(totalPtSol)} SOL locked`;
 
   const sellSub = canSell
     ? `${formatSolAmount(activeStakeSol, 2)} SOL across active stake`
@@ -193,24 +210,11 @@ export default function WelcomeScreen({ validatorName }: WelcomeScreenProps) {
 
   return (
     <Body style={{ borderRadius: "10px 10px 0 0" }}>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        <p style={{ ...displayFont(32, c.primary), letterSpacing: "-0.02em", lineHeight: 1.5 }}>
-          Welcome back
-        </p>
-        <p style={font(15, c.secondary)}>
-          {isInitialLoading
-            ? "Loading your positions…"
-            : canRedeem && canSell
-              ? "We found active staked SOL positions and PTs ready to redeem. What would you like to do?"
-              : canRedeem
-                ? "We found PTs ready to redeem. What would you like to do?"
-                : canSell
-                  ? "We found active staked SOL positions. Sell your future rewards upfront."
-                  : `Stake SOL with ${validatorName ?? "your validator"} to get started.`}
-        </p>
-      </div>
-
-      <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 8 }}>
+      <StepTitle
+        title="Manage your rewards"
+        subtitle="Your stake and positions at a glance. Sell future rewards or redeem SOL that has matured."
+      />
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {isInitialLoading ? (
           <>
             <SkeletonRow />
@@ -227,17 +231,11 @@ export default function WelcomeScreen({ validatorName }: WelcomeScreenProps) {
             />
             <ChoiceRow
               icon={<IconRedeem />}
-              label="Redeem PTs"
+              label="Redeem"
               sub={redeemSub}
               subColor={maturedPtSol > 0 ? c.green : undefined}
               disabled={!canRedeem}
               onClick={() => navigate("redeem-list")}
-            />
-            <ChoiceRow
-              icon={<IconDocs />}
-              label="Learn more"
-              sub="Read the docs"
-              onClick={() => window.open("https://docs.pye.fi/", "_blank", "noopener,noreferrer")}
             />
           </>
         )}

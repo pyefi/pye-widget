@@ -56,7 +56,7 @@ export interface WidgetActions {
   goBack(): void;
   selectStakeAccount(pubkey: string, balance: number, validatorName?: string, validatorIcon?: string, validatorVoteAccount?: string, validatorAltPubkey?: string | null): void;
   setDepositAmount(amount: string): void;
-  setSelectedMaturity(id: MaturityId): void;
+  setSelectedMaturity(id: MaturityId | null): void;
   setAdvancedOpen(open: boolean): void;
   setSlippageBps(bps: number): void;
   setSellAmountSol(amount: number): void;
