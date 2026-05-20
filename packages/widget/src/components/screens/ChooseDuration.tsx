@@ -5,14 +5,13 @@ import {
   maturities,
   type MaturityId,
   lookupBondByVoteAccount,
-  PYE_TRADING_FEE_BPS,
   applyTradingFee,
   estimateRtFromStake,
   fetchEpochSyncedNowTs,
 } from "@pyefi/sdk";
 import { useMarketStore } from "@pyefi/sdk/react";
 import { c, font, displayFont, MARKET_RATE, formatSolAmount, POINTS_ENABLED } from "../design-system";
-import { CTA, Tooltip, Spacer } from "../shared/Layout";
+import { CTA, Tooltip } from "../shared/Layout";
 import { Odometer } from "../shared/Odometer";
 
 /** Map SDK maturity IDs to Dan's display format */
@@ -121,8 +120,6 @@ export default function ChooseDuration() {
     return { matId, ...info, bestBid, grossYield, netYield, daysToMaturity };
   });
 
-  const feePct = (PYE_TRADING_FEE_BPS / 100).toFixed(2);
-
   const sel = quarters.find((q) => q.matId === selectedMaturityId);
 
   return (
@@ -226,15 +223,11 @@ export default function ChooseDuration() {
                 />
               )}
             </div>
-            <p style={font(12, c.muted)}>
-              Quote includes a {feePct}% Pye protocol fee.
-            </p>
           </div>
         )}
 
       </div>
 
-      <Spacer />
       <CTA
         label="Review"
         onClick={() => navigate("review-quote")}

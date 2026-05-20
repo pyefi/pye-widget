@@ -3,8 +3,8 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { useWidgetStore } from "../../stores/widget-store";
 import { useBalanceStore, useWalletStore } from "@pyefi/sdk/react";
 import { buildPtLookup, maturities } from "@pyefi/sdk";
-import { Body, Spacer, SkeletonRow } from "../shared/Layout";
-import { c, font, displayFont, formatSolAmount } from "../design-system";
+import { Body, Spacer, SkeletonRow, StepTitle } from "../shared/Layout";
+import { c, font, formatSolAmount } from "../design-system";
 
 const LAMPORTS_PER_SOL = 1_000_000_000;
 
@@ -40,7 +40,7 @@ function ChoiceRow({
     >
       {icon}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
-        <p style={font(15, c.primary, 600)}>{label}</p>
+        <p style={font(15, c.primary)}>{label}</p>
         <p style={font(14, subColor ?? c.secondary)}>{sub}</p>
       </div>
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
@@ -118,7 +118,7 @@ interface WelcomeScreenProps {
   validatorName?: string;
 }
 
-export default function WelcomeScreen({ validatorName }: WelcomeScreenProps) {
+export default function WelcomeScreen(_props: WelcomeScreenProps) {
   const navigate = useWidgetStore((s) => s.navigate);
   const walletBalances = useBalanceStore((s) => s.walletBalances);
   const userStakeAccounts = useBalanceStore((s) => s.userStakeAccounts);
@@ -175,13 +175,11 @@ export default function WelcomeScreen({ validatorName }: WelcomeScreenProps) {
 
   return (
     <Body style={{ borderRadius: "10px 10px 0 0" }}>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        <p style={{ ...displayFont(32, c.primary), letterSpacing: "-0.02em", lineHeight: 1.5 }}>
-          Welcome back
-        </p>
-      </div>
-
-      <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 8 }}>
+      <StepTitle
+        title="Manage your rewards"
+        subtitle="Your stake and positions at a glance. Sell future rewards or redeem matured ones."
+      />
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {isInitialLoading ? (
           <>
             <SkeletonRow />
