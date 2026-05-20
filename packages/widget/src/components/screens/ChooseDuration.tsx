@@ -1,18 +1,38 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useConnection } from "@solana/wallet-adapter-react";
 import { useWidgetStore } from "../../stores/widget-store";
 import {
   maturities,
   type MaturityId,
-  lookupBondByVoteAccount,
+  type SellYieldCode,
+  type SellYieldStatus,
+  SELL_YIELD_CODES,
   applyTradingFee,
+  canSellYield,
+  checkSellLiquidity,
   estimateRtFromStake,
   fetchEpochSyncedNowTs,
 } from "@pyefi/sdk";
-import { useMarketStore } from "@pyefi/sdk/react";
-import { c, font, displayFont, MARKET_RATE, formatSolAmount, POINTS_ENABLED } from "../design-system";
+import {
+  useMarketStore,
+  useValidatorStore,
+  useLockupStore,
+} from "@pyefi/sdk/react";
+import { c, font, displayFont, formatSolAmount, POINTS_ENABLED } from "../design-system";
 import { CTA, Tooltip } from "../shared/Layout";
 import { Odometer } from "../shared/Odometer";
+
+/** Short user-facing headlines per gate failure code. Reason text from
+ *  canSellYield is shown beneath this as the detail line. */
+const GATE_HEADLINE: Record<SellYieldCode, string> = {
+  [SELL_YIELD_CODES.VALIDATOR_NOT_CONFIGURED]: "Validator not supported",
+  [SELL_YIELD_CODES.VALIDATOR_WIDGET_DISABLED]: "Validator not enabled",
+  [SELL_YIELD_CODES.VALIDATOR_ALT_MISSING]: "Setup pending",
+  [SELL_YIELD_CODES.BOND_MISSING]: "Not available",
+  [SELL_YIELD_CODES.BOND_NOT_STANDARD]: "Setup pending",
+  [SELL_YIELD_CODES.MARKET_MISSING]: "Market not open",
+  [SELL_YIELD_CODES.LIQUIDITY_INSUFFICIENT]: "Insufficient liquidity",
+};
 
 /** Map SDK maturity IDs to Dan's display format */
 const QUARTER_INFO: Record<MaturityId, { label: string; pts: string | null }> =
@@ -45,6 +65,8 @@ export default function ChooseDuration() {
   const depositAmount = useWidgetStore((s) => s.depositAmount);
   const selectedValidatorVoteAccount = useWidgetStore((s) => s.selectedValidatorVoteAccount);
   const markets = useMarketStore((s) => s.markets);
+  const validators = useValidatorStore((s) => s.validators);
+  const bonds = useLockupStore((s) => s.bonds);
 
   // Epoch-synced wall-clock seconds — matches the on-chain "now" used by the
   // Bonds program when computing RT issuance, so our preview number stays in
@@ -56,21 +78,25 @@ export default function ChooseDuration() {
     });
   }, [connection]);
 
-  const availableMaturities = useMemo(() => getAvailableMaturities(), []);
+  // Only show maturities that have a canonical RT market for the selected
+  // validator. Without a market we have no real price to quote against, so
+  // hiding the row is more honest than showing a fabricated fallback rate.
+  const availableMaturities = useMemo(() => {
+    const timeFiltered = getAvailableMaturities();
+    if (!selectedValidatorVoteAccount) return [];
+    return timeFiltered.filter((matId) =>
+      Boolean(markets[`${selectedValidatorVoteAccount}-${matId}-RT`]),
+    );
+  }, [selectedValidatorVoteAccount, markets]);
 
-  // Resolve the validator ID for validator-specific market lookup
-  const stakeValidatorId = useMemo(() => {
-    if (!selectedValidatorVoteAccount) return null;
-    for (const matId of availableMaturities) {
-      const lookup = lookupBondByVoteAccount(selectedValidatorVoteAccount, matId);
-      if (lookup) return lookup.validatorId;
-    }
-    return null;
-  }, [selectedValidatorVoteAccount, availableMaturities]);
-
-  // Default to first available duration if none selected
+  // Default to first available duration if none selected, or clear if the
+  // current selection is no longer available (e.g. markets refreshed).
   useEffect(() => {
-    if (!selectedMaturityId && availableMaturities.length > 0) {
+    if (availableMaturities.length === 0) {
+      if (selectedMaturityId) setSelectedMaturity(null);
+      return;
+    }
+    if (!selectedMaturityId || !availableMaturities.includes(selectedMaturityId)) {
       setSelectedMaturity(availableMaturities[0]);
     }
   }, [selectedMaturityId, setSelectedMaturity, availableMaturities]);
@@ -80,45 +106,71 @@ export default function ChooseDuration() {
   // first render before the RPC call resolves.
   const effectiveNowTs = nowTs ?? Date.now() / 1000;
 
-  // Build display quarters from available maturities
+  // Build display quarters from available maturities. canSellYield is the
+  // single source of truth for gating — it covers alt_pubkey, standard, and
+  // liquidity. We re-compute the price from the same liquidity check when
+  // the status is ok, so the displayed yield matches the gate decision.
   const quarters = availableMaturities.map((matId) => {
     const info = QUARTER_INFO[matId] ?? {
       label: maturities[matId]?.human_readable ?? matId,
       pts: null,
     };
 
-    // Look up RT market data — bids represent what buyers will pay per RT
-    // Use validator-specific key when available; fall back to generic lookup
-    const rtMarketKey = stakeValidatorId
-      ? `${stakeValidatorId}-${matId}-RT`
-      : Object.keys(markets).find((k) => k.endsWith(`-${matId}-RT`));
-    const rtMarket = rtMarketKey ? markets[rtMarketKey] ?? null : null;
-    const bestBid = rtMarket?.bestBidPrice ?? null;
-
-    // Bonds program mints RT proportional to remaining issuance window, so
-    // we scale the deposit by time remaining to get the RT the user will
-    // actually receive. Using `parsedAmount` here would overstate the quote.
     const maturity = maturities[matId];
-    const estimatedRt = estimateRtFromStake({
-      amountSol: parsedAmount,
-      maturity,
-      nowTs: effectiveNowTs,
-    });
+    const status: SellYieldStatus = selectedValidatorVoteAccount
+      ? canSellYield({
+          validatorVoteAccount: selectedValidatorVoteAccount,
+          maturityId: matId,
+          amountSol: parsedAmount,
+          nowTs: effectiveNowTs,
+          validators,
+          bonds,
+          markets,
+        })
+      : {
+          ok: false,
+          code: SELL_YIELD_CODES.VALIDATOR_NOT_CONFIGURED,
+          reason: "No validator selected.",
+        };
 
-    // Gross yield: estimated RT × best bid price (SOL per RT)
-    // Fallback: MARKET_RATE is annual (0.85%), scaled by time remaining so Q2–Q4 differ
-    const maturityTs = Number(maturity.maturity_timestamp);
-    const yearsRemaining = Math.max(0, (maturityTs - effectiveNowTs) / (365.25 * 86400));
-    const grossYield =
-      bestBid != null
-        ? bestBid * estimatedRt
-        : parsedAmount * (MARKET_RATE / 100) * yearsRemaining;
-    // User-facing yield is net of Pye's taker fee
+    let grossYield = 0;
+    if (status.ok) {
+      const rtMarket = markets[`${selectedValidatorVoteAccount}-${matId}-RT`];
+      const estimatedRt = estimateRtFromStake({
+        amountSol: parsedAmount,
+        maturity,
+        nowTs: effectiveNowTs,
+      });
+      const liq = rtMarket?.bids?.length
+        ? checkSellLiquidity(rtMarket.bids, estimatedRt)
+        : null;
+      grossYield = (liq?.expectedFillPrice ?? 0) * estimatedRt;
+    }
     const netYield = applyTradingFee(grossYield);
-    const daysToMaturity = Math.max(0, Math.ceil((maturityTs - effectiveNowTs) / 86400));
+    const daysToMaturity = Math.max(
+      0,
+      Math.ceil((Number(maturity.maturity_timestamp) - effectiveNowTs) / 86400),
+    );
 
-    return { matId, ...info, bestBid, grossYield, netYield, daysToMaturity };
+    return { matId, ...info, status, grossYield, netYield, daysToMaturity };
   });
+
+  // Telemetry: log each (validator, maturity, code) gate failure once per
+  // session — useful for support and for spotting validators that have demand
+  // but aren't yet fully set up.
+  const loggedRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!selectedValidatorVoteAccount) return;
+    for (const q of quarters) {
+      if (q.status.ok) continue;
+      const key = `${q.status.code}:${selectedValidatorVoteAccount}:${q.matId}`;
+      if (loggedRef.current.has(key)) continue;
+      loggedRef.current.add(key);
+      console.warn(
+        `[Pye] ${q.status.code}: validator ${selectedValidatorVoteAccount}, maturity ${q.matId} — ${q.status.reason}`,
+      );
+    }
+  }, [quarters, selectedValidatorVoteAccount]);
 
   const sel = quarters.find((q) => q.matId === selectedMaturityId);
 
@@ -136,10 +188,33 @@ export default function ChooseDuration() {
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        {quarters.length === 0 && (
+          <div
+            style={{
+              background: c.lowered,
+              borderRadius: 8,
+              padding: 12,
+              borderTop: `1px solid ${c.shadow}`,
+              boxShadow: `inset 0 -1px 0 ${c.highlight}`,
+            }}
+          >
+            <p style={font(14, c.primary, 500)}>No durations available</p>
+            <p style={font(13, c.secondary)}>
+              There aren't any active markets for this validator yet. Check
+              back soon.
+            </p>
+          </div>
+        )}
+
         {/* Duration rows — full width, one per row */}
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {quarters.map((q) => {
             const isSelected = selectedMaturityId === q.matId;
+            const gateCode = q.status.ok ? null : q.status.code;
+            const isGated = gateCode !== null;
+            const labelColor = isGated
+              ? c.muted
+              : isSelected ? c.primary : c.secondary;
             return (
               <div
                 key={q.matId}
@@ -160,31 +235,46 @@ export default function ChooseDuration() {
                     ? `inset 0 -1px 0 ${c.highlight}`
                     : `inset 0 -1px 0 ${c.shadow}`,
                   transition: "background 0.1s",
+                  opacity: isGated ? 0.7 : 1,
                 }}
               >
                 <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                  <span style={font(15, isSelected ? c.primary : c.secondary, isSelected ? 500 : 400)}>
+                  <span style={font(15, labelColor, isSelected ? 500 : 400)}>
                     {q.label}
                   </span>
                   <span style={font(12, c.muted)}>
                     {q.daysToMaturity} {q.daysToMaturity === 1 ? "day" : "days"}
                   </span>
                 </div>
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
+                {gateCode ? (
                   <span
                     style={{
-                      ...font(15, c.green, 500),
-                      fontVariantNumeric: "lining-nums tabular-nums",
+                      ...font(12, c.muted),
+                      padding: "2px 8px",
+                      borderRadius: 4,
+                      background: c.lowered,
+                      flexShrink: 0,
                     }}
                   >
-                    {q.netYield < 0.0001
-                      ? "< 0.0001 SOL"
-                      : `+${formatSolAmount(q.netYield, 3)} SOL`}
+                    {GATE_HEADLINE[gateCode] ?? "Not available"}
                   </span>
-                  {POINTS_ENABLED && q.pts && (
-                    <span style={font(12, c.purple)}>{q.pts}</span>
-                  )}
-                </div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
+                    <span
+                      style={{
+                        ...font(15, c.green, 500),
+                        fontVariantNumeric: "lining-nums tabular-nums",
+                      }}
+                    >
+                      {q.netYield < 0.0001
+                        ? "< 0.0001 SOL"
+                        : `+${formatSolAmount(q.netYield, 3)} SOL`}
+                    </span>
+                    {POINTS_ENABLED && q.pts && (
+                      <span style={font(12, c.purple)}>{q.pts}</span>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })}
@@ -205,24 +295,36 @@ export default function ChooseDuration() {
             }}
           >
             <p style={font(14, c.secondary)}>You receive today</p>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-              {sel.netYield < 0.0001 ? (
-                <p
-                  style={{
-                    ...displayFont(32, c.green),
-                    lineHeight: 1.2,
-                    fontVariantNumeric: "lining-nums tabular-nums",
-                  }}
-                >
-                  &lt; 0.0001 SOL
+            {sel.status.ok ? (
+              <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                {sel.netYield < 0.0001 ? (
+                  <p
+                    style={{
+                      ...displayFont(32, c.green),
+                      lineHeight: 1.2,
+                      fontVariantNumeric: "lining-nums tabular-nums",
+                    }}
+                  >
+                    &lt; 0.0001 SOL
+                  </p>
+                ) : (
+                  <Odometer
+                    value={`+${formatSolAmount(sel.netYield, 3)} SOL`}
+                    style={{ ...displayFont(32, c.green), lineHeight: 1.2 }}
+                  />
+                )}
+              </div>
+            ) : (
+              <>
+                <p style={{ ...displayFont(22, c.muted), lineHeight: 1.2 }}>
+                  {GATE_HEADLINE[sel.status.code] ?? "Not available"}
                 </p>
-              ) : (
-                <Odometer
-                  value={`+${formatSolAmount(sel.netYield, 3)} SOL`}
-                  style={{ ...displayFont(32, c.green), lineHeight: 1.2 }}
-                />
-              )}
-            </div>
+                <p style={font(12, c.muted)}>{sel.status.reason}</p>
+                <p style={{ ...font(10, c.muted), letterSpacing: "0.02em", marginTop: 4 }}>
+                  {sel.status.code}
+                </p>
+              </>
+            )}
           </div>
         )}
 
@@ -231,7 +333,7 @@ export default function ChooseDuration() {
       <CTA
         label="Review"
         onClick={() => navigate("review-quote")}
-        disabled={!selectedMaturityId}
+        disabled={!selectedMaturityId || !sel?.status.ok}
         purple
       />
     </>

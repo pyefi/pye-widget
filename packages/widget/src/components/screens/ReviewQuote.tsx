@@ -3,24 +3,28 @@ import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { useWidgetStore } from "../../stores/widget-store";
 import {
   maturities,
-  validators,
-  type MaturityId,
-  type ValidatorId,
+  canSellYield,
   executeStakeDeposit,
   executeRtSell,
   executeDepositAndSell,
   checkSellLiquidity,
-  allowedLockups,
-  lookupBondByVoteAccount,
   fetchBalances,
   fetchUserStakeAccounts,
+  writeCachedWalletBalances,
   PYE_TRADING_FEE_BPS,
   applyTradingFee,
   estimateRtFromStake,
   fetchEpochSyncedNowTs,
+  type CanonicalMaturity,
 } from "@pyefi/sdk";
-import { useMarketStore, useBalanceStore, useWalletStore } from "@pyefi/sdk/react";
-import { c, font, MARKET_RATE, pointsMap, formatSolAmount, POINTS_ENABLED } from "../design-system";
+import {
+  useMarketStore,
+  useBalanceStore,
+  useWalletStore,
+  useLockupStore,
+  useValidatorStore,
+} from "@pyefi/sdk/react";
+import { c, font, pointsMap, formatSolAmount, POINTS_ENABLED } from "../design-system";
 import { StepTitle, CTA, Tooltip, Spacer } from "../shared/Layout";
 import { Odometer } from "../shared/Odometer";
 
@@ -104,33 +108,6 @@ function DiscountSlider({
   );
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   Helper: resolve bond data from lockups for a given market
-   ═══════════════════════════════════════════════════════════════════════════ */
-
-function resolveBondParams(marketKey: string) {
-  // marketKey format: "validatorId-maturityId-PT" or "validatorId-maturityId-RT"
-  const parts = marketKey.split("-");
-  if (parts.length < 3) return null;
-  const tokenType = parts.pop(); // "PT" or "RT"
-  const maturityId = parts.pop() as MaturityId;
-  const validatorId = parts.join("-"); // rejoin in case validator has hyphens
-
-  const lockups = allowedLockups();
-  const bond = (lockups as Record<string, Record<string, { pubkey: string; pt_address: string; rt_address: string }>>)[validatorId]?.[maturityId];
-  if (!bond) return null;
-
-  const validator = validators[validatorId as ValidatorId];
-  return {
-    validatorId,
-    maturityId,
-    bondPubkey: bond.pubkey,
-    principalTokenMint: bond.pt_address,
-    yieldTokenMint: bond.rt_address,
-    voteAccount: validator?.vote_account ?? "",
-  };
-}
-
 export default function ReviewQuote() {
   const { connection } = useConnection();
   const wallet = useWallet();
@@ -164,6 +141,8 @@ export default function ReviewQuote() {
   const selectedValidatorAltPubkey = useWidgetStore((s) => s.selectedValidatorAltPubkey);
 
   const markets = useMarketStore((s) => s.markets);
+  const bonds = useLockupStore((s) => s.bonds);
+  const validators = useValidatorStore((s) => s.validators);
   const userStakeAccounts = useBalanceStore((s) => s.userStakeAccounts);
   const setWalletBalances = useBalanceStore((s) => s.setWalletBalances);
   const setUserStakeAccounts = useBalanceStore((s) => s.setUserStakeAccounts);
@@ -183,17 +162,18 @@ export default function ReviewQuote() {
     ? userStakeAccounts.find((a) => a.pubkey === selectedStakeAccountPubkey)
     : null;
 
-  // Resolve the validator ID for market lookup
+  // Resolve the bond for the stake account's validator at the chosen maturity.
+  // In the new schema, market keys are vote_account-scoped, so we use the
+  // stake account's vote_account directly to build the key.
   const stakeVoteAccount = selectedStakeAccount?.validatorVoteAccount;
-  const stakeBondLookup = stakeVoteAccount && selectedMaturityId
-    ? lookupBondByVoteAccount(stakeVoteAccount, selectedMaturityId)
+  const stakeBond = stakeVoteAccount && selectedMaturityId
+    ? bonds[`${stakeVoteAccount}:${selectedMaturityId}`] ?? null
     : null;
-  const stakeValidatorId = stakeBondLookup?.validatorId;
 
   // RT market data — must match the stake account's validator (each validator has its own RT token)
   const rtMarketKey = selectedMaturityId
-    ? (stakeValidatorId
-        ? `${stakeValidatorId}-${selectedMaturityId}-RT`
+    ? (stakeBond && stakeVoteAccount
+        ? `${stakeVoteAccount}-${selectedMaturityId}-RT`
         : Object.keys(markets).find((k) => k.endsWith(`-${selectedMaturityId}-RT`)))
     : null;
   const rtMarket = rtMarketKey ? markets[rtMarketKey] ?? null : null;
@@ -219,10 +199,13 @@ export default function ReviewQuote() {
   const hasLiquidity = liquidityCheck?.isSufficientLiquidity ?? false;
   const orderBookSlippageBps = liquidityCheck?.slippageBps ?? 0;
 
-  // Quote: expected gross SOL from selling RT on Manifest
-  const grossSellAmount = liquidityCheck?.expectedFillPrice != null
-    ? liquidityCheck.expectedFillPrice * rtAmount
-    : rtAmount * (MARKET_RATE / 100); // fallback
+  // Quote: expected gross SOL from selling RT on Manifest. When the book can't
+  // fill (no liquidity), the quote is zero and the Sign CTA is already disabled
+  // by `canSign` — better than showing a fabricated fallback price.
+  const grossSellAmount =
+    liquidityCheck?.expectedFillPrice != null
+      ? liquidityCheck.expectedFillPrice * rtAmount
+      : 0;
 
   // Net-of-fee SOL shown to the user and paid out after treasury transfer
   const sellAmount = applyTradingFee(grossSellAmount);
@@ -246,18 +229,31 @@ export default function ReviewQuote() {
 
   // Resolve bond from the stake account's actual validator (not from market key)
   // Fall back to market-key-based resolution for liquid SOL (no stake account)
-  const anyMarketKey = !stakeBondLookup
-    ? (rtMarketKey ?? (selectedMaturityId ? Object.keys(markets).find((k) => k.endsWith(`-${selectedMaturityId}-PT`)) : null))
-    : null;
-  const marketBondParams = anyMarketKey ? resolveBondParams(anyMarketKey) : null;
+  const marketBondParams = (() => {
+    if (stakeBond) return null;
+    const fallbackMarketKey = rtMarketKey
+      ?? (selectedMaturityId ? Object.keys(markets).find((k) => k.endsWith(`-${selectedMaturityId}-PT`)) : null);
+    if (!fallbackMarketKey) return null;
+    // Market key format: `${voteAccount}-${canonicalLabel}-${PT|RT}`
+    const parts = fallbackMarketKey.split("-");
+    parts.pop(); // tokenType
+    const canonicalLabel = parts.pop() as CanonicalMaturity;
+    const voteAccount = parts.join("-");
+    const bond = bonds[`${voteAccount}:${canonicalLabel}`];
+    if (!bond) return null;
+    return {
+      bondPubkey: bond.pubkey,
+      principalTokenMint: bond.pt_mint,
+      yieldTokenMint: bond.rt_mint,
+      voteAccount,
+    };
+  })();
 
-  const bondParams = stakeBondLookup
+  const bondParams = stakeBond
     ? {
-        validatorId: stakeBondLookup.validatorId,
-        maturityId: selectedMaturityId!,
-        bondPubkey: stakeBondLookup.pubkey,
-        principalTokenMint: stakeBondLookup.pt_address,
-        yieldTokenMint: stakeBondLookup.rt_address,
+        bondPubkey: stakeBond.pubkey,
+        principalTokenMint: stakeBond.pt_mint,
+        yieldTokenMint: stakeBond.rt_mint,
         voteAccount: stakeVoteAccount!,
       }
     : marketBondParams;
@@ -267,6 +263,24 @@ export default function ReviewQuote() {
     if (!bondParams) throw new Error("Could not resolve bond data for this market");
     if (!rtMarket) throw new Error("No RT market found for this maturity");
     if (!maturity) throw new Error("No maturity selected");
+
+    // Safety net — ChooseDuration already gates this, but re-check at sign time
+    // so a stale or mid-flight state can't slip a doomed swap through.
+    const gate = canSellYield({
+      validatorVoteAccount: bondParams.voteAccount,
+      maturityId: selectedMaturityId,
+      amountSol: parsedAmount,
+      nowTs: nowTs ?? Date.now() / 1000,
+      validators,
+      bonds,
+      markets,
+    });
+    if (!gate.ok) {
+      console.error(
+        `[Pye] ${gate.code}: validator ${bondParams.voteAccount}, maturity ${selectedMaturityId} — ${gate.reason}`,
+      );
+      throw new Error(`${gate.reason} (${gate.code})`);
+    }
 
     setTxStatus("loading");
     setTxStep("depositing");
@@ -315,12 +329,10 @@ export default function ReviewQuote() {
         setTxStatus("success", rtSellResult.signature);
         navigate("complete");
       } else {
-        // Stake account path — single bundled v0 transaction (requires ALT)
-        if (!selectedValidatorAltPubkey) {
-          throw new Error(
-            "Sell Yield is not yet enabled for this validator. An Address Lookup Table hasn't been deployed yet — please contact the Pye team.",
-          );
-        }
+        // Stake account path — single bundled v0 transaction.
+        // ALT presence is guaranteed by the canSellYield safety net above;
+        // the non-null assertion narrows the widget-store union for TS.
+        const altPubkey = selectedValidatorAltPubkey!;
         const result = await executeDepositAndSell({
           connection,
           wallet,
@@ -335,7 +347,7 @@ export default function ReviewQuote() {
           marketPubkey: rtMarket.marketPubkey,
           minReceiveTokens: minReceive,
           expectedSolOut: grossSellAmount,
-          altPubkey: selectedValidatorAltPubkey,
+          altPubkey,
         });
         setTxStep("complete");
         setSellAmountSol(sellAmount);
@@ -351,12 +363,22 @@ export default function ReviewQuote() {
     } finally {
       const owner = wallet.publicKey!;
       connection.getBalance(owner, "confirmed").then(setBalanceLamports).catch(() => {});
-      fetchBalances(connection, owner).then(setWalletBalances).catch(() => {});
+      fetchBalances(connection, owner)
+        .then((bals) => {
+          setWalletBalances(bals);
+          writeCachedWalletBalances(owner.toBase58(), bals);
+        })
+        .catch(() => {});
       fetchUserStakeAccounts(connection, owner).then(setUserStakeAccounts).catch(() => {});
     }
   }, [
     rtMarket,
     bondParams,
+    stakeBond,
+    bonds,
+    validators,
+    markets,
+    nowTs,
     selectedStakeAccount,
     selectedStakeAccountPubkey,
     selectedMaturityId,

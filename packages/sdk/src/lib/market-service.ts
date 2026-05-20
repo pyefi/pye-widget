@@ -1,11 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { parseOrderBook, type IndividualOrder } from "./manifest-parser";
-import { ALLOWED_VALIDATORS, type ValidatorId } from "../constants/validators";
-import {
-  maturities,
-  maturityIdsArray,
-  type MaturityId,
-} from "../constants/maturities";
+import type { CanonicalMaturity } from "../stores/lockup-store";
 import { getPyeConfig } from "../config";
 
 export interface ManifestMarketRecord {
@@ -27,9 +22,11 @@ export interface ManifestMarketRecord {
 export interface MatchedMarket {
   marketPubkey: string;
   bondPubkey: string;
-  validatorId: ValidatorId;
-  maturityId: MaturityId;
+  voteAccount: string;
+  canonicalLabel: CanonicalMaturity;
   tokenType: "PT" | "RT";
+  /** Mint address for this market's base token (PT or RT). */
+  mint: string;
   totalAskSize: number;
   bestAskPrice: number | null;
   totalBidSize: number;
@@ -40,70 +37,53 @@ export interface MatchedMarket {
   bids: IndividualOrder[];
 }
 
-// Tolerance for matching maturity timestamps (24 hours in seconds)
-const MATURITY_TOLERANCE = 86_400;
-
-// Reverse lookup: vote_account → ValidatorId (only allowed validators)
-const voteAccountToValidatorId = new Map<string, ValidatorId>();
-for (const v of ALLOWED_VALIDATORS) {
-  voteAccountToValidatorId.set(v.vote_account, v.id);
-}
-
-function matchMaturity(maturityTs: number): MaturityId | null {
-  for (const id of maturityIdsArray) {
-    const m = maturities[id];
-    const mTs = Number(m.maturity_timestamp);
-    if (Math.abs(maturityTs - mTs) <= MATURITY_TOLERANCE) {
-      return id;
-    }
-  }
-  return null;
-}
-
 export async function fetchManifestMarkets(): Promise<MatchedMarket[]> {
   const config = getPyeConfig();
   const supabase = createClient(config.supabaseUrl, config.supabaseAnonKey);
 
-  // Fetch markets and bonds in parallel (same logic as the old /api/markets endpoint)
-  const allowedVoteAccounts = ALLOWED_VALIDATORS.map((v) => v.vote_account);
-
-  const [marketsRes, bondsRes] = await Promise.all([
+  const [marketsRes, bondsRes, validatorsRes] = await Promise.all([
     supabase
       .from("manifest_markets")
       .select("pubkey, base_mint, account_data"),
     supabase
       .from("solo_validator_bonds")
       .select(
-        "pubkey, validator_vote_account, principal_token_mint, yield_token_mint, maturity_ts",
+        "pubkey, validator_vote_account, principal_token_mint, yield_token_mint, canonical_label",
       )
-      .in("validator_vote_account", allowedVoteAccounts),
+      .not("canonical_label", "is", null)
+      .eq("is_hidden", false),
+    supabase
+      .from("validator_metadata_configs")
+      .select("vote_pubkey")
+      .eq("widget", true),
   ]);
 
   if (marketsRes.error) throw marketsRes.error;
   if (bondsRes.error) throw bondsRes.error;
+  if (validatorsRes.error) throw validatorsRes.error;
   if (!marketsRes.data?.length || !bondsRes.data?.length) return [];
 
-  // Build mint → bond lookup
-  const ptMintToBond = new Map<string, (typeof bondsRes.data)[0]>();
-  const rtMintToBond = new Map<string, (typeof bondsRes.data)[0]>();
+  const allowedVoteAccounts = new Set(
+    (validatorsRes.data ?? []).map((r) => r.vote_pubkey),
+  );
+
+  const ptMintToBond = new Map<string, (typeof bondsRes.data)[number]>();
+  const rtMintToBond = new Map<string, (typeof bondsRes.data)[number]>();
   for (const bond of bondsRes.data) {
     ptMintToBond.set(bond.principal_token_mint, bond);
     rtMintToBond.set(bond.yield_token_mint, bond);
   }
 
-  // Match markets to bonds, parse order books, and filter to known validators/maturities
   const matched: MatchedMarket[] = [];
   for (const market of marketsRes.data) {
     const ptBond = ptMintToBond.get(market.base_mint);
     const rtBond = rtMintToBond.get(market.base_mint);
     const bond = ptBond ?? rtBond;
     if (!bond) continue;
+    if (!allowedVoteAccounts.has(bond.validator_vote_account)) continue;
 
-    const validatorId = voteAccountToValidatorId.get(bond.validator_vote_account);
-    if (!validatorId) continue;
-
-    const maturityId = matchMaturity(Number(bond.maturity_ts));
-    if (!maturityId) continue;
+    const tokenType: "PT" | "RT" = ptBond ? "PT" : "RT";
+    const mint = tokenType === "PT" ? bond.principal_token_mint : bond.yield_token_mint;
 
     let orderBook = {
       totalAskSize: 0,
@@ -129,9 +109,10 @@ export async function fetchManifestMarkets(): Promise<MatchedMarket[]> {
     matched.push({
       marketPubkey: market.pubkey,
       bondPubkey: bond.pubkey,
-      validatorId,
-      maturityId,
-      tokenType: ptBond ? "PT" : "RT",
+      voteAccount: bond.validator_vote_account,
+      canonicalLabel: bond.canonical_label as CanonicalMaturity,
+      tokenType,
+      mint,
       ...orderBook,
     });
   }
@@ -139,14 +120,16 @@ export async function fetchManifestMarkets(): Promise<MatchedMarket[]> {
   return matched;
 }
 
-/** Build a lookup keyed by "validatorId-maturityId-PT/RT".
- *  One market per key — first match wins (no merging across markets). */
+/**
+ * Build a lookup keyed by "${voteAccount}-${canonicalLabel}-${PT|RT}".
+ * One market per key — first match wins (no merging across markets).
+ */
 export function buildMarketLookup(
   markets: MatchedMarket[],
 ): Record<string, MatchedMarket> {
   const lookup: Record<string, MatchedMarket> = {};
   for (const m of markets) {
-    const key = `${m.validatorId}-${m.maturityId}-${m.tokenType}`;
+    const key = `${m.voteAccount}-${m.canonicalLabel}-${m.tokenType}`;
     if (!lookup[key]) {
       lookup[key] = { ...m };
     }
