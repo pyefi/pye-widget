@@ -22,7 +22,7 @@ import {
   useWalletStore,
   useLockupStore,
 } from "@pyefi/sdk/react";
-import { c, font, MARKET_RATE, pointsMap, formatSolAmount, POINTS_ENABLED } from "../design-system";
+import { c, font, pointsMap, formatSolAmount, POINTS_ENABLED } from "../design-system";
 import { StepTitle, CTA, Tooltip, Spacer } from "../shared/Layout";
 import { Odometer } from "../shared/Odometer";
 
@@ -196,10 +196,13 @@ export default function ReviewQuote() {
   const hasLiquidity = liquidityCheck?.isSufficientLiquidity ?? false;
   const orderBookSlippageBps = liquidityCheck?.slippageBps ?? 0;
 
-  // Quote: expected gross SOL from selling RT on Manifest
-  const grossSellAmount = liquidityCheck?.expectedFillPrice != null
-    ? liquidityCheck.expectedFillPrice * rtAmount
-    : rtAmount * (MARKET_RATE / 100); // fallback
+  // Quote: expected gross SOL from selling RT on Manifest. When the book can't
+  // fill (no liquidity), the quote is zero and the Sign CTA is already disabled
+  // by `canSign` — better than showing a fabricated fallback price.
+  const grossSellAmount =
+    liquidityCheck?.expectedFillPrice != null
+      ? liquidityCheck.expectedFillPrice * rtAmount
+      : 0;
 
   // Net-of-fee SOL shown to the user and paid out after treasury transfer
   const sellAmount = applyTradingFee(grossSellAmount);

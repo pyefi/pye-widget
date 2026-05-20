@@ -6,11 +6,12 @@ import {
   type MaturityId,
   PYE_TRADING_FEE_BPS,
   applyTradingFee,
+  checkSellLiquidity,
   estimateRtFromStake,
   fetchEpochSyncedNowTs,
 } from "@pyefi/sdk";
 import { useMarketStore } from "@pyefi/sdk/react";
-import { c, font, displayFont, MARKET_RATE, formatSolAmount, POINTS_ENABLED } from "../design-system";
+import { c, font, displayFont, formatSolAmount, POINTS_ENABLED } from "../design-system";
 import { CTA, Tooltip, Spacer } from "../shared/Layout";
 import { Odometer } from "../shared/Odometer";
 
@@ -93,30 +94,31 @@ export default function ChooseDuration() {
 
     // availableMaturities already guarantees a validator-specific market.
     const rtMarket = markets[`${selectedValidatorVoteAccount}-${matId}-RT`];
-    const bestBid = rtMarket?.bestBidPrice ?? null;
+    const maturity = maturities[matId];
 
     // Bonds program mints RT proportional to remaining issuance window, so
     // we scale the deposit by time remaining to get the RT the user will
     // actually receive. Using `parsedAmount` here would overstate the quote.
-    const maturity = maturities[matId];
     const estimatedRt = estimateRtFromStake({
       amountSol: parsedAmount,
       maturity,
       nowTs: effectiveNowTs,
     });
 
-    // Gross yield: estimated RT × best bid price (SOL per RT)
-    // Fallback: MARKET_RATE is annual (0.85%), scaled by time remaining so Q2–Q4 differ
-    const maturityTs = Number(maturity.maturity_timestamp);
-    const yearsRemaining = Math.max(0, (maturityTs - effectiveNowTs) / (365.25 * 86400));
+    // Quote against the actual bid stack — same check ReviewQuote uses. If the
+    // book is empty or shallow for this amount, hasLiquidity is false and we
+    // surface that to the user instead of fabricating a yield number.
+    const liquidityCheck = rtMarket?.bids?.length
+      ? checkSellLiquidity(rtMarket.bids, estimatedRt)
+      : null;
+    const hasLiquidity = liquidityCheck?.isSufficientLiquidity ?? false;
     const grossYield =
-      bestBid != null
-        ? bestBid * estimatedRt
-        : parsedAmount * (MARKET_RATE / 100) * yearsRemaining;
-    // User-facing yield is net of Pye's taker fee
+      hasLiquidity && liquidityCheck?.expectedFillPrice != null
+        ? liquidityCheck.expectedFillPrice * estimatedRt
+        : 0;
     const netYield = applyTradingFee(grossYield);
 
-    return { matId, ...info, bestBid, grossYield, netYield };
+    return { matId, ...info, hasLiquidity, grossYield, netYield };
   });
 
   const feePct = (PYE_TRADING_FEE_BPS / 100).toFixed(2);
@@ -207,27 +209,41 @@ export default function ChooseDuration() {
             }}
           >
             <p style={font(14, c.secondary)}>You receive today</p>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-              {sel.netYield < 0.0001 ? (
-                <p
-                  style={{
-                    ...displayFont(32, c.green),
-                    lineHeight: 1.2,
-                    fontVariantNumeric: "lining-nums tabular-nums",
-                  }}
-                >
-                  &lt; 0.0001 SOL
+            {sel.hasLiquidity ? (
+              <>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                  {sel.netYield < 0.0001 ? (
+                    <p
+                      style={{
+                        ...displayFont(32, c.green),
+                        lineHeight: 1.2,
+                        fontVariantNumeric: "lining-nums tabular-nums",
+                      }}
+                    >
+                      &lt; 0.0001 SOL
+                    </p>
+                  ) : (
+                    <Odometer
+                      value={`+${formatSolAmount(sel.netYield, 3)} SOL`}
+                      style={{ ...displayFont(32, c.green), lineHeight: 1.2 }}
+                    />
+                  )}
+                </div>
+                <p style={font(12, c.muted)}>
+                  Quote includes a {feePct}% Pye protocol fee.
                 </p>
-              ) : (
-                <Odometer
-                  value={`+${formatSolAmount(sel.netYield, 3)} SOL`}
-                  style={{ ...displayFont(32, c.green), lineHeight: 1.2 }}
-                />
-              )}
-            </div>
-            <p style={font(12, c.muted)}>
-              Quote includes a {feePct}% Pye protocol fee.
-            </p>
+              </>
+            ) : (
+              <>
+                <p style={{ ...displayFont(22, c.muted), lineHeight: 1.2 }}>
+                  Insufficient liquidity
+                </p>
+                <p style={font(12, c.muted)}>
+                  The order book for this maturity doesn't have enough bids to
+                  fill your amount yet. Try a smaller amount or check back soon.
+                </p>
+              </>
+            )}
           </div>
         )}
 
@@ -237,7 +253,7 @@ export default function ChooseDuration() {
       <CTA
         label="Review"
         onClick={() => navigate("review-quote")}
-        disabled={!selectedMaturityId}
+        disabled={!selectedMaturityId || !sel?.hasLiquidity}
         purple
       />
     </>
