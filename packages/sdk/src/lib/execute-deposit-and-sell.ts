@@ -35,6 +35,8 @@ const DEPOSIT_STAKE_DISCRIMINATOR = new Uint8Array([
 const SYSVAR_CLOCK = new PublicKey("SysvarC1ock11111111111111111111111111111111");
 const STAKE_PROGRAM = new PublicKey("Stake11111111111111111111111111111111111111");
 const SYSVAR_STAKE_HISTORY = new PublicKey("SysvarStakeHistory1111111111111111111111111");
+const SYSVAR_RENT = new PublicKey("SysvarRent111111111111111111111111111111111");
+const STAKE_CONFIG = new PublicKey("StakeConfig11111111111111111111111111111111");
 
 function deriveGlobalSettings(): PublicKey {
   const [pda] = PublicKey.findProgramAddressSync(
@@ -269,7 +271,7 @@ export async function executeDepositAndSell({
         { pubkey: depositStakeAccount, isSigner: false, isWritable: true },
         { pubkey: ownerPt,           isSigner: false, isWritable: true  },
         { pubkey: ownerYt,           isSigner: false, isWritable: true  },
-        { pubkey: bond,              isSigner: false, isWritable: false },
+        { pubkey: bond,              isSigner: false, isWritable: true  },
         { pubkey: voteAccount,       isSigner: false, isWritable: false },
         { pubkey: stakeAccountPda,   isSigner: false, isWritable: true  },
         { pubkey: ptMint,            isSigner: false, isWritable: true  },
@@ -284,6 +286,8 @@ export async function executeDepositAndSell({
         { pubkey: SYSVAR_CLOCK,      isSigner: false, isWritable: false },
         { pubkey: STAKE_PROGRAM,     isSigner: false, isWritable: false },
         { pubkey: SYSVAR_STAKE_HISTORY, isSigner: false, isWritable: false },
+        { pubkey: SYSVAR_RENT,       isSigner: false, isWritable: false },
+        { pubkey: STAKE_CONFIG,      isSigner: false, isWritable: false },
         ...remainingAccounts,
       ],
       data: Buffer.from(DEPOSIT_STAKE_DISCRIMINATOR),

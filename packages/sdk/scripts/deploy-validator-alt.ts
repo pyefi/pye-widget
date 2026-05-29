@@ -53,6 +53,8 @@ const STAKE_PROGRAM = new PublicKey("Stake11111111111111111111111111111111111111
 const SYSVAR_STAKE_HISTORY = new PublicKey(
   "SysvarStakeHistory1111111111111111111111111",
 );
+const SYSVAR_RENT = new PublicKey("SysvarRent111111111111111111111111111111111");
+const STAKE_CONFIG = new PublicKey("StakeConfig11111111111111111111111111111111");
 
 // Accounts per extend ix. Each extend ix carries 32 bytes per pubkey + a small
 // header. 20 keeps us well under the 1232B tx limit with some slack.
@@ -197,6 +199,8 @@ async function main() {
   add(SYSVAR_CLOCK);
   add(STAKE_PROGRAM);
   add(SYSVAR_STAKE_HISTORY);
+  add(SYSVAR_RENT);
+  add(STAKE_CONFIG);
   add(ASSOCIATED_TOKEN_PROGRAM_ID);
   add(TOKEN_PROGRAM_ID);
   add(NATIVE_MINT);
