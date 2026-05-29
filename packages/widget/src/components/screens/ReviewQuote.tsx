@@ -14,7 +14,8 @@ import {
   PYE_TRADING_FEE_BPS,
   applyTradingFee,
   estimateRtFromStake,
-  fetchEpochSyncedNowTs,
+  fetchDepositStartTs,
+  resolveDepositStartTs,
   type CanonicalMaturity,
 } from "@pyefi/sdk";
 import {
@@ -115,12 +116,8 @@ export default function ReviewQuote() {
   // Epoch-synced wall-clock — matches the on-chain clock the Bonds program
   // uses when computing RT issuance, so the swap we build matches what the
   // user will actually hold after deposit.
-  const [nowTs, setNowTs] = useState<number | null>(null);
-  useEffect(() => {
-    fetchEpochSyncedNowTs(connection).then(setNowTs).catch(() => {
-      setNowTs(Date.now() / 1000);
-    });
-  }, [connection]);
+  // Per-bond issuance-accrual start (resolved below, once the bond is known).
+  const [depositStartTs, setDepositStartTs] = useState<number | null>(null);
 
   const navigate = useWidgetStore((s) => s.navigate);
   const txStatus = useWidgetStore((s) => s.txStatus);
@@ -182,12 +179,16 @@ export default function ReviewQuote() {
   // 1:1 with the deposit. Use the same formula the on-chain program does
   // so the swap we build matches the user's actual post-deposit RT balance.
   // PT, separately, *is* 1:1 with the stake — keep `parsedAmount` for PT rows.
-  const effectiveNowTs = nowTs ?? Date.now() / 1000;
-  const rtAmount = maturity
+  const effectiveDepositStartTs = depositStartTs ?? Date.now() / 1000;
+  // Estimate RT against the *bond's own* on-chain issuance window (rolling per
+  // bond), not the shared maturities.ts constant — otherwise recently-created
+  // bonds (e.g. a just-listed validator) are off by multiples.
+  const rtAmount = stakeBond
     ? estimateRtFromStake({
         amountSol: parsedAmount,
-        maturity,
-        nowTs: effectiveNowTs,
+        issuanceTs: stakeBond.issuance_ts,
+        maturityTs: stakeBond.maturity_ts,
+        depositStartTs: effectiveDepositStartTs,
       })
     : 0;
 
@@ -258,6 +259,33 @@ export default function ReviewQuote() {
       }
     : marketBondParams;
 
+  // Resolve the program's issuance-accrual start for *this* bond — current
+  // epoch start if its stake is already active, next epoch start if fresh —
+  // so the RT estimate matches the mint exactly. Falls back to next epoch
+  // start (the never-over-sells choice) if the status can't be read.
+  const resolveBondPubkey = bondParams?.bondPubkey ?? null;
+  useEffect(() => {
+    let cancelled = false;
+    if (!resolveBondPubkey) {
+      setDepositStartTs(null);
+      return;
+    }
+    resolveDepositStartTs(connection, [resolveBondPubkey])
+      .then((map) => {
+        if (!cancelled) setDepositStartTs(map[resolveBondPubkey] ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          fetchDepositStartTs(connection)
+            .then((ts) => !cancelled && setDepositStartTs(ts))
+            .catch(() => !cancelled && setDepositStartTs(Date.now() / 1000));
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [connection, resolveBondPubkey]);
+
   const handleSign = useCallback(async () => {
     if (!selectedStakeAccountPubkey || !selectedMaturityId) return;
     if (!bondParams) throw new Error("Could not resolve bond data for this market");
@@ -270,7 +298,7 @@ export default function ReviewQuote() {
       validatorVoteAccount: bondParams.voteAccount,
       maturityId: selectedMaturityId,
       amountSol: parsedAmount,
-      nowTs: nowTs ?? Date.now() / 1000,
+      depositStartTs: depositStartTs ?? Date.now() / 1000,
       validators,
       bonds,
       markets,
@@ -293,14 +321,19 @@ export default function ReviewQuote() {
     // value can be minutes stale by the time the user clicks, and the chain
     // clock keeps advancing. An out-of-date nowTs overshoots the actual
     // mint by ~1 atom per second of drift, which fails the Manifest swap.
-    const freshNowTs = await fetchEpochSyncedNowTs(connection).catch(
-      () => Date.now() / 1000,
-    );
-    const freshRtAmount = estimateRtFromStake({
-      amountSol: parsedAmount,
-      maturity,
-      nowTs: freshNowTs,
-    });
+    const freshMap = await resolveDepositStartTs(connection, [
+      bondParams.bondPubkey,
+    ]).catch(() => null);
+    const freshDepositStartTs =
+      freshMap?.[bondParams.bondPubkey] ?? depositStartTs ?? Date.now() / 1000;
+    const freshRtAmount = stakeBond
+      ? estimateRtFromStake({
+          amountSol: parsedAmount,
+          issuanceTs: stakeBond.issuance_ts,
+          maturityTs: stakeBond.maturity_ts,
+          depositStartTs: freshDepositStartTs,
+        })
+      : 0;
 
     try {
       if (selectedStakeAccountPubkey === "liquid-sol") {
@@ -378,7 +411,7 @@ export default function ReviewQuote() {
     bonds,
     validators,
     markets,
-    nowTs,
+    depositStartTs,
     selectedStakeAccount,
     selectedStakeAccountPubkey,
     selectedMaturityId,

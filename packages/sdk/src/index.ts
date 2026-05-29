@@ -83,7 +83,7 @@ export type {
 } from "./lib/can-sell-yield";
 
 // Lib — RT estimation
-export { estimateRtFromStake, fetchEpochSyncedNowTs } from "./lib/estimate-rt";
+export { estimateRtFromStake, fetchEpochSyncedNowTs, fetchDepositStartTs, resolveDepositStartTs } from "./lib/estimate-rt";
 export type { EstimateRtFromStakeParams } from "./lib/estimate-rt";
 
 // Lib — Transaction execution

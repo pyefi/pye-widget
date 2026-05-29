@@ -11,7 +11,7 @@ import {
   canSellYield,
   checkSellLiquidity,
   estimateRtFromStake,
-  fetchEpochSyncedNowTs,
+  resolveDepositStartTs,
 } from "@pyefi/sdk";
 import {
   useMarketStore,
@@ -68,15 +68,12 @@ export default function ChooseDuration() {
   const validators = useValidatorStore((s) => s.validators);
   const bonds = useLockupStore((s) => s.bonds);
 
-  // Epoch-synced wall-clock seconds — matches the on-chain "now" used by the
-  // Bonds program when computing RT issuance, so our preview number stays in
-  // sync with the real swap amount.
-  const [nowTs, setNowTs] = useState<number | null>(null);
-  useEffect(() => {
-    fetchEpochSyncedNowTs(connection).then(setNowTs).catch(() => {
-      setNowTs(Date.now() / 1000);
-    });
-  }, [connection]);
+  // Per-bond issuance-accrual start the Bonds program will use (current epoch
+  // start for active bonds, next for fresh) — keyed by bond pubkey. Resolved
+  // below once the available maturities are known.
+  const [depositStartByBond, setDepositStartByBond] = useState<
+    Record<string, number>
+  >({});
 
   // Only show maturities that have a canonical RT market for the selected
   // validator. Without a market we have no real price to quote against, so
@@ -88,6 +85,26 @@ export default function ChooseDuration() {
       Boolean(markets[`${selectedValidatorVoteAccount}-${matId}-RT`]),
     );
   }, [selectedValidatorVoteAccount, markets]);
+
+  // Resolve each available bond's issuance-accrual start in one batched RPC,
+  // matching the program's branch (active → current epoch start, fresh → next).
+  useEffect(() => {
+    if (!selectedValidatorVoteAccount || availableMaturities.length === 0)
+      return;
+    const pubkeys = availableMaturities
+      .map((matId) => bonds[`${selectedValidatorVoteAccount}:${matId}`]?.pubkey)
+      .filter((p): p is string => Boolean(p));
+    if (pubkeys.length === 0) return;
+    let cancelled = false;
+    resolveDepositStartTs(connection, pubkeys)
+      .then((map) => {
+        if (!cancelled) setDepositStartByBond(map);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [connection, selectedValidatorVoteAccount, availableMaturities, bonds]);
 
   // Default to first available duration if none selected, or clear if the
   // current selection is no longer available (e.g. markets refreshed).
@@ -102,9 +119,6 @@ export default function ChooseDuration() {
   }, [selectedMaturityId, setSelectedMaturity, availableMaturities]);
 
   const parsedAmount = parseFloat(depositAmount) || 0;
-  // Use epoch-synced now when available; fall back to wall-clock for the
-  // first render before the RPC call resolves.
-  const effectiveNowTs = nowTs ?? Date.now() / 1000;
 
   // Build display quarters from available maturities. canSellYield is the
   // single source of truth for gating — it covers alt_pubkey, standard, and
@@ -117,12 +131,18 @@ export default function ChooseDuration() {
     };
 
     const maturity = maturities[matId];
+    const bond = selectedValidatorVoteAccount
+      ? bonds[`${selectedValidatorVoteAccount}:${matId}`]
+      : undefined;
+    // Issuance-accrual start for this specific bond; fall back to wall-clock
+    // only for the first render before the batched resolve lands.
+    const ds = (bond && depositStartByBond[bond.pubkey]) ?? Date.now() / 1000;
     const status: SellYieldStatus = selectedValidatorVoteAccount
       ? canSellYield({
           validatorVoteAccount: selectedValidatorVoteAccount,
           maturityId: matId,
           amountSol: parsedAmount,
-          nowTs: effectiveNowTs,
+          depositStartTs: ds,
           validators,
           bonds,
           markets,
@@ -135,12 +155,17 @@ export default function ChooseDuration() {
 
     let grossYield = 0;
     if (status.ok) {
+      // status.ok guarantees the bond exists; estimate against its real
+      // on-chain issuance window, not the shared maturities.ts constant.
       const rtMarket = markets[`${selectedValidatorVoteAccount}-${matId}-RT`];
-      const estimatedRt = estimateRtFromStake({
-        amountSol: parsedAmount,
-        maturity,
-        nowTs: effectiveNowTs,
-      });
+      const estimatedRt = bond
+        ? estimateRtFromStake({
+            amountSol: parsedAmount,
+            issuanceTs: bond.issuance_ts,
+            maturityTs: bond.maturity_ts,
+            depositStartTs: ds,
+          })
+        : 0;
       const liq = rtMarket?.bids?.length
         ? checkSellLiquidity(rtMarket.bids, estimatedRt)
         : null;
@@ -149,7 +174,7 @@ export default function ChooseDuration() {
     const netYield = applyTradingFee(grossYield);
     const daysToMaturity = Math.max(
       0,
-      Math.ceil((Number(maturity.maturity_timestamp) - effectiveNowTs) / 86400),
+      Math.ceil((Number(maturity.maturity_timestamp) - Date.now() / 1000) / 86400),
     );
 
     return { matId, ...info, status, grossYield, netYield, daysToMaturity };

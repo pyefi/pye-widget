@@ -20,6 +20,10 @@ export interface BondRow {
   validator_vote_account: string;
   pt_mint: string;
   rt_mint: string;
+  /** Bond's on-chain issuance start (UNIX s). Rolling per bond — do NOT assume
+   *  the shared `maturities.ts` constant; the Bonds program accrues RT from
+   *  this exact value, so the RT estimate must use it. */
+  issuance_ts: number;
   maturity_ts: number;
   canonical_label: CanonicalMaturity;
   is_hidden: boolean;
@@ -75,7 +79,7 @@ export function createLockupStore() {
           const { data, error } = await supabase
             .from("solo_validator_bonds")
             .select(
-              "pubkey, validator_vote_account, pt_mint:principal_token_mint, rt_mint:yield_token_mint, maturity_ts, canonical_label, is_hidden, standard",
+              "pubkey, validator_vote_account, pt_mint:principal_token_mint, rt_mint:yield_token_mint, issuance_ts, maturity_ts, canonical_label, is_hidden, standard",
             )
             .not("canonical_label", "is", null)
             .eq("is_hidden", false);
