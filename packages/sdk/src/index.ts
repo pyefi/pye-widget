@@ -85,6 +85,8 @@ export type {
 // Lib — RT estimation
 export { estimateRtFromStake, fetchEpochSyncedNowTs, fetchDepositStartTs, resolveDepositStartTs } from "./lib/estimate-rt";
 export type { EstimateRtFromStakeParams } from "./lib/estimate-rt";
+export { computeDepositCostBreakdown } from "./lib/deposit-costs";
+export type { DepositCostBreakdown, DepositCostBreakdownParams } from "./lib/deposit-costs";
 
 // Lib — Transaction execution
 export { executeStakeDeposit, executeStakeAccountDeposit } from "./lib/execute-stake-deposit";

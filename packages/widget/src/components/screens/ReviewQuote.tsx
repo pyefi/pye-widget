@@ -16,8 +16,11 @@ import {
   estimateRtFromStake,
   fetchDepositStartTs,
   resolveDepositStartTs,
+  computeDepositCostBreakdown,
   type CanonicalMaturity,
+  type DepositCostBreakdown,
 } from "@pyefi/sdk";
+import { PublicKey } from "@solana/web3.js";
 import {
   useMarketStore,
   useBalanceStore,
@@ -119,6 +122,10 @@ export default function ReviewQuote() {
   // Per-bond issuance-accrual start (resolved below, once the bond is known).
   const [depositStartTs, setDepositStartTs] = useState<number | null>(null);
 
+  // Deterministic upfront-cost breakdown for the bundled tx (rent + fees).
+  // Amount-independent, so resolved once per (owner, bond).
+  const [costs, setCosts] = useState<DepositCostBreakdown | null>(null);
+
   const navigate = useWidgetStore((s) => s.navigate);
   const txStatus = useWidgetStore((s) => s.txStatus);
   const txStep = useWidgetStore((s) => s.txStep);
@@ -213,6 +220,18 @@ export default function ReviewQuote() {
   const feeAmountSol = grossSellAmount - sellAmount;
   const feePct = (PYE_TRADING_FEE_BPS / 100).toFixed(2);
 
+  // Net SOL the wallet actually gains today = yield payout minus upfront rent
+  // and network fee. Matches Phantom's previewed balance change. Most of the
+  // rent is refundable (see the cost rows below), so this can be negative on
+  // small deposits even though the position itself is net-positive.
+  const netChangeTodaySol =
+    costs != null
+      ? sellAmount -
+        costs.refundableRentSol -
+        costs.nonRefundableSetupSol -
+        costs.networkFeeSol
+      : null;
+
   // Slippage tolerance from slider (0-5 float)
   const slippage = slippageBps / 100;
 
@@ -285,6 +304,40 @@ export default function ReviewQuote() {
       cancelled = true;
     };
   }, [connection, resolveBondPubkey]);
+
+  // Deterministic upfront-cost breakdown so the 4/4 screen reconciles with the
+  // wallet's net balance change (what Phantom previews). Resolved per bond.
+  const owner = wallet.publicKey;
+  const ownerKey = owner?.toBase58() ?? null;
+  const isPartialDeposit =
+    selectedStakeAccountPubkey !== "liquid-sol" &&
+    parsedAmount > 0 &&
+    parsedAmount < selectedStakeAccountBalance;
+  useEffect(() => {
+    let cancelled = false;
+    if (!owner || !bondParams || !rtMarket) {
+      setCosts(null);
+      return;
+    }
+    computeDepositCostBreakdown({
+      connection,
+      owner,
+      principalTokenMint: new PublicKey(bondParams.principalTokenMint),
+      yieldTokenMint: new PublicKey(bondParams.yieldTokenMint),
+      bondPubkey: new PublicKey(bondParams.bondPubkey),
+      isPartial: isPartialDeposit,
+    })
+      .then((b) => {
+        if (!cancelled) setCosts(b);
+      })
+      .catch(() => {
+        if (!cancelled) setCosts(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connection, ownerKey, resolveBondPubkey, rtMarket?.marketPubkey, isPartialDeposit]);
 
   const handleSign = useCallback(async () => {
     if (!selectedStakeAccountPubkey || !selectedMaturityId) return;
@@ -504,6 +557,46 @@ export default function ReviewQuote() {
               />
             ),
           },
+          ...(costs && costs.refundableRentSol > 0 ? [{
+            key: "refundable-rent",
+            left: (
+              <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+                <p style={font(14, c.secondary)}>Refundable rent</p>
+                <Tooltip text="Rent to create your PT and RT token accounts. You pay it now and get it back when you close those accounts or redeem at maturity — which is why your wallet shows a larger dip today." />
+              </div>
+            ),
+            right: (
+              <Odometer
+                value={`−${formatSolAmount(costs.refundableRentSol)} SOL`}
+                style={{ ...font(14, c.primary), whiteSpace: "nowrap", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}
+              />
+            ),
+          }] : []),
+          ...(costs && costs.nonRefundableSetupSol > 0 ? [{
+            key: "setup-cost",
+            left: (
+              <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+                <p style={font(14, c.secondary)}>Account setup</p>
+                <Tooltip text="One-time, non-refundable rent for protocol-owned accounts created by this deposit (and, for a brand-new bond, its stake account)." />
+              </div>
+            ),
+            right: (
+              <Odometer
+                value={`−${formatSolAmount(costs.nonRefundableSetupSol)} SOL`}
+                style={{ ...font(14, c.primary), whiteSpace: "nowrap", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}
+              />
+            ),
+          }] : []),
+          ...(costs ? [{
+            key: "network-fee",
+            left: <p style={font(14, c.secondary)}>Network fee</p>,
+            right: (
+              <Odometer
+                value={`−${formatSolAmount(costs.networkFeeSol)} SOL`}
+                style={{ ...font(14, c.primary), whiteSpace: "nowrap", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}
+              />
+            ),
+          }] : []),
           ...(points ? [{
             key: "points",
             left: <p style={font(14, c.secondary)}>Points multiplier</p>,
@@ -511,6 +604,21 @@ export default function ReviewQuote() {
               <p style={{ ...font(14, c.purple), whiteSpace: "nowrap", flexShrink: 0 }}>
                 {points}
               </p>
+            ),
+          }] : []),
+          ...(netChangeTodaySol != null ? [{
+            key: "net-today",
+            left: (
+              <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+                <p style={font(14, c.primary, 600)}>Net change today</p>
+                <Tooltip text="Your actual SOL balance change today — yield received minus the upfront rent and network fee. This matches what your wallet shows. The refundable rent comes back when you close the accounts / redeem. On rare occasions a busy order book adds a small one-time rent (~0.0006 SOL)." />
+              </div>
+            ),
+            right: (
+              <Odometer
+                value={`${netChangeTodaySol >= 0 ? "+" : "−"}${formatSolAmount(Math.abs(netChangeTodaySol))} SOL`}
+                style={{ ...font(15, netChangeTodaySol >= 0 ? c.green : c.primary, 600), whiteSpace: "nowrap", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}
+              />
             ),
           }] : []),
         ];
