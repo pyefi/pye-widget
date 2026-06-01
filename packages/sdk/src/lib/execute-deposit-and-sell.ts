@@ -258,10 +258,19 @@ export async function executeDepositAndSell({
   if (!treasuryWsolExists)  instructions.push(createAssociatedTokenAccountIdempotentInstruction(owner, treasuryWsol, PYE_TREASURY_WALLET, NATIVE_MINT));
 
   // Bonds deposit instruction — mints PT + RT into ownerPt / ownerYt
+  // remaining_accounts for deposit_stake:
+  //   - transient stake account (only when the bond already has one set; the
+  //     program locates it by key when merging)
+  //   - the Bonds program itself — required so the program's `transfer_native`
+  //     self-CPI (hit on the first deposit to a bond, the Empty branch) can
+  //     resolve its own program account. Omitting it fails with MissingAccount.
   const isTransientSet = !transientStakeAccount.equals(PublicKey.default);
-  const remainingAccounts = isTransientSet
-    ? [{ pubkey: transientStakeAccount, isSigner: false, isWritable: true }]
-    : [];
+  const remainingAccounts = [
+    ...(isTransientSet
+      ? [{ pubkey: transientStakeAccount, isSigner: false, isWritable: true }]
+      : []),
+    { pubkey: BONDS_PROGRAM_ID, isSigner: false, isWritable: false },
+  ];
 
   instructions.push(
     new TransactionInstruction({

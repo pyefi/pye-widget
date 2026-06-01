@@ -14,9 +14,13 @@ import {
   PYE_TRADING_FEE_BPS,
   applyTradingFee,
   estimateRtFromStake,
-  fetchEpochSyncedNowTs,
+  fetchDepositStartTs,
+  resolveDepositStartTs,
+  computeDepositCostBreakdown,
   type CanonicalMaturity,
+  type DepositCostBreakdown,
 } from "@pyefi/sdk";
+import { PublicKey } from "@solana/web3.js";
 import {
   useMarketStore,
   useBalanceStore,
@@ -115,12 +119,12 @@ export default function ReviewQuote() {
   // Epoch-synced wall-clock — matches the on-chain clock the Bonds program
   // uses when computing RT issuance, so the swap we build matches what the
   // user will actually hold after deposit.
-  const [nowTs, setNowTs] = useState<number | null>(null);
-  useEffect(() => {
-    fetchEpochSyncedNowTs(connection).then(setNowTs).catch(() => {
-      setNowTs(Date.now() / 1000);
-    });
-  }, [connection]);
+  // Per-bond issuance-accrual start (resolved below, once the bond is known).
+  const [depositStartTs, setDepositStartTs] = useState<number | null>(null);
+
+  // Deterministic upfront-cost breakdown for the bundled tx (rent + fees).
+  // Amount-independent, so resolved once per (owner, bond).
+  const [costs, setCosts] = useState<DepositCostBreakdown | null>(null);
 
   const navigate = useWidgetStore((s) => s.navigate);
   const txStatus = useWidgetStore((s) => s.txStatus);
@@ -182,12 +186,16 @@ export default function ReviewQuote() {
   // 1:1 with the deposit. Use the same formula the on-chain program does
   // so the swap we build matches the user's actual post-deposit RT balance.
   // PT, separately, *is* 1:1 with the stake — keep `parsedAmount` for PT rows.
-  const effectiveNowTs = nowTs ?? Date.now() / 1000;
-  const rtAmount = maturity
+  const effectiveDepositStartTs = depositStartTs ?? Date.now() / 1000;
+  // Estimate RT against the *bond's own* on-chain issuance window (rolling per
+  // bond), not the shared maturities.ts constant — otherwise recently-created
+  // bonds (e.g. a just-listed validator) are off by multiples.
+  const rtAmount = stakeBond
     ? estimateRtFromStake({
         amountSol: parsedAmount,
-        maturity,
-        nowTs: effectiveNowTs,
+        issuanceTs: stakeBond.issuance_ts,
+        maturityTs: stakeBond.maturity_ts,
+        depositStartTs: effectiveDepositStartTs,
       })
     : 0;
 
@@ -211,6 +219,54 @@ export default function ReviewQuote() {
   const sellAmount = applyTradingFee(grossSellAmount);
   const feeAmountSol = grossSellAmount - sellAmount;
   const feePct = (PYE_TRADING_FEE_BPS / 100).toFixed(2);
+
+  // Net SOL the wallet actually gains today = yield payout minus upfront rent
+  // and network fee. Matches Phantom's previewed balance change. Most of the
+  // rent is refundable (see the cost rows below), so this can be negative on
+  // small deposits even though the position itself is net-positive.
+  const netChangeTodaySol =
+    costs != null
+      ? sellAmount -
+        costs.refundableRentSol -
+        costs.nonRefundableSetupSol -
+        costs.networkFeeSol
+      : null;
+
+  // All non-yield costs collapsed into one "Fees" line. Pye's 0.5% is already
+  // baked into `sellAmount`, so it's NOT in this total (it's disclosed in the
+  // tooltip) — keeps the visible rows summing: you receive − fees = net.
+  const feesTotalSol =
+    costs != null
+      ? costs.refundableRentSol + costs.nonRefundableSetupSol + costs.networkFeeSol
+      : null;
+  // Friendly format for cost amounts — floor trivially-small values so the row
+  // doesn't read like "−0.000011 SOL".
+  const fmtCost = (x: number) =>
+    x > 0 && x < 0.0001 ? "< 0.0001" : formatSolAmount(x);
+  const feesTooltip =
+    costs != null
+      ? (() => {
+          const hasOneTime =
+            costs.refundableRentSol > 0 || costs.nonRefundableSetupSol > 0;
+          const parts = [
+            costs.refundableRentSol > 0
+              ? `token-account rent ≈${formatSolAmount(costs.refundableRentSol)} SOL`
+              : null,
+            costs.nonRefundableSetupSol > 0
+              ? `market setup ≈${formatSolAmount(costs.nonRefundableSetupSol)} SOL`
+              : null,
+            `network fee ≈${formatSolAmount(costs.networkFeeSol)} SOL`,
+          ].filter(Boolean) as string[];
+          const breakdown = parts.join(", ");
+          const sentence =
+            breakdown.charAt(0).toUpperCase() + breakdown.slice(1) + ".";
+          const protocol = `The ${feePct}% protocol fee (≈${formatSolAmount(feeAmountSol)} SOL) is already included in the payout above.`;
+          const later = hasOneTime
+            ? " Later deposits to this market cost only the network fee."
+            : "";
+          return `${sentence} ${protocol}${later}`;
+        })()
+      : "";
 
   // Slippage tolerance from slider (0-5 float)
   const slippage = slippageBps / 100;
@@ -258,6 +314,67 @@ export default function ReviewQuote() {
       }
     : marketBondParams;
 
+  // Resolve the program's issuance-accrual start for *this* bond — current
+  // epoch start if its stake is already active, next epoch start if fresh —
+  // so the RT estimate matches the mint exactly. Falls back to next epoch
+  // start (the never-over-sells choice) if the status can't be read.
+  const resolveBondPubkey = bondParams?.bondPubkey ?? null;
+  useEffect(() => {
+    let cancelled = false;
+    if (!resolveBondPubkey) {
+      setDepositStartTs(null);
+      return;
+    }
+    resolveDepositStartTs(connection, [resolveBondPubkey])
+      .then((map) => {
+        if (!cancelled) setDepositStartTs(map[resolveBondPubkey] ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          fetchDepositStartTs(connection)
+            .then((ts) => !cancelled && setDepositStartTs(ts))
+            .catch(() => !cancelled && setDepositStartTs(Date.now() / 1000));
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [connection, resolveBondPubkey]);
+
+  // Deterministic upfront-cost breakdown so the 4/4 screen reconciles with the
+  // wallet's net balance change (what Phantom previews). Resolved per bond.
+  const owner = wallet.publicKey;
+  const ownerKey = owner?.toBase58() ?? null;
+  const isPartialDeposit =
+    selectedStakeAccountPubkey !== "liquid-sol" &&
+    parsedAmount > 0 &&
+    parsedAmount < selectedStakeAccountBalance;
+  useEffect(() => {
+    let cancelled = false;
+    if (!owner || !bondParams || !rtMarket) {
+      setCosts(null);
+      return;
+    }
+    computeDepositCostBreakdown({
+      connection,
+      owner,
+      principalTokenMint: new PublicKey(bondParams.principalTokenMint),
+      yieldTokenMint: new PublicKey(bondParams.yieldTokenMint),
+      bondPubkey: new PublicKey(bondParams.bondPubkey),
+      isPartial: isPartialDeposit,
+    })
+      .then((b) => {
+        if (!cancelled) setCosts(b);
+      })
+      .catch(() => {
+        if (!cancelled) setCosts(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connection, ownerKey, resolveBondPubkey, rtMarket?.marketPubkey, isPartialDeposit]);
+
   const handleSign = useCallback(async () => {
     if (!selectedStakeAccountPubkey || !selectedMaturityId) return;
     if (!bondParams) throw new Error("Could not resolve bond data for this market");
@@ -270,7 +387,7 @@ export default function ReviewQuote() {
       validatorVoteAccount: bondParams.voteAccount,
       maturityId: selectedMaturityId,
       amountSol: parsedAmount,
-      nowTs: nowTs ?? Date.now() / 1000,
+      depositStartTs: depositStartTs ?? Date.now() / 1000,
       validators,
       bonds,
       markets,
@@ -293,14 +410,19 @@ export default function ReviewQuote() {
     // value can be minutes stale by the time the user clicks, and the chain
     // clock keeps advancing. An out-of-date nowTs overshoots the actual
     // mint by ~1 atom per second of drift, which fails the Manifest swap.
-    const freshNowTs = await fetchEpochSyncedNowTs(connection).catch(
-      () => Date.now() / 1000,
-    );
-    const freshRtAmount = estimateRtFromStake({
-      amountSol: parsedAmount,
-      maturity,
-      nowTs: freshNowTs,
-    });
+    const freshMap = await resolveDepositStartTs(connection, [
+      bondParams.bondPubkey,
+    ]).catch(() => null);
+    const freshDepositStartTs =
+      freshMap?.[bondParams.bondPubkey] ?? depositStartTs ?? Date.now() / 1000;
+    const freshRtAmount = stakeBond
+      ? estimateRtFromStake({
+          amountSol: parsedAmount,
+          issuanceTs: stakeBond.issuance_ts,
+          maturityTs: stakeBond.maturity_ts,
+          depositStartTs: freshDepositStartTs,
+        })
+      : 0;
 
     try {
       if (selectedStakeAccountPubkey === "liquid-sol") {
@@ -378,7 +500,7 @@ export default function ReviewQuote() {
     bonds,
     validators,
     markets,
-    nowTs,
+    depositStartTs,
     selectedStakeAccount,
     selectedStakeAccountPubkey,
     selectedMaturityId,
@@ -412,7 +534,7 @@ export default function ReviewQuote() {
             left: (
               <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
                 <p style={font(14, c.secondary)}>You receive today</p>
-                <Tooltip text="Estimated upfront payout based on current market rates, net of fees. The final amount is confirmed when your order fills on the Pye orderbook." />
+                <Tooltip text="Estimated upfront payout at current market rates, after the 0.5% protocol fee. Account and network costs are shown below. Final amount is confirmed when your order fills on the Pye orderbook." />
               </div>
             ),
             right: (
@@ -456,21 +578,21 @@ export default function ReviewQuote() {
               </p>
             ),
           },
-          {
-            key: "fee",
+          ...(costs && feesTotalSol != null ? [{
+            key: "fees",
             left: (
               <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
-                <p style={font(14, c.secondary)}>Pye protocol fee ({feePct}%)</p>
-                <Tooltip text={`A ${feePct}% fee is taken from the SOL proceeds of your sale and routed to the Pye treasury.`} />
+                <p style={font(14, c.secondary)}>Fees</p>
+                <Tooltip text={feesTooltip} />
               </div>
             ),
             right: (
               <Odometer
-                value={`−${formatSolAmount(feeAmountSol)} SOL`}
+                value={`−${fmtCost(feesTotalSol)} SOL`}
                 style={{ ...font(14, c.primary), whiteSpace: "nowrap", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}
               />
             ),
-          },
+          }] : []),
           ...(points ? [{
             key: "points",
             left: <p style={font(14, c.secondary)}>Points multiplier</p>,
@@ -478,6 +600,21 @@ export default function ReviewQuote() {
               <p style={{ ...font(14, c.purple), whiteSpace: "nowrap", flexShrink: 0 }}>
                 {points}
               </p>
+            ),
+          }] : []),
+          ...(netChangeTodaySol != null ? [{
+            key: "net-today",
+            left: (
+              <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+                <p style={font(14, c.primary, 600)}>Net change today</p>
+                <Tooltip text="Your actual SOL balance change today — the payout above minus fees. This matches what your wallet shows." />
+              </div>
+            ),
+            right: (
+              <Odometer
+                value={`${netChangeTodaySol >= 0 ? "+" : "−"}${formatSolAmount(Math.abs(netChangeTodaySol))} SOL`}
+                style={{ ...font(15, netChangeTodaySol >= 0 ? c.green : c.primary, 600), whiteSpace: "nowrap", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}
+              />
             ),
           }] : []),
         ];

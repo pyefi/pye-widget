@@ -2,7 +2,6 @@ import type { ValidatorRow } from "../stores/validator-store";
 import type { BondRow } from "../stores/lockup-store";
 import type { MatchedMarket } from "./market-service";
 import type { MaturityId } from "../constants/maturities";
-import { maturities } from "../constants/maturities";
 import { estimateRtFromStake } from "./estimate-rt";
 import { checkSellLiquidity } from "./liquidity";
 
@@ -30,7 +29,8 @@ export interface CanSellYieldParams {
   validatorVoteAccount: string;
   maturityId: MaturityId;
   amountSol: number;
-  nowTs: number;
+  /** Issuance-accrual start the program will use; from `fetchDepositStartTs`. */
+  depositStartTs: number;
   validators: Record<string, ValidatorRow>;
   bonds: Record<string, BondRow>;
   markets: Record<string, MatchedMarket>;
@@ -92,11 +92,11 @@ export function canSellYield(params: CanSellYieldParams): SellYieldStatus {
     };
   }
 
-  const maturity = maturities[params.maturityId];
   const estimatedRt = estimateRtFromStake({
     amountSol: params.amountSol,
-    maturity,
-    nowTs: params.nowTs,
+    issuanceTs: bond.issuance_ts,
+    maturityTs: bond.maturity_ts,
+    depositStartTs: params.depositStartTs,
   });
   const liquidity = market.bids?.length
     ? checkSellLiquidity(market.bids, estimatedRt)
