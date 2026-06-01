@@ -239,20 +239,26 @@ export default function ReviewQuote() {
     costs != null
       ? costs.refundableRentSol + costs.nonRefundableSetupSol + costs.networkFeeSol
       : null;
+  // Friendly format for cost amounts — floor trivially-small values so the row
+  // doesn't read like "−0.000011 SOL".
+  const fmtCost = (x: number) =>
+    x > 0 && x < 0.0001 ? "< 0.0001" : formatSolAmount(x);
   const feesTooltip =
     costs != null
-      ? [
-          costs.refundableRentSol > 0
-            ? `token-account rent ~${formatSolAmount(costs.refundableRentSol)} SOL`
-            : null,
-          costs.nonRefundableSetupSol > 0
-            ? `one-time market setup ~${formatSolAmount(costs.nonRefundableSetupSol)} SOL (first trade only)`
-            : null,
-          `network fee ~${formatSolAmount(costs.networkFeeSol)} SOL`,
-        ]
-          .filter(Boolean)
-          .join(" · ") +
-        `. A ${feePct}% protocol fee (~${formatSolAmount(feeAmountSol)} SOL) is already applied to the amount above.`
+      ? (() => {
+          const oneTime = [
+            costs.refundableRentSol > 0
+              ? `token-account rent ≈${formatSolAmount(costs.refundableRentSol)} SOL`
+              : null,
+            costs.nonRefundableSetupSol > 0
+              ? `market setup ≈${formatSolAmount(costs.nonRefundableSetupSol)} SOL`
+              : null,
+          ].filter(Boolean);
+          const lead = oneTime.length
+            ? `One-time setup the first time you trade this market: ${oneTime.join(" and ")}, plus a small network fee. Later deposits here cost only the network fee.`
+            : `Just a small network fee.`;
+          return `${lead} The ${feePct}% protocol fee (≈${formatSolAmount(feeAmountSol)} SOL) is already included in the payout above.`;
+        })()
       : "";
 
   // Slippage tolerance from slider (0-5 float)
@@ -521,7 +527,7 @@ export default function ReviewQuote() {
             left: (
               <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
                 <p style={font(14, c.secondary)}>You receive today</p>
-                <Tooltip text="Estimated upfront payout based on current market rates, net of fees. The final amount is confirmed when your order fills on the Pye orderbook." />
+                <Tooltip text="Estimated upfront payout at current market rates, after the 0.5% protocol fee. Account and network costs are shown below. Final amount is confirmed when your order fills on the Pye orderbook." />
               </div>
             ),
             right: (
@@ -575,7 +581,7 @@ export default function ReviewQuote() {
             ),
             right: (
               <Odometer
-                value={`−${formatSolAmount(feesTotalSol)} SOL`}
+                value={`−${fmtCost(feesTotalSol)} SOL`}
                 style={{ ...font(14, c.primary), whiteSpace: "nowrap", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}
               />
             ),
@@ -589,54 +595,66 @@ export default function ReviewQuote() {
               </p>
             ),
           }] : []),
-          ...(netChangeTodaySol != null ? [{
-            key: "net-today",
-            left: (
-              <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
-                <p style={font(14, c.primary, 600)}>Net change today</p>
-                <Tooltip text="Your actual SOL balance change today — the payout above minus fees. This matches what your wallet shows." />
-              </div>
-            ),
-            right: (
-              <Odometer
-                value={`${netChangeTodaySol >= 0 ? "+" : "−"}${formatSolAmount(Math.abs(netChangeTodaySol))} SOL`}
-                style={{ ...font(15, netChangeTodaySol >= 0 ? c.green : c.primary, 600), whiteSpace: "nowrap", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}
-              />
-            ),
-          }] : []),
         ];
 
         return (
-          <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-            {rows.map((row, i) => {
-              const isFirst = i === 0;
-              const isLast = i === rows.length - 1;
-              const radius = isFirst && isLast
-                ? 8
-                : isFirst
-                  ? "8px 8px 0 0"
-                  : isLast
-                    ? "0 0 8px 8px"
-                    : 0;
-              return (
-                <div
-                  key={row.key}
-                  style={{
-                    background: c.lowered,
-                    borderTop: `1px solid ${c.shadow}`,
-                    boxShadow: `inset 0 -1px 0 ${c.highlight}`,
-                    borderRadius: radius,
-                    padding: "12px 12px",
-                    display: "flex", alignItems: "center", justifyContent: "space-between",
-                    gap: 12,
-                  }}
-                >
-                  {row.left}
-                  {row.right}
+          <>
+            <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+              {rows.map((row, i) => {
+                const isFirst = i === 0;
+                const isLast = i === rows.length - 1;
+                const radius = isFirst && isLast
+                  ? 8
+                  : isFirst
+                    ? "8px 8px 0 0"
+                    : isLast
+                      ? "0 0 8px 8px"
+                      : 0;
+                return (
+                  <div
+                    key={row.key}
+                    style={{
+                      background: c.lowered,
+                      borderTop: `1px solid ${c.shadow}`,
+                      boxShadow: `inset 0 -1px 0 ${c.highlight}`,
+                      borderRadius: radius,
+                      padding: "12px 12px",
+                      display: "flex", alignItems: "center", justifyContent: "space-between",
+                      gap: 12,
+                    }}
+                  >
+                    {row.left}
+                    {row.right}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Net change today — separated as the bottom-line total */}
+            {netChangeTodaySol != null && (
+              <div
+                style={{
+                  marginTop: 8,
+                  background: c.lowered,
+                  borderTop: `1px solid ${c.shadow}`,
+                  boxShadow: `inset 0 -1px 0 ${c.highlight}`,
+                  borderRadius: 8,
+                  padding: "12px 12px",
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  gap: 12,
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+                  <p style={font(14, c.primary, 600)}>Net change today</p>
+                  <Tooltip text="Your actual SOL balance change today — the payout above minus fees. This matches what your wallet shows." />
                 </div>
-              );
-            })}
-          </div>
+                <Odometer
+                  value={`${netChangeTodaySol >= 0 ? "+" : "−"}${formatSolAmount(Math.abs(netChangeTodaySol))} SOL`}
+                  style={{ ...font(15, netChangeTodaySol >= 0 ? c.green : c.primary, 600), whiteSpace: "nowrap", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}
+                />
+              </div>
+            )}
+          </>
         );
       })()}
 
