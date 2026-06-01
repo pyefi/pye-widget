@@ -232,6 +232,29 @@ export default function ReviewQuote() {
         costs.networkFeeSol
       : null;
 
+  // All non-yield costs collapsed into one "Fees" line. Pye's 0.5% is already
+  // baked into `sellAmount`, so it's NOT in this total (it's disclosed in the
+  // tooltip) — keeps the visible rows summing: you receive − fees = net.
+  const feesTotalSol =
+    costs != null
+      ? costs.refundableRentSol + costs.nonRefundableSetupSol + costs.networkFeeSol
+      : null;
+  const feesTooltip =
+    costs != null
+      ? [
+          costs.refundableRentSol > 0
+            ? `token-account rent ~${formatSolAmount(costs.refundableRentSol)} SOL`
+            : null,
+          costs.nonRefundableSetupSol > 0
+            ? `one-time market setup ~${formatSolAmount(costs.nonRefundableSetupSol)} SOL (first trade only)`
+            : null,
+          `network fee ~${formatSolAmount(costs.networkFeeSol)} SOL`,
+        ]
+          .filter(Boolean)
+          .join(" · ") +
+        `. A ${feePct}% protocol fee (~${formatSolAmount(feeAmountSol)} SOL) is already applied to the amount above.`
+      : "";
+
   // Slippage tolerance from slider (0-5 float)
   const slippage = slippageBps / 100;
 
@@ -542,57 +565,17 @@ export default function ReviewQuote() {
               </p>
             ),
           },
-          {
-            key: "fee",
+          ...(costs && feesTotalSol != null ? [{
+            key: "fees",
             left: (
               <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
-                <p style={font(14, c.secondary)}>Pye protocol fee ({feePct}%)</p>
-                <Tooltip text={`A ${feePct}% fee is taken from the SOL proceeds of your sale and routed to the Pye treasury.`} />
+                <p style={font(14, c.secondary)}>Fees</p>
+                <Tooltip text={feesTooltip} />
               </div>
             ),
             right: (
               <Odometer
-                value={`−${formatSolAmount(feeAmountSol)} SOL`}
-                style={{ ...font(14, c.primary), whiteSpace: "nowrap", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}
-              />
-            ),
-          },
-          ...(costs && costs.refundableRentSol > 0 ? [{
-            key: "refundable-rent",
-            left: (
-              <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
-                <p style={font(14, c.secondary)}>Refundable rent</p>
-                <Tooltip text="Rent to create your PT and RT token accounts. You pay it now and get it back when you close those accounts or redeem at maturity — which is why your wallet shows a larger dip today." />
-              </div>
-            ),
-            right: (
-              <Odometer
-                value={`−${formatSolAmount(costs.refundableRentSol)} SOL`}
-                style={{ ...font(14, c.primary), whiteSpace: "nowrap", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}
-              />
-            ),
-          }] : []),
-          ...(costs && costs.nonRefundableSetupSol > 0 ? [{
-            key: "setup-cost",
-            left: (
-              <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
-                <p style={font(14, c.secondary)}>Account setup</p>
-                <Tooltip text="One-time, non-refundable rent the first time you trade this market — the order book grows to include you (plus, rarely, protocol or new-bond accounts). Not charged on later deposits to the same market." />
-              </div>
-            ),
-            right: (
-              <Odometer
-                value={`−${formatSolAmount(costs.nonRefundableSetupSol)} SOL`}
-                style={{ ...font(14, c.primary), whiteSpace: "nowrap", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}
-              />
-            ),
-          }] : []),
-          ...(costs ? [{
-            key: "network-fee",
-            left: <p style={font(14, c.secondary)}>Network fee</p>,
-            right: (
-              <Odometer
-                value={`−${formatSolAmount(costs.networkFeeSol)} SOL`}
+                value={`−${formatSolAmount(feesTotalSol)} SOL`}
                 style={{ ...font(14, c.primary), whiteSpace: "nowrap", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}
               />
             ),
@@ -611,7 +594,7 @@ export default function ReviewQuote() {
             left: (
               <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
                 <p style={font(14, c.primary, 600)}>Net change today</p>
-                <Tooltip text="Your actual SOL balance change today — yield received minus the upfront rent and network fee. This matches what your wallet shows. The refundable rent comes back when you close the accounts / redeem." />
+                <Tooltip text="Your actual SOL balance change today — the payout above minus fees. This matches what your wallet shows." />
               </div>
             ),
             right: (
