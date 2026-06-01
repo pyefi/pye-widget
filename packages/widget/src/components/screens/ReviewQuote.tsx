@@ -246,18 +246,25 @@ export default function ReviewQuote() {
   const feesTooltip =
     costs != null
       ? (() => {
-          const oneTime = [
+          const hasOneTime =
+            costs.refundableRentSol > 0 || costs.nonRefundableSetupSol > 0;
+          const parts = [
             costs.refundableRentSol > 0
               ? `token-account rent ≈${formatSolAmount(costs.refundableRentSol)} SOL`
               : null,
             costs.nonRefundableSetupSol > 0
               ? `market setup ≈${formatSolAmount(costs.nonRefundableSetupSol)} SOL`
               : null,
-          ].filter(Boolean);
-          const lead = oneTime.length
-            ? `One-time setup the first time you trade this market: ${oneTime.join(" and ")}, plus a small network fee. Later deposits here cost only the network fee.`
-            : `Just a small network fee.`;
-          return `${lead} The ${feePct}% protocol fee (≈${formatSolAmount(feeAmountSol)} SOL) is already included in the payout above.`;
+            `network fee ≈${formatSolAmount(costs.networkFeeSol)} SOL`,
+          ].filter(Boolean) as string[];
+          const breakdown = parts.join(", ");
+          const sentence =
+            breakdown.charAt(0).toUpperCase() + breakdown.slice(1) + ".";
+          const protocol = `The ${feePct}% protocol fee (≈${formatSolAmount(feeAmountSol)} SOL) is already included in the payout above.`;
+          const later = hasOneTime
+            ? " Later deposits to this market cost only the network fee."
+            : "";
+          return `${sentence} ${protocol}${later}`;
         })()
       : "";
 
@@ -595,66 +602,54 @@ export default function ReviewQuote() {
               </p>
             ),
           }] : []),
+          ...(netChangeTodaySol != null ? [{
+            key: "net-today",
+            left: (
+              <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+                <p style={font(14, c.primary, 600)}>Net change today</p>
+                <Tooltip text="Your actual SOL balance change today — the payout above minus fees. This matches what your wallet shows." />
+              </div>
+            ),
+            right: (
+              <Odometer
+                value={`${netChangeTodaySol >= 0 ? "+" : "−"}${formatSolAmount(Math.abs(netChangeTodaySol))} SOL`}
+                style={{ ...font(15, netChangeTodaySol >= 0 ? c.green : c.primary, 600), whiteSpace: "nowrap", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}
+              />
+            ),
+          }] : []),
         ];
 
         return (
-          <>
-            <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-              {rows.map((row, i) => {
-                const isFirst = i === 0;
-                const isLast = i === rows.length - 1;
-                const radius = isFirst && isLast
-                  ? 8
-                  : isFirst
-                    ? "8px 8px 0 0"
-                    : isLast
-                      ? "0 0 8px 8px"
-                      : 0;
-                return (
-                  <div
-                    key={row.key}
-                    style={{
-                      background: c.lowered,
-                      borderTop: `1px solid ${c.shadow}`,
-                      boxShadow: `inset 0 -1px 0 ${c.highlight}`,
-                      borderRadius: radius,
-                      padding: "12px 12px",
-                      display: "flex", alignItems: "center", justifyContent: "space-between",
-                      gap: 12,
-                    }}
-                  >
-                    {row.left}
-                    {row.right}
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Net change today — separated as the bottom-line total */}
-            {netChangeTodaySol != null && (
-              <div
-                style={{
-                  marginTop: 8,
-                  background: c.lowered,
-                  borderTop: `1px solid ${c.shadow}`,
-                  boxShadow: `inset 0 -1px 0 ${c.highlight}`,
-                  borderRadius: 8,
-                  padding: "12px 12px",
-                  display: "flex", alignItems: "center", justifyContent: "space-between",
-                  gap: 12,
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
-                  <p style={font(14, c.primary, 600)}>Net change today</p>
-                  <Tooltip text="Your actual SOL balance change today — the payout above minus fees. This matches what your wallet shows." />
+          <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+            {rows.map((row, i) => {
+              const isFirst = i === 0;
+              const isLast = i === rows.length - 1;
+              const radius = isFirst && isLast
+                ? 8
+                : isFirst
+                  ? "8px 8px 0 0"
+                  : isLast
+                    ? "0 0 8px 8px"
+                    : 0;
+              return (
+                <div
+                  key={row.key}
+                  style={{
+                    background: c.lowered,
+                    borderTop: `1px solid ${c.shadow}`,
+                    boxShadow: `inset 0 -1px 0 ${c.highlight}`,
+                    borderRadius: radius,
+                    padding: "12px 12px",
+                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                    gap: 12,
+                  }}
+                >
+                  {row.left}
+                  {row.right}
                 </div>
-                <Odometer
-                  value={`${netChangeTodaySol >= 0 ? "+" : "−"}${formatSolAmount(Math.abs(netChangeTodaySol))} SOL`}
-                  style={{ ...font(15, netChangeTodaySol >= 0 ? c.green : c.primary, 600), whiteSpace: "nowrap", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}
-                />
-              </div>
-            )}
-          </>
+              );
+            })}
+          </div>
         );
       })()}
 
