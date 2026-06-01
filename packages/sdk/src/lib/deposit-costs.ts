@@ -20,6 +20,14 @@ const BONDS_PROGRAM_ID = new PublicKey(
 
 /** Rent-exempt minimum for an SPL token account (165 bytes). */
 const ATA_RENT = 2_039_280;
+/**
+ * Rent for the Manifest market-account expansion charged on a wallet's FIRST
+ * trade of a market (the market grows one 80-byte block = 80 × 6960). Verified
+ * lamport-for-lamport on tx 2Yd54cKcshXZ4iyjDtvTgqpMyJMeGC3N762vpR7SQw1x... and
+ * mifioRB85eZU... . Non-refundable. Coincides with the RT ATA being new (the
+ * deposit-and-sell flow always trades the RT market), so we key off that.
+ */
+const MANIFEST_EXPANSION_RENT = 556_800;
 /** Base signature fee. */
 const BASE_FEE_PER_SIG = 5_000;
 /** Priority fee = compute-unit limit × price (mirrors executeDepositAndSell). */
@@ -62,16 +70,12 @@ export interface DepositCostBreakdownParams {
 
 export interface DepositCostBreakdown {
   /** Rent for the user's PT + RT token accounts (created if missing) — they own
-   *  these and reclaim the rent on close/redeem. (SOL)
-   *
-   *  NOTE: an intermittent Manifest market-account expansion (~0.00056 SOL) can
-   *  occur when the order book needs a new block; it's paid by whoever's swap
-   *  triggers it and is not predictable client-side, so it's intentionally
-   *  excluded here. Net is exact for mature markets. */
+   *  these and reclaim the rent on close/redeem. (SOL) */
   refundableRentSol: number;
-  /** One-time, non-reclaimable setup the user pays: protocol-owned fee/treasury
-   *  ATAs created here, and (first deposit to a brand-new bond) the bond's main
-   *  stake-account reserve. Usually 0 in steady state. (SOL) */
+  /** One-time, non-reclaimable setup the user pays: the Manifest market-account
+   *  expansion on their first trade of this market (~0.00056), protocol-owned
+   *  fee/treasury ATAs created here, and (first deposit to a brand-new bond) the
+   *  bond's main stake-account reserve. (SOL) */
   nonRefundableSetupSol: number;
   /** Base + priority network fee. (SOL) */
   networkFeeSol: number;
@@ -111,8 +115,15 @@ export async function computeDepositCostBreakdown({
   if (!ownerPtI) refundable += ATA_RENT;
   if (!ownerYtI) refundable += ATA_RENT;
 
-  // Non-refundable: protocol-owned ATAs the user funds if they don't exist yet.
+  // Non-refundable: Manifest expands the market on the wallet's first trade of
+  // it. A new RT ATA means this is that first deposit-and-sell, so the swap
+  // will trigger the expansion. (Conservative: if the market happens to have a
+  // free block, we'd over-state by this much — i.e. the wallet ends up better
+  // than shown, never worse.)
   let nonRefundable = 0;
+  if (!ownerYtI) nonRefundable += MANIFEST_EXPANSION_RENT;
+
+  // Non-refundable: protocol-owned ATAs the user funds if they don't exist yet.
   if (!feeWalletPtI) nonRefundable += ATA_RENT;
   if (!feeWalletYtI) nonRefundable += ATA_RENT;
   if (!treasuryWsolI) nonRefundable += ATA_RENT;

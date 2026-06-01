@@ -577,7 +577,7 @@ export default function ReviewQuote() {
             left: (
               <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
                 <p style={font(14, c.secondary)}>Account setup</p>
-                <Tooltip text="One-time, non-refundable rent for protocol-owned accounts created by this deposit (and, for a brand-new bond, its stake account)." />
+                <Tooltip text="One-time, non-refundable rent the first time you trade this market — the order book grows to include you (plus, rarely, protocol or new-bond accounts). Not charged on later deposits to the same market." />
               </div>
             ),
             right: (
@@ -611,7 +611,7 @@ export default function ReviewQuote() {
             left: (
               <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
                 <p style={font(14, c.primary, 600)}>Net change today</p>
-                <Tooltip text="Your actual SOL balance change today — yield received minus the upfront rent and network fee. This matches what your wallet shows. The refundable rent comes back when you close the accounts / redeem. On rare occasions a busy order book adds a small one-time rent (~0.0006 SOL)." />
+                <Tooltip text="Your actual SOL balance change today — yield received minus the upfront rent and network fee. This matches what your wallet shows. The refundable rent comes back when you close the accounts / redeem." />
               </div>
             ),
             right: (
