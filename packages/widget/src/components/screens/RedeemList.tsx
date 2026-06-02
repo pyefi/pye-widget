@@ -4,10 +4,11 @@ import { useWidgetStore } from "../../stores/widget-store";
 import {
   maturities,
   executeRedeem,
-  fetchBalances,
+  fetchBalancesForMints,
   fetchUserStakeAccounts,
   writeCachedWalletBalances,
   getPyeConfig,
+  selectTrackedTokenMints,
   type BondRow,
   type CanonicalMaturity,
 } from "@pyefi/sdk";
@@ -172,7 +173,7 @@ export default function RedeemList() {
       connection.getBalance(owner, "confirmed")
         .then(setBalanceLamports)
         .catch(() => {});
-      fetchBalances(connection, owner)
+      fetchBalancesForMints(connection, owner, selectTrackedTokenMints(bonds, validators))
         .then((bals) => {
           setWalletBalances(bals);
           writeCachedWalletBalances(owner.toBase58(), bals);
@@ -182,7 +183,7 @@ export default function RedeemList() {
         .then(setUserStakeAccounts)
         .catch(() => {});
     }
-  }, [connection, wallet, setRedeemError, setRedeemingMint, setRedeemAmountSol, setRedeemTxSignature, navigate, setBalanceLamports, setWalletBalances, setUserStakeAccounts]);
+  }, [connection, wallet, bonds, validators, setRedeemError, setRedeemingMint, setRedeemAmountSol, setRedeemTxSignature, navigate, setBalanceLamports, setWalletBalances, setUserStakeAccounts]);
 
   return (
     <Body padding={0} style={{ borderTop: "none" }}>

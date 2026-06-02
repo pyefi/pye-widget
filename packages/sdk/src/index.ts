@@ -48,6 +48,7 @@ export {
   createLockupStore,
   selectBondsForValidator,
   selectBond,
+  selectTrackedTokenMints,
 } from "./stores/lockup-store";
 export type {
   LockupStore, LockupState, LockupActions, BondRow, CanonicalMaturity,
@@ -55,7 +56,7 @@ export type {
 
 // Lib — Data fetching
 export { fetchUserStakeAccounts } from "./lib/fetch-user-stake-accounts";
-export { fetchBalances, fetchBalancesForMints } from "./lib/fetch-balances";
+export { fetchBalancesForMints } from "./lib/fetch-balances";
 export { readCachedWalletBalances, writeCachedWalletBalances } from "./lib/wallet-balances-cache";
 export { fetchExchangeBalances } from "./lib/fetch-exchange-balances";
 export type { ExchangeBalancesResult } from "./lib/fetch-exchange-balances";
