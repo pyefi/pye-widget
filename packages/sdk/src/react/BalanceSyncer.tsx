@@ -1,8 +1,15 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useConnection } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
-import { useWalletStore, useBalanceStore, useMarketStore } from "./providers";
-import { fetchBalances } from "../lib/fetch-balances";
+import {
+  useWalletStore,
+  useBalanceStore,
+  useMarketStore,
+  useLockupStore,
+  useValidatorStore,
+} from "./providers";
+import { fetchBalancesForMints } from "../lib/fetch-balances";
+import { selectTrackedTokenMints } from "../stores/lockup-store";
 import { fetchExchangeBalances } from "../lib/fetch-exchange-balances";
 import { fetchUserStakeAccounts } from "../lib/fetch-user-stake-accounts";
 import {
@@ -32,6 +39,16 @@ export default function BalanceSyncer() {
   const resetBalances = useBalanceStore((s) => s.resetBalances);
   const marketsRecord = useMarketStore((s) => s.markets);
   const markets = Object.values(marketsRecord);
+  const bonds = useLockupStore((s) => s.bonds);
+  const validators = useValidatorStore((s) => s.validators);
+  // PT+RT mints to track — derived from the already-synced lockup + validator
+  // stores (widget-enabled canonical bonds), so the balance path makes no extra
+  // Supabase calls. Both syncers fetch once, so this is stable after load.
+  const trackedMints = useMemo(
+    () => selectTrackedTokenMints(bonds, validators),
+    [bonds, validators],
+  );
+  const mintsKey = trackedMints.join(",");
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const prevPublicKeyRef = useRef<string | null>(null);
 
@@ -85,16 +102,6 @@ export default function BalanceSyncer() {
         setUserStakeAccountsLoading(false);
       });
 
-    fetchBalances(connection, owner)
-      .then((walletBals) => {
-        if (prevPublicKeyRef.current !== pkAtStart) return;
-        setWalletBalances(walletBals);
-        writeCachedWalletBalances(pkAtStart, walletBals);
-      })
-      .catch((err) => {
-        console.error("[BalanceSyncer] wallet-balances fetch failed:", err);
-      });
-
     fetchExchangeBalances(connection, owner, markets)
       .then((exchangeResult) => {
         if (prevPublicKeyRef.current !== pkAtStart) return;
@@ -119,15 +126,6 @@ export default function BalanceSyncer() {
         })
         .catch((err) => {
           console.error("[BalanceSyncer] stake-accounts poll failed:", err);
-        });
-      fetchBalances(connection, owner)
-        .then((walletBals) => {
-          if (prevPublicKeyRef.current !== pkAtStart) return;
-          setWalletBalances(walletBals);
-          writeCachedWalletBalances(pkAtStart, walletBals);
-        })
-        .catch((err) => {
-          console.error("[BalanceSyncer] wallet-balances poll failed:", err);
         });
       fetchExchangeBalances(connection, owner, markets)
         .then((exchangeResult) => {
@@ -166,6 +164,39 @@ export default function BalanceSyncer() {
     setUserStakeAccountsLoading,
     resetBalances,
   ]);
+
+  // Wallet PT/RT balances — kept in its own effect so it re-runs when the
+  // tracked-mint set first loads (or changes) without re-triggering the
+  // expensive stake/exchange scans above. Polls on the same cadence.
+  useEffect(() => {
+    if (status !== "connected" || !publicKey || trackedMints.length === 0) {
+      return;
+    }
+    const owner = new PublicKey(publicKey);
+    const pkAtStart = publicKey;
+    let cancelled = false;
+
+    const run = () => {
+      fetchBalancesForMints(connection, owner, trackedMints)
+        .then((walletBals) => {
+          if (cancelled || prevPublicKeyRef.current !== pkAtStart) return;
+          setWalletBalances(walletBals);
+          writeCachedWalletBalances(pkAtStart, walletBals);
+        })
+        .catch((err) => {
+          console.error("[BalanceSyncer] wallet-balances fetch failed:", err);
+        });
+    };
+
+    run();
+    const id = setInterval(run, POLL_INTERVAL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+    // trackedMints is stable by content via mintsKey.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, publicKey, connection, mintsKey, setWalletBalances]);
 
   return null;
 }

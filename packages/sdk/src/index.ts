@@ -48,6 +48,7 @@ export {
   createLockupStore,
   selectBondsForValidator,
   selectBond,
+  selectTrackedTokenMints,
 } from "./stores/lockup-store";
 export type {
   LockupStore, LockupState, LockupActions, BondRow, CanonicalMaturity,
@@ -55,7 +56,7 @@ export type {
 
 // Lib — Data fetching
 export { fetchUserStakeAccounts } from "./lib/fetch-user-stake-accounts";
-export { fetchBalances, fetchBalancesForMints } from "./lib/fetch-balances";
+export { fetchBalancesForMints } from "./lib/fetch-balances";
 export { readCachedWalletBalances, writeCachedWalletBalances } from "./lib/wallet-balances-cache";
 export { fetchExchangeBalances } from "./lib/fetch-exchange-balances";
 export type { ExchangeBalancesResult } from "./lib/fetch-exchange-balances";
@@ -85,13 +86,11 @@ export type {
 // Lib — RT estimation
 export { estimateRtFromStake, fetchEpochSyncedNowTs, fetchDepositStartTs, resolveDepositStartTs } from "./lib/estimate-rt";
 export type { EstimateRtFromStakeParams } from "./lib/estimate-rt";
-export { computeDepositCostBreakdown } from "./lib/deposit-costs";
-export type { DepositCostBreakdown, DepositCostBreakdownParams } from "./lib/deposit-costs";
 
 // Lib — Transaction execution
 export { executeStakeDeposit, executeStakeAccountDeposit } from "./lib/execute-stake-deposit";
-export { executeDepositAndSell } from "./lib/execute-deposit-and-sell";
-export type { ExecuteDepositAndSellParams, ExecuteDepositAndSellResult } from "./lib/execute-deposit-and-sell";
+export { executeDepositAndSell, simulateDepositAndSellNetSol, buildDepositAndSellTx } from "./lib/execute-deposit-and-sell";
+export type { ExecuteDepositAndSellParams, ExecuteDepositAndSellResult, BuildDepositAndSellParams } from "./lib/execute-deposit-and-sell";
 export type {
   ExecuteStakeDepositParams, ExecuteStakeDepositResult,
   ExecuteStakeAccountDepositParams,

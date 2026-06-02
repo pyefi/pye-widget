@@ -120,9 +120,26 @@ export interface ExecuteDepositAndSellResult {
  *   6. transfer → Pye taker fee (wSOL) from owner's wsolAta to treasuryWsol
  *   7. closeAccount → unwraps remaining wSOL to native SOL
  */
-export async function executeDepositAndSell({
+/** Build params are the execute params minus the wallet, plus the owner pubkey
+ *  — so the same builder serves both signing (execute) and simulation. */
+export type BuildDepositAndSellParams = Omit<ExecuteDepositAndSellParams, "wallet"> & {
+  owner: PublicKey;
+};
+
+export interface BuiltDepositAndSellTx {
+  vtx: VersionedTransaction;
+  splitKeypair: Keypair | null;
+  latestBlockhash: Awaited<ReturnType<Connection["getLatestBlockhash"]>>;
+}
+
+/**
+ * Builds (but does not send) the bundled deposit-and-sell v0 transaction.
+ * Shared by `executeDepositAndSell` (signs + sends) and
+ * `simulateDepositAndSellNetSol` (simulates to preview the wallet delta).
+ */
+export async function buildDepositAndSellTx({
   connection,
-  wallet,
+  owner,
   bondPubkey,
   principalTokenMint,
   yieldTokenMint,
@@ -135,12 +152,7 @@ export async function executeDepositAndSell({
   minReceiveTokens,
   expectedSolOut,
   altPubkey,
-}: ExecuteDepositAndSellParams): Promise<ExecuteDepositAndSellResult> {
-  if (!wallet.publicKey || !wallet.sendTransaction) {
-    throw new Error("Wallet not connected");
-  }
-
-  const owner = wallet.publicKey;
+}: BuildDepositAndSellParams): Promise<BuiltDepositAndSellTx> {
   const bond = new PublicKey(bondPubkey);
   const ptMint = new PublicKey(principalTokenMint);
   const ytMint = new PublicKey(yieldTokenMint);
@@ -337,24 +349,28 @@ export async function executeDepositAndSell({
   const vtx = new VersionedTransaction(message);
   if (splitKeypair) vtx.sign([splitKeypair]);
 
-  // Log serialized size so we can verify we're under the 1232-byte limit.
-  try {
-    const serialized = vtx.serialize();
-    console.log(
-      `[executeDepositAndSell] v0 tx size=${serialized.length}B ` +
-      `(limit=1232) alt=${altPubkey.slice(0, 8)}... skipped=[ownerPt:${ownerPtExists},ownerYt:${ownerYtExists},` +
-      `feeWalletPt:${feeWalletPtExists},feeWalletYt:${feeWalletYtExists},` +
-      `wsolAta:${wsolAtaExists},treasuryWsol:${treasuryWsolExists}] feeLamports=${feeLamports}`,
-    );
-  } catch (err) {
-    console.warn("[executeDepositAndSell] could not measure tx size:", err);
+  return { vtx, splitKeypair, latestBlockhash };
+}
+
+/**
+ * Builds, signs, sends, and confirms the bundled deposit-and-sell transaction.
+ */
+export async function executeDepositAndSell({
+  wallet,
+  ...rest
+}: ExecuteDepositAndSellParams): Promise<ExecuteDepositAndSellResult> {
+  if (!wallet.publicKey || !wallet.sendTransaction) {
+    throw new Error("Wallet not connected");
   }
 
-  // ── Send & confirm ─────────────────────────────────────────────────────────
+  const { vtx, latestBlockhash } = await buildDepositAndSellTx({
+    owner: wallet.publicKey,
+    ...rest,
+  });
 
-  const signature = await wallet.sendTransaction(vtx, connection);
+  const signature = await wallet.sendTransaction(vtx, rest.connection);
 
-  const confirmation = await connection.confirmTransaction(
+  const confirmation = await rest.connection.confirmTransaction(
     {
       signature,
       blockhash: latestBlockhash.blockhash,
@@ -370,4 +386,45 @@ export async function executeDepositAndSell({
   }
 
   return { signature };
+}
+
+/** Compute-budget priority fee for this tx (550k CU × 1000 µLamports). */
+const PRIORITY_FEE_LAMPORTS = Math.ceil((550_000 * 1_000) / 1_000_000);
+
+/**
+ * Simulates the bundled deposit-and-sell and returns the **net SOL change** to
+ * the owner's wallet — exactly what a wallet preview (Phantom) shows. Captures
+ * every real cost (token-account rent, the Manifest market expansion only when
+ * it actually happens, fresh-bond split rent, slippage) without modeling any of
+ * them. `simulateTransaction` doesn't charge the network fee, so we subtract it.
+ *
+ * Throws if the transaction would fail to simulate.
+ */
+export async function simulateDepositAndSellNetSol(
+  params: BuildDepositAndSellParams,
+): Promise<number> {
+  const { connection, owner } = params;
+  const { vtx } = await buildDepositAndSellTx(params);
+
+  const [preLamports, sim] = await Promise.all([
+    connection.getBalance(owner, "confirmed"),
+    connection.simulateTransaction(vtx, {
+      replaceRecentBlockhash: true,
+      commitment: "confirmed",
+      accounts: { encoding: "base64", addresses: [owner.toBase58()] },
+    }),
+  ]);
+
+  if (sim.value.err) {
+    throw new Error(`Simulation failed: ${JSON.stringify(sim.value.err)}`);
+  }
+  const postLamports = sim.value.accounts?.[0]?.lamports;
+  if (postLamports == null) {
+    throw new Error("Simulation returned no balance for the owner");
+  }
+
+  const numSigs = vtx.message.header.numRequiredSignatures;
+  const networkFeeLamports = 5_000 * numSigs + PRIORITY_FEE_LAMPORTS;
+
+  return (postLamports - preLamports - networkFeeLamports) / 1e9;
 }
