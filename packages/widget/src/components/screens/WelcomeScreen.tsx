@@ -150,12 +150,15 @@ export default function WelcomeScreen() {
       if (amount <= 0) continue;
       const bond = ptMintToBond.get(mint);
       if (!bond) continue;
+      // Single-validator widget: only count the configured validator's positions
+      // (matches the redeem list + deposit scoping).
+      if (configuredVoteAccount && bond.validator_vote_account !== configuredVoteAccount) continue;
       const sol = amount / LAMPORTS_PER_SOL;
       total += sol;
       if (now >= bond.maturity_ts) matured += sol;
     }
     return { totalPtSol: total, maturedPtSol: matured };
-  }, [walletBalances, bonds]);
+  }, [walletBalances, bonds, configuredVoteAccount]);
 
   // Sum SOL across active stake accounts on widget-allowed validators only —
   // matches the filter applied in SelectPosition so the headline number can't

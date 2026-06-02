@@ -133,3 +133,22 @@ export function selectBond(
 ): BondRow | null {
   return state.bonds[keyOf(votePubkey, label)] ?? null;
 }
+
+/**
+ * PT + RT mints to track balances for: every canonical bond (the lockup store
+ * already excludes non-canonical / hidden) whose validator is widget-enabled.
+ * `validators` only needs the `widget` flag, so it's typed loosely to avoid a
+ * store import. Both mints are returned — PT drives redeem, RT drives sells.
+ */
+export function selectTrackedTokenMints(
+  bonds: Record<string, BondRow>,
+  validators: Record<string, { widget: boolean | null } | undefined>,
+): string[] {
+  const set = new Set<string>();
+  for (const bond of Object.values(bonds)) {
+    if (validators[bond.validator_vote_account]?.widget !== true) continue;
+    set.add(bond.pt_mint);
+    set.add(bond.rt_mint);
+  }
+  return [...set];
+}

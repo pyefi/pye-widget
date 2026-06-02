@@ -8,7 +8,8 @@ import {
   executeRtSell,
   executeDepositAndSell,
   checkSellLiquidity,
-  fetchBalances,
+  fetchBalancesForMints,
+  selectTrackedTokenMints,
   fetchUserStakeAccounts,
   writeCachedWalletBalances,
   PYE_TRADING_FEE_BPS,
@@ -473,7 +474,7 @@ export default function ReviewQuote() {
     } finally {
       const owner = wallet.publicKey!;
       connection.getBalance(owner, "confirmed").then(setBalanceLamports).catch(() => {});
-      fetchBalances(connection, owner)
+      fetchBalancesForMints(connection, owner, selectTrackedTokenMints(bonds, validators))
         .then((bals) => {
           setWalletBalances(bals);
           writeCachedWalletBalances(owner.toBase58(), bals);
