@@ -124,6 +124,9 @@ export default function ReviewQuote() {
   // source of truth for "Net change today". `Fees` is derived as the gap
   // between the quote and this. null until it resolves (or on sim error).
   const [netSimSol, setNetSimSol] = useState<number | null>(null);
+  // True while the simulation is in flight — drives the loading placeholder so
+  // the Fees / Net rows don't pop in (and the card doesn't jump).
+  const [simLoading, setSimLoading] = useState(false);
 
   const navigate = useWidgetStore((s) => s.navigate);
   const txStatus = useWidgetStore((s) => s.txStatus);
@@ -321,8 +324,10 @@ export default function ReviewQuote() {
       !(grossSellAmount > 0)
     ) {
       setNetSimSol(null);
+      setSimLoading(false);
       return;
     }
+    setSimLoading(true);
     const minReceive = Math.max(grossSellAmount * (1 - slippageBps / 10000), 0);
     simulateDepositAndSellNetSol({
       connection,
@@ -341,10 +346,16 @@ export default function ReviewQuote() {
       altPubkey,
     })
       .then((net) => {
-        if (!cancelled) setNetSimSol(net);
+        if (!cancelled) {
+          setNetSimSol(net);
+          setSimLoading(false);
+        }
       })
       .catch(() => {
-        if (!cancelled) setNetSimSol(null);
+        if (!cancelled) {
+          setNetSimSol(null);
+          setSimLoading(false);
+        }
       });
     return () => {
       cancelled = true;
@@ -555,7 +566,7 @@ export default function ReviewQuote() {
               </p>
             ),
           },
-          ...(feesSol != null ? [{
+          ...(feesSol != null || simLoading ? [{
             key: "fees",
             left: (
               <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
@@ -563,11 +574,13 @@ export default function ReviewQuote() {
                 <Tooltip text={feesTooltip} />
               </div>
             ),
-            right: (
+            right: feesSol != null ? (
               <Odometer
                 value={`−${fmtAmt(feesSol)} SOL`}
                 style={{ ...font(14, c.primary), whiteSpace: "nowrap", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}
               />
+            ) : (
+              <div style={{ width: 54, height: 13, borderRadius: 4, background: c.shadow, opacity: 0.5, flexShrink: 0 }} />
             ),
           }] : []),
           ...(points ? [{
@@ -579,7 +592,7 @@ export default function ReviewQuote() {
               </p>
             ),
           }] : []),
-          ...(netChangeTodaySol != null ? [{
+          ...(netChangeTodaySol != null || simLoading ? [{
             key: "net-today",
             left: (
               <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
@@ -587,11 +600,13 @@ export default function ReviewQuote() {
                 <Tooltip text="Your actual SOL balance change today — the payout above minus fees. This matches what your wallet shows." />
               </div>
             ),
-            right: (
+            right: netChangeTodaySol != null ? (
               <Odometer
                 value={`${netChangeTodaySol >= 0 ? "+" : "−"}${fmtAmt(Math.abs(netChangeTodaySol))} SOL`}
                 style={{ ...font(15, netChangeTodaySol >= 0 ? c.green : c.primary, 600), whiteSpace: "nowrap", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}
               />
+            ) : (
+              <div style={{ width: 64, height: 14, borderRadius: 4, background: c.shadow, opacity: 0.5, flexShrink: 0 }} />
             ),
           }] : []),
         ];
