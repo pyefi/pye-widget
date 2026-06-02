@@ -85,13 +85,11 @@ export type {
 // Lib — RT estimation
 export { estimateRtFromStake, fetchEpochSyncedNowTs, fetchDepositStartTs, resolveDepositStartTs } from "./lib/estimate-rt";
 export type { EstimateRtFromStakeParams } from "./lib/estimate-rt";
-export { computeDepositCostBreakdown } from "./lib/deposit-costs";
-export type { DepositCostBreakdown, DepositCostBreakdownParams } from "./lib/deposit-costs";
 
 // Lib — Transaction execution
 export { executeStakeDeposit, executeStakeAccountDeposit } from "./lib/execute-stake-deposit";
-export { executeDepositAndSell } from "./lib/execute-deposit-and-sell";
-export type { ExecuteDepositAndSellParams, ExecuteDepositAndSellResult } from "./lib/execute-deposit-and-sell";
+export { executeDepositAndSell, simulateDepositAndSellNetSol, buildDepositAndSellTx } from "./lib/execute-deposit-and-sell";
+export type { ExecuteDepositAndSellParams, ExecuteDepositAndSellResult, BuildDepositAndSellParams } from "./lib/execute-deposit-and-sell";
 export type {
   ExecuteStakeDepositParams, ExecuteStakeDepositResult,
   ExecuteStakeAccountDepositParams,

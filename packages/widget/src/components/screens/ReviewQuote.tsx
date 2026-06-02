@@ -16,11 +16,9 @@ import {
   estimateRtFromStake,
   fetchDepositStartTs,
   resolveDepositStartTs,
-  computeDepositCostBreakdown,
+  simulateDepositAndSellNetSol,
   type CanonicalMaturity,
-  type DepositCostBreakdown,
 } from "@pyefi/sdk";
-import { PublicKey } from "@solana/web3.js";
 import {
   useMarketStore,
   useBalanceStore,
@@ -122,9 +120,10 @@ export default function ReviewQuote() {
   // Per-bond issuance-accrual start (resolved below, once the bond is known).
   const [depositStartTs, setDepositStartTs] = useState<number | null>(null);
 
-  // Deterministic upfront-cost breakdown for the bundled tx (rent + fees).
-  // Amount-independent, so resolved once per (owner, bond).
-  const [costs, setCosts] = useState<DepositCostBreakdown | null>(null);
+  // Simulated net SOL change to the wallet (from simulateTransaction) — the
+  // source of truth for "Net change today". `Fees` is derived as the gap
+  // between the quote and this. null until it resolves (or on sim error).
+  const [netSimSol, setNetSimSol] = useState<number | null>(null);
 
   const navigate = useWidgetStore((s) => s.navigate);
   const txStatus = useWidgetStore((s) => s.txStatus);
@@ -215,58 +214,20 @@ export default function ReviewQuote() {
       ? liquidityCheck.expectedFillPrice * rtAmount
       : 0;
 
-  // Net-of-fee SOL shown to the user and paid out after treasury transfer
+  // Net-of-Pye payout — used at sign time and on the success screen.
   const sellAmount = applyTradingFee(grossSellAmount);
-  const feeAmountSol = grossSellAmount - sellAmount;
   const feePct = (PYE_TRADING_FEE_BPS / 100).toFixed(2);
 
-  // Net SOL the wallet actually gains today = yield payout minus upfront rent
-  // and network fee. Matches Phantom's previewed balance change. Most of the
-  // rent is refundable (see the cost rows below), so this can be negative on
-  // small deposits even though the position itself is net-positive.
-  const netChangeTodaySol =
-    costs != null
-      ? sellAmount -
-        costs.refundableRentSol -
-        costs.nonRefundableSetupSol -
-        costs.networkFeeSol
-      : null;
-
-  // All non-yield costs collapsed into one "Fees" line. Pye's 0.5% is already
-  // baked into `sellAmount`, so it's NOT in this total (it's disclosed in the
-  // tooltip) — keeps the visible rows summing: you receive − fees = net.
-  const feesTotalSol =
-    costs != null
-      ? costs.refundableRentSol + costs.nonRefundableSetupSol + costs.networkFeeSol
-      : null;
-  // Friendly format for cost amounts — floor trivially-small values so the row
-  // doesn't read like "−0.000011 SOL".
-  const fmtCost = (x: number) =>
-    x > 0 && x < 0.0001 ? "< 0.0001" : formatSolAmount(x);
-  const feesTooltip =
-    costs != null
-      ? (() => {
-          const hasOneTime =
-            costs.refundableRentSol > 0 || costs.nonRefundableSetupSol > 0;
-          const parts = [
-            costs.refundableRentSol > 0
-              ? `token-account rent ≈${formatSolAmount(costs.refundableRentSol)} SOL`
-              : null,
-            costs.nonRefundableSetupSol > 0
-              ? `market setup ≈${formatSolAmount(costs.nonRefundableSetupSol)} SOL`
-              : null,
-            `network fee ≈${formatSolAmount(costs.networkFeeSol)} SOL`,
-          ].filter(Boolean) as string[];
-          const breakdown = parts.join(", ");
-          const sentence =
-            breakdown.charAt(0).toUpperCase() + breakdown.slice(1) + ".";
-          const protocol = `The ${feePct}% protocol fee (≈${formatSolAmount(feeAmountSol)} SOL) is already included in the payout above.`;
-          const later = hasOneTime
-            ? " Later deposits to this market cost only the network fee."
-            : "";
-          return `${sentence} ${protocol}${later}`;
-        })()
-      : "";
+  // "You receive today" = the gross order-book quote (value of the rewards
+  // you're selling, before fees). The real wallet delta comes from simulating
+  // the actual transaction (`netSimSol`); "Fees" is just the gap between the
+  // two — so it captures the Pye fee, Solana network fee, token / Manifest
+  // market rent, and any slippage with zero per-cost modeling.
+  const netChangeTodaySol = netSimSol;
+  const feesSol = netSimSol != null ? grossSellAmount - netSimSol : null;
+  const fmtAmt = (x: number) =>
+    Math.abs(x) > 0 && Math.abs(x) < 0.0001 ? "< 0.0001" : formatSolAmount(x);
+  const feesTooltip = `The difference between the quoted rewards and what actually lands in your wallet. Includes the Solana network fee, Pye's ${feePct}% protocol fee, rent for your token accounts (and the Manifest market, where applicable), and any order-book slippage.`;
 
   // Slippage tolerance from slider (0-5 float)
   const slippage = slippageBps / 100;
@@ -341,39 +302,55 @@ export default function ReviewQuote() {
     };
   }, [connection, resolveBondPubkey]);
 
-  // Deterministic upfront-cost breakdown so the 4/4 screen reconciles with the
-  // wallet's net balance change (what Phantom previews). Resolved per bond.
+  // Preview the actual wallet delta by simulating the real bundled tx — this is
+  // the source of truth for "Net change today" (matches what the wallet shows).
+  // Only the stake-account path uses the bundled tx; liquid-sol is skipped.
   const owner = wallet.publicKey;
   const ownerKey = owner?.toBase58() ?? null;
-  const isPartialDeposit =
-    selectedStakeAccountPubkey !== "liquid-sol" &&
-    parsedAmount > 0 &&
-    parsedAmount < selectedStakeAccountBalance;
   useEffect(() => {
     let cancelled = false;
-    if (!owner || !bondParams || !rtMarket) {
-      setCosts(null);
+    const altPubkey = selectedValidatorAltPubkey;
+    if (
+      !owner ||
+      !bondParams ||
+      !rtMarket ||
+      !altPubkey ||
+      selectedStakeAccountPubkey === "liquid-sol" ||
+      selectedStakeAccountPubkey == null ||
+      !(rtAmount > 0) ||
+      !(grossSellAmount > 0)
+    ) {
+      setNetSimSol(null);
       return;
     }
-    computeDepositCostBreakdown({
+    const minReceive = Math.max(grossSellAmount * (1 - slippageBps / 10000), 0);
+    simulateDepositAndSellNetSol({
       connection,
       owner,
-      principalTokenMint: new PublicKey(bondParams.principalTokenMint),
-      yieldTokenMint: new PublicKey(bondParams.yieldTokenMint),
-      bondPubkey: new PublicKey(bondParams.bondPubkey),
-      isPartial: isPartialDeposit,
+      bondPubkey: bondParams.bondPubkey,
+      principalTokenMint: bondParams.principalTokenMint,
+      yieldTokenMint: bondParams.yieldTokenMint,
+      validatorVoteAccount: bondParams.voteAccount,
+      stakeAccountPubkey: selectedStakeAccountPubkey,
+      amountSol: parsedAmount,
+      stakeBalanceSol: selectedStakeAccountBalance,
+      marketPubkey: rtMarket.marketPubkey,
+      rtAmountToSell: rtAmount,
+      minReceiveTokens: minReceive,
+      expectedSolOut: grossSellAmount,
+      altPubkey,
     })
-      .then((b) => {
-        if (!cancelled) setCosts(b);
+      .then((net) => {
+        if (!cancelled) setNetSimSol(net);
       })
       .catch(() => {
-        if (!cancelled) setCosts(null);
+        if (!cancelled) setNetSimSol(null);
       });
     return () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [connection, ownerKey, resolveBondPubkey, rtMarket?.marketPubkey, isPartialDeposit]);
+  }, [connection, ownerKey, resolveBondPubkey, rtMarket?.marketPubkey, selectedStakeAccountPubkey, parsedAmount, depositStartTs]);
 
   const handleSign = useCallback(async () => {
     if (!selectedStakeAccountPubkey || !selectedMaturityId) return;
@@ -534,12 +511,12 @@ export default function ReviewQuote() {
             left: (
               <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
                 <p style={font(14, c.secondary)}>You receive today</p>
-                <Tooltip text="Estimated upfront payout at current market rates, after the 0.5% protocol fee. Account and network costs are shown below. Final amount is confirmed when your order fills on the Pye orderbook." />
+                <Tooltip text="The value of the rewards you're selling at current market rates, before fees. Fees and your net wallet change are shown below. Final amount is confirmed when your order fills on the Pye orderbook." />
               </div>
             ),
             right: (
               <Odometer
-                value={`+${formatSolAmount(sellAmount)} SOL`}
+                value={`+${formatSolAmount(grossSellAmount)} SOL`}
                 style={{ ...font(15, c.green, 500), whiteSpace: "nowrap", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}
               />
             ),
@@ -578,7 +555,7 @@ export default function ReviewQuote() {
               </p>
             ),
           },
-          ...(costs && feesTotalSol != null ? [{
+          ...(feesSol != null ? [{
             key: "fees",
             left: (
               <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
@@ -588,7 +565,7 @@ export default function ReviewQuote() {
             ),
             right: (
               <Odometer
-                value={`−${fmtCost(feesTotalSol)} SOL`}
+                value={`−${fmtAmt(feesSol)} SOL`}
                 style={{ ...font(14, c.primary), whiteSpace: "nowrap", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}
               />
             ),
@@ -612,7 +589,7 @@ export default function ReviewQuote() {
             ),
             right: (
               <Odometer
-                value={`${netChangeTodaySol >= 0 ? "+" : "−"}${formatSolAmount(Math.abs(netChangeTodaySol))} SOL`}
+                value={`${netChangeTodaySol >= 0 ? "+" : "−"}${fmtAmt(Math.abs(netChangeTodaySol))} SOL`}
                 style={{ ...font(15, netChangeTodaySol >= 0 ? c.green : c.primary, 600), whiteSpace: "nowrap", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}
               />
             ),
