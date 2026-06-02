@@ -12,27 +12,45 @@ const SOL_MINT = "So11111111111111111111111111111111111111112";
 const MAX_ACCOUNTS_PER_REQUEST = 100;
 
 /**
- * Resolves the PT/RT mints to track from the **live** Supabase bonds — not the
+ * Resolves the PT/RT mints to track from the **live** Supabase data — not the
  * deprecated static token list, which is filtered to `is_allowed` validators
  * and silently drops e.g. Binance, so their positions never appear (redeem
- * stays disabled). Scoped to the configured vote account for single-validator
- * widgets. Falls back to the static list only if the query fails.
+ * stays disabled).
+ *
+ * Universe = canonical (`canonical_label NOT NULL`) bonds of validators that
+ * are `widget = true`. Single-validator widgets narrow that to the configured
+ * vote account (a subset). Falls back to the static list only on query error.
  */
 async function resolveTrackedMints(): Promise<string[]> {
   try {
     const config = getPyeConfig();
     const supabase = createClient(config.supabaseUrl, config.supabaseAnonKey);
-    let query = supabase
+
+    // Which validators' bonds to track.
+    let voteAccounts: string[];
+    if (config.voteAccount) {
+      voteAccounts = [config.voteAccount];
+    } else {
+      const { data: vals, error: valErr } = await supabase
+        .from("validator_metadata_configs")
+        .select("vote_pubkey")
+        .eq("widget", true);
+      if (valErr || !vals) throw valErr ?? new Error("no widget validators");
+      voteAccounts = vals
+        .map((v) => v.vote_pubkey)
+        .filter((v): v is string => Boolean(v));
+    }
+    if (voteAccounts.length === 0) return [];
+
+    const { data: bonds, error: bondErr } = await supabase
       .from("solo_validator_bonds")
       .select("principal_token_mint, yield_token_mint")
-      .not("canonical_label", "is", null);
-    if (config.voteAccount) {
-      query = query.eq("validator_vote_account", config.voteAccount);
-    }
-    const { data, error } = await query;
-    if (error || !data) throw error ?? new Error("no bond data");
+      .not("canonical_label", "is", null)
+      .in("validator_vote_account", voteAccounts);
+    if (bondErr || !bonds) throw bondErr ?? new Error("no bond data");
+
     const set = new Set<string>();
-    for (const row of data as Array<{
+    for (const row of bonds as Array<{
       principal_token_mint: string | null;
       yield_token_mint: string | null;
     }>) {
