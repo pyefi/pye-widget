@@ -7,6 +7,7 @@ import {
   fetchBalances,
   fetchUserStakeAccounts,
   writeCachedWalletBalances,
+  getPyeConfig,
   type BondRow,
   type CanonicalMaturity,
 } from "@pyefi/sdk";
@@ -105,6 +106,13 @@ export default function RedeemList() {
   const setBalanceLamports = useWalletStore((s) => s.setBalanceLamports);
 
   const positions: Position[] = useMemo(() => {
+    // Single-validator widgets are scoped to one vote account — only show that
+    // validator's positions, mirroring how deposits are filtered in
+    // fetchUserStakeAccounts. Without this, a wallet's positions from other
+    // validators (e.g. Helios) leak into a /validator/binance widget.
+    const configuredVoteAccount = (() => {
+      try { return getPyeConfig().voteAccount; } catch { return undefined; }
+    })();
     const ptMintToBond = new Map<string, BondRow>();
     for (const bond of Object.values(bonds)) {
       ptMintToBond.set(bond.pt_mint, bond);
@@ -115,6 +123,7 @@ export default function RedeemList() {
       if (amount <= 0) continue;
       const bond = ptMintToBond.get(mint);
       if (!bond) continue;
+      if (configuredVoteAccount && bond.validator_vote_account !== configuredVoteAccount) continue;
       const matTs = bond.maturity_ts;
       const isMatured = now >= matTs;
       const daysLeft = isMatured ? 0 : Math.ceil((matTs * 1000 - Date.now()) / (1000 * 60 * 60 * 24));
