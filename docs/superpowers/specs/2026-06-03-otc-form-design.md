@@ -130,6 +130,34 @@ token idiom (`c`, `font()`), kept out of the already-large `Layout.tsx` (406 lin
 
 ## Open questions / decisions made
 
-- **Entry-point placement:** Welcome screen (chosen default). Could additionally surface on the
-  Redeem list later if desired.
 - **Submission target:** deferred — mocked for this release.
+
+## Update — intelligent entry points + CEO copy (2026-06-03)
+
+### CEO copy changes
+- **Email field removed.** Contact is captured via "How should we reach you?" (Telegram/email);
+  the team follows up for the other channel after. `step1Valid` now only requires the contact field.
+- **SOL-amount helper removed** — the question stands alone.
+- **Timeframe reworded** to "How soon do you need this resolved?".
+
+### Intelligent entry points (pre-fill + start at contact)
+The OTC form now opens via `openOtcForm(prefill?)` (new store action). `prefill` seeds the
+request type, validator, and amount into steps 2–3; the user still lands on step 1 (contact). A
+context banner summarises the pre-filled details on step 1. Cold entries pass no prefill.
+
+Store additions (`widget-store.ts`): `OtcPrefill` interface, `otcPrefill` state, `openOtcForm` action.
+Request-type label constants are exported from `OtcForm.tsx` (`OTC_REQUEST_OVERSIZED`,
+`OTC_REQUEST_EARLY_REDEEM`) as the single source of truth for callers.
+
+Shipping **two** entry points (decided 2026-06-03):
+1. **Sell → ReviewQuote (4/4):** when `liquidityCheck.isSufficientLiquidity === false`, the
+   "Insufficient liquidity" box gains a **"Request OTC liquidity →"** action. Prefill: oversized
+   request type + selected validator + deposit amount. (Most reliable signal.)
+2. **Redeem list:** non-matured positions (`!isMatured`) show a **"Redeem early →"** link.
+   Prefill: early-redemption request type + position validator + PT amount.
+
+Considered and dropped for this release: a ChooseAmount (2/4) amount-threshold nudge and a generic
+Welcome link. The form is intentionally reachable only from the two contextual triggers above.
+
+### Backend
+Submission stays mocked here. Wiring the submit handler to a real endpoint is a **separate PR**.
