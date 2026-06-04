@@ -2,6 +2,7 @@ import { type ReactNode, type CSSProperties, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { c, font } from "../design-system";
 import { PyeWordmark } from "../Icons";
+import { LINKS } from "../../links";
 
 export function Widget({ children }: { children: ReactNode }) {
   return (
@@ -377,6 +378,36 @@ export function Footer() {
       <a href="https://pye.fi/" target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", gap: 8, textDecoration: "none" }}>
         <span style={font(15, c.secondary)}>Powered by</span>
         <PyeWordmark />
+      </a>
+    </div>
+  );
+}
+
+// Post-transaction feedback & support card. Both feedback and support route to
+// Discord; Telegram/X sit alongside as secondary social links. Kept to a single
+// row so it never forces a scroll on the success screens.
+export function SupportCard() {
+  const discordBtn: CSSProperties = {
+    display: "flex", alignItems: "center", justifyContent: "center",
+    height: 32, borderRadius: 8, padding: "0 14px",
+    background: c.highlight,
+    borderTop: `1px solid ${c.highlight}`,
+    boxShadow: `inset 0 -1px 0 ${c.shadow}`,
+    textDecoration: "none", flexShrink: 0, whiteSpace: "nowrap",
+    ...font(13, c.primary, 500),
+  };
+
+  return (
+    <div style={{
+      background: c.raised,
+      borderTop: `1px solid ${c.highlight}`,
+      boxShadow: `inset 0 -1px 0 ${c.shadow}`,
+      borderRadius: 8, padding: "10px 12px",
+      display: "flex", alignItems: "center", gap: 10,
+    }}>
+      <p style={{ ...font(14, c.primary), flex: 1, minWidth: 0 }}>Feedback or need help?</p>
+      <a href={LINKS.discordSupport} target="_blank" rel="noreferrer" style={discordBtn}>
+        Ask on Discord
       </a>
     </div>
   );
