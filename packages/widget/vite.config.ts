@@ -27,6 +27,7 @@ export default defineConfig(({ mode }) => {
         ? {}
         : {
             external: [
+              "buffer",
               "react",
               "react-dom",
               "react/jsx-runtime",
