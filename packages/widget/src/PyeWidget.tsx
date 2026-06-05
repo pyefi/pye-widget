@@ -1,4 +1,4 @@
-import { useRef, useMemo } from "react";
+import { useRef, useMemo, useCallback } from "react";
 import {
   ConnectionProvider,
   WalletProvider,
@@ -68,6 +68,19 @@ export default function PyeWidget({
     [],
   );
 
+  const fetchMiddleware = useCallback(
+    (
+      url: Parameters<typeof fetch>[0],
+      opts: Parameters<typeof fetch>[1],
+      fetcher: (...args: Parameters<typeof fetch>) => void,
+    ) => {
+      const headers = new Headers(opts?.headers);
+      headers.delete("solana-client");
+      fetcher(url, { ...opts, headers });
+    },
+    [],
+  );
+
   const widgetStoreRef = useRef<ReturnType<typeof createWidgetStore>>(undefined);
   if (!widgetStoreRef.current) {
     widgetStoreRef.current = createWidgetStore();
@@ -76,7 +89,7 @@ export default function PyeWidget({
   return (
     <div data-theme={theme}>
       <style>{THEME_CSS}</style>
-      <ConnectionProvider endpoint={rpcUrl}>
+      <ConnectionProvider endpoint={rpcUrl} config={{ fetchMiddleware }}>
         <WalletProvider wallets={wallets} autoConnect>
           <PyeSDKProvider>
             <WalletSyncer />
