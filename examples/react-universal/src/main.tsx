@@ -201,12 +201,13 @@ const GLOBAL_CSS = `
 
 function App() {
   const [open, setOpen] = useState(false);
+  const [validBlocksOpen, setValidBlocksOpen] = useState(false);
   const [theme, _setTheme] = useState<WidgetTheme>(loadTheme);
   const [brandColor, _setBrandColor] = useState(loadBrand);
   const [brandHex, setBrandHex] = useState(loadBrand);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open && !validBlocksOpen) return;
     const scrollY = window.scrollY;
     const scrollbarW = window.innerWidth - document.documentElement.clientWidth;
     document.body.style.position = "fixed";
@@ -224,7 +225,7 @@ function App() {
       document.body.style.paddingRight = "";
       window.scrollTo(0, scrollY);
     };
-  }, [open]);
+  }, [open, validBlocksOpen]);
 
   const isNeutral = theme.startsWith("neutral");
   const t = PAGE_THEMES[theme];
@@ -458,26 +459,45 @@ function App() {
             and receive SOL upfront. Your stake stays put. Your principal comes
             back at maturity.
           </p>
-          <button
-            className="demo-cta"
-            onClick={() => setOpen(true)}
-            style={{
-              width: "fit-content",
-              padding: "14px 36px",
-              fontSize: 15,
-              fontWeight: 600,
-              fontFamily: "'Inter', sans-serif",
-              background: t.accent,
-              color: brandTextColor(t.accent),
-              border: "none",
-              borderRadius: 10,
-              cursor: "pointer",
-              boxShadow:
-                `0 0 24px ${t.accentGlow}, 0 4px 12px rgba(0,0,0,0.2)`,
-            }}
-          >
-            Get started
-          </button>
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+            <button
+              className="demo-cta"
+              onClick={() => setOpen(true)}
+              style={{
+                width: "fit-content",
+                padding: "14px 36px",
+                fontSize: 15,
+                fontWeight: 600,
+                fontFamily: "'Inter', sans-serif",
+                background: t.accent,
+                color: brandTextColor(t.accent),
+                border: "none",
+                borderRadius: 10,
+                cursor: "pointer",
+                boxShadow: `0 0 24px ${t.accentGlow}, 0 4px 12px rgba(0,0,0,0.2)`,
+              }}
+            >
+              Get started
+            </button>
+            <button
+              className="demo-cta"
+              onClick={() => setValidBlocksOpen(true)}
+              style={{
+                width: "fit-content",
+                padding: "14px 36px",
+                fontSize: 15,
+                fontWeight: 600,
+                fontFamily: "'Inter', sans-serif",
+                background: "transparent",
+                color: t.accent,
+                border: `1.5px solid ${t.accent}`,
+                borderRadius: 10,
+                cursor: "pointer",
+              }}
+            >
+              Valid Blocks
+            </button>
+          </div>
         </div>
 
         {/* Stats */}
@@ -554,6 +574,41 @@ function App() {
           </span>
         </div>
       </div>
+
+      {/* Valid Blocks overlay */}
+      {validBlocksOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          onKeyDown={(e) => { if (e.key === "Escape") setValidBlocksOpen(false); }}
+          style={{
+            position: "fixed",
+            inset: 0,
+            display: "flex",
+            alignItems: "flex-start",
+            justifyContent: "center",
+            paddingTop: "clamp(16px, calc(100dvh - 632px), 80px)",
+            paddingBottom: 16,
+            overflowY: "auto",
+            overscrollBehavior: "contain",
+            background: t.scrim,
+            backdropFilter: "blur(8px)",
+            zIndex: 9999,
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setValidBlocksOpen(false);
+          }}
+        >
+          <PyeWidget
+            rpcUrl={import.meta.env.VITE_RPC_URL}
+            supabaseUrl={import.meta.env.VITE_SUPABASE_URL}
+            supabaseAnonKey={import.meta.env.VITE_SUPABASE_ANON_KEY}
+            theme={theme}
+            voteAccount="6hkfqeNAbURk7CmAQsP4Qm6WwHVF4LxHupEvQf7Tkrf1"
+            onClose={() => setValidBlocksOpen(false)}
+          />
+        </div>
+      )}
 
       {/* Widget overlay */}
       {open && (
