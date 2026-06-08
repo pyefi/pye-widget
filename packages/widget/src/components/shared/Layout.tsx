@@ -384,8 +384,7 @@ export function Footer() {
 }
 
 // Post-transaction feedback & support card. Both feedback and support route to
-// Discord; Telegram/X sit alongside as secondary social links. Kept to a single
-// row so it never forces a scroll on the success screens.
+// Discord. Kept to a single row so it never forces a scroll on the success screens.
 export function SupportCard() {
   const discordBtn: CSSProperties = {
     display: "flex", alignItems: "center", justifyContent: "center",
