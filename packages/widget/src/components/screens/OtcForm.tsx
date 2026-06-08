@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { useWidgetStore } from "../../stores/widget-store";
 import { c, font } from "../design-system";
-import { Body, CTA, StepHeader, SuccessHeader, Spacer, StepTitle } from "../shared/Layout";
+import { Body, CTA, StepHeader, SuccessHeader, Spacer, StepTitle, InlineError } from "../shared/Layout";
 import { TextField, ChoiceGroup, isOther } from "../shared/FormControls";
+import { submitOtcRequest } from "@pyefi/sdk";
 
 interface FormFields {
   name: string;
@@ -54,6 +55,7 @@ export default function OtcForm() {
   }));
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const set = <K extends keyof FormFields>(key: K, value: FormFields[K]) =>
     setFields((f) => ({ ...f, [key]: value }));
@@ -63,14 +65,38 @@ export default function OtcForm() {
     fields.requestType !== null &&
     (!isOther(fields.requestType) || fields.requestTypeOther.trim() !== "");
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (submitting) return;
     setSubmitting(true);
-    // Mocked submission — the real backend wiring lands here later.
-    setTimeout(() => {
-      setSubmitting(false);
+    setError(null);
+
+    const describes = isOther(fields.describes)
+      ? fields.describesOther.trim()
+      : fields.describes ?? "";
+    const requestType = isOther(fields.requestType)
+      ? fields.requestTypeOther.trim()
+      : fields.requestType ?? "";
+
+    try {
+      await submitOtcRequest({
+        contact: fields.contact.trim(),
+        requestType,
+        name: fields.name.trim() || undefined,
+        organization: fields.organization.trim() || undefined,
+        describes: describes || undefined,
+        solAmount: fields.solAmount.trim() || undefined,
+        timeframe: fields.timeframe.trim() || undefined,
+        validator: fields.validator.trim() || undefined,
+      });
       setSubmitted(true);
-    }, 500);
+    } catch (err) {
+      console.error("[OtcForm] submitOtcRequest failed:", err);
+      setError(
+        "Something went wrong sending your request. Please try again.",
+      );
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (submitted) {
@@ -102,7 +128,13 @@ export default function OtcForm() {
     );
   }
 
-  const onBack = step === 0 ? goBack : () => setStep((s) => s - 1);
+  const onBack =
+    step === 0
+      ? goBack
+      : () => {
+          setError(null);
+          setStep((s) => s - 1);
+        };
 
   const continueDisabled =
     (step === 0 && !step1Valid) || (step === 1 && !step2Valid);
@@ -196,6 +228,7 @@ export default function OtcForm() {
         )}
 
         <Spacer />
+        {error && <InlineError message={error} />}
         <CTA
           label={ctaLabel}
           onClick={onContinue}
