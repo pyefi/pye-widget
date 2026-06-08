@@ -20,6 +20,7 @@ import {
 } from "@pyefi/sdk/react";
 import { Body } from "../shared/Layout";
 import { c, font, formatSolAmount } from "../design-system";
+import { OTC_REQUEST_EARLY_REDEEM } from "./OtcForm";
 
 const LAMPORTS_PER_SOL = 1_000_000_000;
 
@@ -38,9 +39,10 @@ interface Position {
   validatorPtIcon: string;
 }
 
-function PositionRow({ position, onRedeem, isRedeeming }: {
+function PositionRow({ position, onRedeem, onRedeemEarly, isRedeeming }: {
   position: Position;
   onRedeem: (p: Position) => void;
+  onRedeemEarly: (p: Position) => void;
   isRedeeming: boolean;
 }) {
   return (
@@ -59,6 +61,17 @@ function PositionRow({ position, onRedeem, isRedeeming }: {
       <div style={{ flex: 1, minWidth: 0 }}>
         <p style={font(15, c.primary)}>{formatSolAmount(position.ptAmount)} PT</p>
         <p style={font(14, c.secondary)}>{position.validatorName} · {position.maturityLabel}</p>
+        {!position.isMatured && (
+          <button
+            onClick={() => onRedeemEarly(position)}
+            style={{
+              background: "none", border: "none", cursor: "pointer", padding: 0,
+              marginTop: 2, textAlign: "left",
+            }}
+          >
+            <span style={font(13, c.purple, 500)}>Redeem early →</span>
+          </button>
+        )}
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
         <p style={{ ...font(14, position.isMatured ? c.green : c.secondary), whiteSpace: "nowrap" }}>
@@ -93,6 +106,7 @@ export default function RedeemList() {
   const wallet = useWallet();
   const walletBalances = useBalanceStore((s) => s.walletBalances);
   const navigate = useWidgetStore((s) => s.navigate);
+  const openOtcForm = useWidgetStore((s) => s.openOtcForm);
   const bonds = useLockupStore((s) => s.bonds);
   const validators = useValidatorStore((s) => s.validators);
 
@@ -185,6 +199,14 @@ export default function RedeemList() {
     }
   }, [connection, wallet, bonds, validators, setRedeemError, setRedeemingMint, setRedeemAmountSol, setRedeemTxSignature, navigate, setBalanceLamports, setWalletBalances, setUserStakeAccounts]);
 
+  const handleRedeemEarly = useCallback((p: Position) => {
+    openOtcForm({
+      requestType: OTC_REQUEST_EARLY_REDEEM,
+      validator: p.validatorName,
+      solAmount: `${formatSolAmount(p.ptAmount)} PT`,
+    });
+  }, [openOtcForm]);
+
   return (
     <Body padding={0} style={{ borderTop: "none" }}>
       <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
@@ -205,6 +227,7 @@ export default function RedeemList() {
                 key={p.ptMint}
                 position={p}
                 onRedeem={handleRedeem}
+                onRedeemEarly={handleRedeemEarly}
                 isRedeeming={redeemingMint === p.ptMint}
               />
             ))}

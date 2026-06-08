@@ -30,6 +30,7 @@ import {
 import { c, font, pointsMap, formatSolAmount, POINTS_ENABLED } from "../design-system";
 import { StepTitle, CTA, Tooltip, Spacer } from "../shared/Layout";
 import { Odometer } from "../shared/Odometer";
+import { OTC_REQUEST_OVERSIZED } from "./OtcForm";
 
 /* ═══════════════════════════════════════════════════════════════════════════
    DiscountSlider — Dan's exact pointer-capture slider
@@ -130,6 +131,8 @@ export default function ReviewQuote() {
   const [simLoading, setSimLoading] = useState(false);
 
   const navigate = useWidgetStore((s) => s.navigate);
+  const openOtcForm = useWidgetStore((s) => s.openOtcForm);
+  const selectedValidatorName = useWidgetStore((s) => s.selectedValidatorName);
   const txStatus = useWidgetStore((s) => s.txStatus);
   const txStep = useWidgetStore((s) => s.txStep);
   const txError = useWidgetStore((s) => s.txError);
@@ -715,6 +718,21 @@ export default function ReviewQuote() {
             Only {liquidityCheck?.totalAvailableSize?.toFixed(2) ?? "0"} RT available on the order book.
             Your order may partially fill or not fill at all.
           </p>
+          <button
+            onClick={() =>
+              openOtcForm({
+                requestType: OTC_REQUEST_OVERSIZED,
+                validator: selectedValidatorName ?? undefined,
+                solAmount: depositAmount ? `${depositAmount} SOL` : undefined,
+              })
+            }
+            style={{
+              background: "none", border: "none", cursor: "pointer", padding: 0,
+              textAlign: "left", alignSelf: "flex-start", marginTop: 4,
+            }}
+          >
+            <span style={font(14, c.purple, 500)}>Request OTC liquidity →</span>
+          </button>
         </div>
       )}
 

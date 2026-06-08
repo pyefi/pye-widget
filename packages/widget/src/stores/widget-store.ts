@@ -14,7 +14,15 @@ export type WidgetScreen =
   | "choose-duration"
   | "review-quote"
   | "complete"
-  | "redeem-complete";
+  | "redeem-complete"
+  | "otc-form";
+
+/** Context carried into the OTC form when opened from an intelligent entry point. */
+export interface OtcPrefill {
+  requestType?: string;
+  validator?: string;
+  solAmount?: string;
+}
 
 export interface WidgetState {
   screen: WidgetScreen;
@@ -49,11 +57,16 @@ export interface WidgetState {
   redeemAmountSol: number | null;
   /** Redeem transaction signature */
   redeemTxSignature: string | null;
+
+  /** Context seeded into the OTC form, or null when opened cold. */
+  otcPrefill: OtcPrefill | null;
 }
 
 export interface WidgetActions {
   navigate(screen: WidgetScreen): void;
   goBack(): void;
+  /** Navigate to the OTC form, optionally seeding it with context to pre-fill. */
+  openOtcForm(prefill?: OtcPrefill | null): void;
   selectStakeAccount(pubkey: string, balance: number, validatorName?: string, validatorIcon?: string, validatorVoteAccount?: string, validatorAltPubkey?: string | null): void;
   setDepositAmount(amount: string): void;
   setSelectedMaturity(id: MaturityId | null): void;
@@ -104,6 +117,8 @@ const initialState: WidgetState = {
   redeemError: null,
   redeemAmountSol: null,
   redeemTxSignature: null,
+
+  otcPrefill: null,
 };
 
 export function createWidgetStore() {
@@ -115,6 +130,14 @@ export function createWidgetStore() {
         set((s) => {
           s.screenHistory.push(s.screen);
           s.screen = screen;
+        });
+      },
+
+      openOtcForm(prefill) {
+        set((s) => {
+          s.otcPrefill = prefill ?? null;
+          s.screenHistory.push(s.screen);
+          s.screen = "otc-form";
         });
       },
 
