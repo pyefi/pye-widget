@@ -202,7 +202,7 @@ export default function WelcomeScreen() {
     userStakeAccountsLoading && userStakeAccounts.length === 0 && !hasAnyBalance;
 
   const redeemSub = !canRedeem
-    ? "No PT positions"
+    ? "No SOL to redeem yet"
     : maturedPtSol > 0
       ? `${formatSolAmount(maturedPtSol)} SOL ready to redeem`
       : `${formatSolAmount(totalPtSol)} SOL locked`;
