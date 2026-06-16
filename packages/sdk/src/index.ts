@@ -105,3 +105,5 @@ export { executeCancelOrder } from "./lib/execute-cancel-order";
 export type { ExecuteCancelOrderParams, ExecuteCancelOrderResult } from "./lib/execute-cancel-order";
 export { executeRedeem } from "./lib/execute-redeem";
 export type { ExecuteRedeemParams, ExecuteRedeemResult } from "./lib/execute-redeem";
+export { submitOtcRequest } from "./lib/submit-otc-request";
+export type { OtcRequestPayload } from "./lib/submit-otc-request";

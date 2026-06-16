@@ -12,6 +12,7 @@ import ReviewQuote from "./screens/ReviewQuote";
 import RedeemList from "./screens/RedeemList";
 import StepComplete from "./screens/StepComplete";
 import RedeemComplete from "./screens/RedeemComplete";
+import OtcForm from "./screens/OtcForm";
 
 const STEP_CONFIG: Partial<Record<WidgetScreen, { step: number; total: number }>> = {
   "select-position": { step: 1, total: 4 },
@@ -77,6 +78,10 @@ export default function WidgetShell() {
 
   if (screen === "welcome") {
     return <Widget><WelcomeScreen /><Footer /></Widget>;
+  }
+
+  if (screen === "otc-form") {
+    return <Widget><OtcForm /><Footer /></Widget>;
   }
 
   if (screen === "yield-forward-intro") {

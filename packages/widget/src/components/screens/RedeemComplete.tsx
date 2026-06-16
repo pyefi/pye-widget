@@ -1,6 +1,6 @@
 import { useWidgetStore } from "../../stores/widget-store";
 import { c, font, displayFont, formatSolAmount } from "../design-system";
-import { Body, CTA, Spacer, SuccessHeader } from "../shared/Layout";
+import { Body, CTA, Spacer, SuccessHeader, SupportCard } from "../shared/Layout";
 import { Odometer } from "../shared/Odometer";
 
 export default function RedeemComplete() {
@@ -118,6 +118,8 @@ export default function RedeemComplete() {
         </div>
 
         <Spacer />
+
+        <SupportCard />
 
         <CTA label="Done" onClick={() => reset()} />
       </Body>

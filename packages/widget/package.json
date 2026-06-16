@@ -1,6 +1,6 @@
 {
   "name": "@pyefi/widget",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "description": "Embeddable Solana yield-trading widget by Pye Finance.",
   "keywords": [
     "solana",
