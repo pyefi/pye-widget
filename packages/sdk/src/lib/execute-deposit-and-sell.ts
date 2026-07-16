@@ -21,12 +21,10 @@ import {
 } from "@solana/spl-token";
 import type { WalletContextState } from "@solana/wallet-adapter-react";
 import { PYE_TREASURY_WALLET, calculateFeeLamports } from "../constants/fees";
-
-// ─── Shared constants (mirrors execute-stake-deposit.ts) ──────────────────────
-
-const BONDS_PROGRAM_ID = new PublicKey(
-  "PYEQZ2qYHPQapnw8Ms8MSPMNzoq59NHHfNwAtuV26wx",
-);
+import { BONDS_PROGRAM_ID, deriveStakeAccount } from "./pdas";
+import { solToLamports, validateStakeDepositAmount, validateSolDepositAmount, DepositValidationError } from "./deposit-validation";
+import { getStakeMinimumDelegationLamports, getStakeRentExemptLamports } from "./stake-requirements";
+import { buildDepositSolInstruction } from "./execute-stake-deposit";
 
 const DEPOSIT_STAKE_DISCRIMINATOR = new Uint8Array([
   21, 14, 117, 220, 1, 60, 23, 13,
@@ -41,14 +39,6 @@ const STAKE_CONFIG = new PublicKey("StakeConfig11111111111111111111111111111111"
 function deriveGlobalSettings(): PublicKey {
   const [pda] = PublicKey.findProgramAddressSync(
     [Buffer.from("global_settings")],
-    BONDS_PROGRAM_ID,
-  );
-  return pda;
-}
-
-function deriveStakeAccount(bond: PublicKey): PublicKey {
-  const [pda] = PublicKey.findProgramAddressSync(
-    [Buffer.from("stake"), bond.toBuffer()],
     BONDS_PROGRAM_ID,
   );
   return pda;
@@ -171,13 +161,15 @@ export async function buildDepositAndSellTx({
     latestBlockhash,
     manifestClient,
     altResponse,
+    minDelegationLamports,
   ] = await Promise.all([
     fetchProtocolFeeWallet(connection, globalSettingsPda),
     fetchTransientStakeAccount(connection, bond),
-    connection.getMinimumBalanceForRentExemption(StakeProgram.space),
+    getStakeRentExemptLamports(connection),
     connection.getLatestBlockhash("confirmed"),
     ManifestClient.getClientReadOnly(connection, marketPk),
     connection.getAddressLookupTable(new PublicKey(altPubkey)),
+    getStakeMinimumDelegationLamports(connection),
   ]);
 
   const altAccount = altResponse.value;
@@ -210,9 +202,17 @@ export async function buildDepositAndSellTx({
     wsolAtaExists, treasuryWsolExists,
   ] = ataInfos.map((info) => info !== null);
 
-  const amountLamports = Math.round(amountSol * 1e9);
-  const totalLamports  = Math.round(stakeBalanceSol * 1e9);
-  const isPartial      = amountLamports < totalLamports;
+  // `stakeBalanceSol` is the account's DELEGATED stake (see the widget wiring in
+  // fetch-user-stake-accounts.ts), not the account total.
+  const amountLamports = solToLamports(amountSol);
+
+  const validation = validateStakeDepositAmount({
+    amountLamports,
+    delegatedLamports: solToLamports(stakeBalanceSol),
+    minDelegationLamports,
+  });
+  if (!validation.ok) throw new DepositValidationError(validation.code, validation.message);
+  const { isPartial } = validation;
 
   // Swap parameters — RT minted is proportional to remaining issuance window,
   // so the caller computes the expected RT with `estimateRtFromStake` and
@@ -392,20 +392,21 @@ export async function executeDepositAndSell({
 const PRIORITY_FEE_LAMPORTS = Math.ceil((550_000 * 1_000) / 1_000_000);
 
 /**
- * Simulates the bundled deposit-and-sell and returns the **net SOL change** to
+ * Simulates a built bundled transaction and returns the **net SOL change** to
  * the owner's wallet — exactly what a wallet preview (Phantom) shows. Captures
  * every real cost (token-account rent, the Manifest market expansion only when
  * it actually happens, fresh-bond split rent, slippage) without modeling any of
- * them. `simulateTransaction` doesn't charge the network fee, so we subtract it.
+ * them. `simulateTransaction` doesn't charge the network fee, so we subtract it
+ * using the same priority fee the sender applies.
  *
  * Throws if the transaction would fail to simulate.
  */
-export async function simulateDepositAndSellNetSol(
-  params: BuildDepositAndSellParams,
+async function simulateNetSolChange(
+  connection: Connection,
+  owner: PublicKey,
+  vtx: VersionedTransaction,
+  priorityFeeLamports: number,
 ): Promise<number> {
-  const { connection, owner } = params;
-  const { vtx } = await buildDepositAndSellTx(params);
-
   const [preLamports, sim] = await Promise.all([
     connection.getBalance(owner, "confirmed"),
     connection.simulateTransaction(vtx, {
@@ -424,7 +425,246 @@ export async function simulateDepositAndSellNetSol(
   }
 
   const numSigs = vtx.message.header.numRequiredSignatures;
-  const networkFeeLamports = 5_000 * numSigs + PRIORITY_FEE_LAMPORTS;
+  const networkFeeLamports = 5_000 * numSigs + priorityFeeLamports;
 
   return (postLamports - preLamports - networkFeeLamports) / 1e9;
+}
+
+/** Simulate the stake-account deposit-and-sell; see {@link simulateNetSolChange}. */
+export async function simulateDepositAndSellNetSol(
+  params: BuildDepositAndSellParams,
+): Promise<number> {
+  const { vtx } = await buildDepositAndSellTx(params);
+  return simulateNetSolChange(params.connection, params.owner, vtx, PRIORITY_FEE_LAMPORTS);
+}
+
+/**
+ * Params for the atomic liquid-SOL deposit + sell — like
+ * `BuildDepositAndSellParams` but with no stake account (deposits native SOL).
+ */
+export interface BuildDepositSolAndSellParams {
+  connection: Connection;
+  owner: PublicKey;
+  // deposit
+  bondPubkey: string;
+  principalTokenMint: string;
+  yieldTokenMint: string;
+  validatorVoteAccount: string;
+  amountSol: number;
+  // sell
+  marketPubkey: string;
+  /**
+   * Expected RT tokens the Bonds program will mint to the user for this
+   * deposit. Compute with `estimateRtFromStake` using an epoch-synced `nowTs`.
+   */
+  rtAmountToSell: number;
+  minReceiveTokens: number;
+  /** Gross SOL out (pre-fee) used to size the Pye taker-fee transfer. */
+  expectedSolOut: number;
+  // v0 lookup table containing this validator's static accounts
+  altPubkey: string;
+}
+
+export interface BuiltDepositSolAndSellTx {
+  vtx: VersionedTransaction;
+  transientKeypair: Keypair | null;
+  latestBlockhash: Awaited<ReturnType<Connection["getLatestBlockhash"]>>;
+}
+
+/**
+ * Builds (but does not send) the bundled liquid-SOL deposit-and-sell v0
+ * transaction. Shared by `executeDepositSolAndSell` and
+ * `simulateDepositSolAndSellNetSol`.
+ */
+export async function buildDepositSolAndSellTx({
+  connection,
+  owner,
+  bondPubkey,
+  principalTokenMint,
+  yieldTokenMint,
+  validatorVoteAccount,
+  amountSol,
+  marketPubkey,
+  rtAmountToSell,
+  minReceiveTokens,
+  expectedSolOut,
+  altPubkey,
+}: BuildDepositSolAndSellParams): Promise<BuiltDepositSolAndSellTx> {
+  const bond = new PublicKey(bondPubkey);
+  const ptMint = new PublicKey(principalTokenMint);
+  const ytMint = new PublicKey(yieldTokenMint);
+  const voteAccount = new PublicKey(validatorVoteAccount);
+  const marketPk = new PublicKey(marketPubkey);
+
+  const globalSettingsPda = deriveGlobalSettings();
+
+  const [
+    protocolFeeWallet,
+    latestBlockhash,
+    manifestClient,
+    altResponse,
+    minDelegationLamports,
+  ] = await Promise.all([
+    fetchProtocolFeeWallet(connection, globalSettingsPda),
+    connection.getLatestBlockhash("confirmed"),
+    ManifestClient.getClientReadOnly(connection, marketPk),
+    connection.getAddressLookupTable(new PublicKey(altPubkey)),
+    getStakeMinimumDelegationLamports(connection),
+  ]);
+
+  const altAccount = altResponse.value;
+  if (!altAccount) {
+    throw new Error(
+      `Address Lookup Table ${altPubkey} not found on-chain — it may not be deployed yet.`,
+    );
+  }
+
+  // allowOwnerOffCurve: true for PDA-backed wallets (Squads vaults, etc.)
+  const ownerPt     = getAssociatedTokenAddressSync(ptMint, owner, true);
+  const ownerYt     = getAssociatedTokenAddressSync(ytMint, owner, true);
+  const feeWalletPt = getAssociatedTokenAddressSync(ptMint, protocolFeeWallet, true);
+  const feeWalletYt = getAssociatedTokenAddressSync(ytMint, protocolFeeWallet, true);
+  const wsolAta     = getAssociatedTokenAddressSync(NATIVE_MINT, owner, true, TOKEN_PROGRAM_ID);
+  const treasuryWsol = getAssociatedTokenAddressSync(
+    NATIVE_MINT, PYE_TREASURY_WALLET, true, TOKEN_PROGRAM_ID,
+  );
+
+  // Pre-check which ATAs already exist so we can skip their createIdempotent ixs.
+  const ataInfos = await connection.getMultipleAccountsInfo([
+    ownerPt, ownerYt, feeWalletPt, feeWalletYt, wsolAta, treasuryWsol,
+  ]);
+  const [
+    ownerPtExists, ownerYtExists, feeWalletPtExists, feeWalletYtExists,
+    wsolAtaExists, treasuryWsolExists,
+  ] = ataInfos.map((info) => info !== null);
+
+  const amountLamportsNum = solToLamports(amountSol);
+
+  const validation = validateSolDepositAmount({
+    amountLamports: amountLamportsNum,
+    minDelegationLamports,
+  });
+  if (!validation.ok) throw new DepositValidationError(validation.code, validation.message);
+
+  // 2 bps safety buffer absorbs clock drift between the caller's quote and the
+  // on-chain mint — asking even 1 atom more than minted fails the swap with
+  // "Insufficient base in atoms".
+  const baseDecimals  = manifestClient.market.baseDecimals();
+  const quoteDecimals = manifestClient.market.quoteDecimals();
+  const rawInAtoms   = Math.floor(rtAmountToSell * 10 ** baseDecimals);
+  const safetyBuffer = Math.max(Math.ceil(rawInAtoms * 0.0002), 100);
+  const inAtoms      = BigInt(Math.max(rawInAtoms - safetyBuffer, 0));
+  const outAtoms     = BigInt(Math.floor(minReceiveTokens * 10 ** quoteDecimals));
+
+  const instructions: TransactionInstruction[] = [];
+
+  // Combined compute budget for deposit_sol (~285k) + Manifest swap (~150k) + margin
+  instructions.push(ComputeBudgetProgram.setComputeUnitLimit({ units: 600_000 }));
+  instructions.push(ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 1_000 }));
+
+  if (!ownerPtExists)      instructions.push(createAssociatedTokenAccountIdempotentInstruction(owner, ownerPt,      owner,               ptMint));
+  if (!ownerYtExists)      instructions.push(createAssociatedTokenAccountIdempotentInstruction(owner, ownerYt,      owner,               ytMint));
+  if (!feeWalletPtExists)  instructions.push(createAssociatedTokenAccountIdempotentInstruction(owner, feeWalletPt,  protocolFeeWallet,   ptMint));
+  if (!feeWalletYtExists)  instructions.push(createAssociatedTokenAccountIdempotentInstruction(owner, feeWalletYt,  protocolFeeWallet,   ytMint));
+  if (!wsolAtaExists)      instructions.push(createAssociatedTokenAccountIdempotentInstruction(owner, wsolAta,      owner,               NATIVE_MINT));
+  if (!treasuryWsolExists) instructions.push(createAssociatedTokenAccountIdempotentInstruction(owner, treasuryWsol, PYE_TREASURY_WALLET, NATIVE_MINT));
+
+  const { ix: depositIx, transientKeypair } = await buildDepositSolInstruction({
+    connection,
+    owner,
+    bond,
+    voteAccount,
+    ptMint,
+    ytMint,
+    ownerPt,
+    ownerYt,
+    feeWalletPt,
+    feeWalletYt,
+    protocolFeeWallet,
+    amountLamports: amountLamportsNum,
+  });
+  instructions.push(depositIx);
+
+  instructions.push(
+    manifestClient.swapIx(owner, {
+      inAtoms,
+      outAtoms,
+      isBaseIn: true,
+      isExactIn: true,
+    }),
+  );
+
+  // Pye taker fee on SOL out → transfer wSOL to treasury before unwrap.
+  const feeLamports = calculateFeeLamports(expectedSolOut);
+  if (feeLamports > BigInt(0)) {
+    instructions.push(
+      createTransferInstruction(wsolAta, treasuryWsol, owner, feeLamports),
+    );
+  }
+
+  instructions.push(createCloseAccountInstruction(wsolAta, owner, owner));
+
+  const message = new TransactionMessage({
+    payerKey: owner,
+    recentBlockhash: latestBlockhash.blockhash,
+    instructions,
+  }).compileToV0Message([altAccount]);
+
+  const vtx = new VersionedTransaction(message);
+  if (transientKeypair) vtx.sign([transientKeypair]);
+
+  return { vtx, transientKeypair, latestBlockhash };
+}
+
+export type ExecuteDepositSolAndSellParams = Omit<BuildDepositSolAndSellParams, "owner"> & {
+  wallet: WalletContextState;
+};
+
+export interface ExecuteDepositSolAndSellResult {
+  signature: string;
+}
+
+/**
+ * Builds, signs, sends, and confirms the bundled liquid-SOL deposit-and-sell
+ * transaction.
+ */
+export async function executeDepositSolAndSell({
+  wallet,
+  ...rest
+}: ExecuteDepositSolAndSellParams): Promise<ExecuteDepositSolAndSellResult> {
+  if (!wallet.publicKey || !wallet.sendTransaction) {
+    throw new Error("Wallet not connected");
+  }
+  const { vtx, latestBlockhash } = await buildDepositSolAndSellTx({
+    owner: wallet.publicKey,
+    ...rest,
+  });
+  const signature = await wallet.sendTransaction(vtx, rest.connection);
+  const confirmation = await rest.connection.confirmTransaction(
+    { signature, blockhash: latestBlockhash.blockhash, lastValidBlockHeight: latestBlockhash.lastValidBlockHeight },
+    "confirmed",
+  );
+  if (confirmation.value.err) {
+    throw new Error(`Transaction failed on-chain: ${JSON.stringify(confirmation.value.err)}`);
+  }
+  return { signature };
+}
+
+/** Compute-budget priority fee for liquid-SOL deposit-and-sell (600k CU × 1000 µLamports). */
+const DEPOSIT_SOL_PRIORITY_FEE_LAMPORTS = Math.ceil((600_000 * 1_000) / 1_000_000);
+
+/**
+ * Simulates the bundled liquid-SOL deposit-and-sell for the net SOL change;
+ * same semantics as `simulateDepositAndSellNetSol` on the native-SOL path.
+ */
+export async function simulateDepositSolAndSellNetSol(
+  params: BuildDepositSolAndSellParams,
+): Promise<number> {
+  const { vtx } = await buildDepositSolAndSellTx(params);
+  return simulateNetSolChange(
+    params.connection,
+    params.owner,
+    vtx,
+    DEPOSIT_SOL_PRIORITY_FEE_LAMPORTS,
+  );
 }
