@@ -16,6 +16,44 @@ const STAKE_STATE_V2_SIZE = 200;
 const U64_MAX = BigInt("18446744073709551615");
 
 /**
+ * Resolves current and next epoch-start timestamps from real on-chain block
+ * times. A fixed 400 ms/slot assumption drifts ~1h late within an epoch (real
+ * slots run slower), which over-estimates RT minting and overshoots the bundled
+ * Manifest swap ("Insufficient base in atoms") on short-dated bonds. Instead we
+ * read `getBlockTime` of the epoch's first slot and project the next boundary
+ * from the previous epoch's measured duration. Falls back to the slot-time
+ * approximation if block times are unavailable (e.g. a pruned RPC).
+ */
+async function resolveEpochBoundaries(connection: Connection): Promise<{
+  currentEpochStartTs: number;
+  nextEpochStartTs: number;
+  epoch: number;
+}> {
+  const epochInfo = await connection.getEpochInfo();
+  const firstSlot = epochInfo.absoluteSlot - epochInfo.slotIndex;
+  try {
+    const [curStart, prevStart] = await Promise.all([
+      connection.getBlockTime(firstSlot),
+      connection.getBlockTime(firstSlot - epochInfo.slotsInEpoch),
+    ]);
+    if (curStart != null && prevStart != null && curStart > prevStart) {
+      const epochDuration = curStart - prevStart;
+      return {
+        currentEpochStartTs: curStart,
+        nextEpochStartTs: curStart + epochDuration,
+        epoch: epochInfo.epoch,
+      };
+    }
+  } catch {
+    // fall through to the slot-time approximation
+  }
+  const elapsed = (epochInfo.slotIndex * DEFAULT_MS_PER_SLOT) / 1000;
+  const dur = (epochInfo.slotsInEpoch * DEFAULT_MS_PER_SLOT) / 1000;
+  const cur = Date.now() / 1000 - elapsed;
+  return { currentEpochStartTs: cur, nextEpochStartTs: cur + dur, epoch: epochInfo.epoch };
+}
+
+/**
  * Returns a UNIX-seconds timestamp aligned with the cluster's perceived
  * **current epoch-start** boundary. This matches the Bonds program's view of
  * time when it merges an already-active stake (`clock.epoch_start_timestamp`).
@@ -23,9 +61,8 @@ const U64_MAX = BigInt("18446744073709551615");
 export async function fetchEpochSyncedNowTs(
   connection: Connection,
 ): Promise<number> {
-  const epochInfo = await connection.getEpochInfo();
-  const elapsedSeconds = (epochInfo.slotIndex * DEFAULT_MS_PER_SLOT) / 1000;
-  return Date.now() / 1000 - elapsedSeconds;
+  const { currentEpochStartTs } = await resolveEpochBoundaries(connection);
+  return currentEpochStartTs;
 }
 
 /**
@@ -49,12 +86,8 @@ export async function fetchEpochSyncedNowTs(
 export async function fetchDepositStartTs(
   connection: Connection,
 ): Promise<number> {
-  const epochInfo = await connection.getEpochInfo();
-  const elapsedSeconds = (epochInfo.slotIndex * DEFAULT_MS_PER_SLOT) / 1000;
-  const epochDurationSeconds =
-    (epochInfo.slotsInEpoch * DEFAULT_MS_PER_SLOT) / 1000;
-  const currentEpochStartTs = Date.now() / 1000 - elapsedSeconds;
-  return currentEpochStartTs + epochDurationSeconds;
+  const { nextEpochStartTs } = await resolveEpochBoundaries(connection);
+  return nextEpochStartTs;
 }
 
 function deriveBondStakeAccount(bond: PublicKey): PublicKey {
@@ -104,12 +137,8 @@ export async function resolveDepositStartTs(
   connection: Connection,
   bondPubkeys: string[],
 ): Promise<Record<string, number>> {
-  const epochInfo = await connection.getEpochInfo();
-  const elapsedSeconds = (epochInfo.slotIndex * DEFAULT_MS_PER_SLOT) / 1000;
-  const epochDurationSeconds =
-    (epochInfo.slotsInEpoch * DEFAULT_MS_PER_SLOT) / 1000;
-  const currentEpochStartTs = Date.now() / 1000 - elapsedSeconds;
-  const nextEpochStartTs = currentEpochStartTs + epochDurationSeconds;
+  const { currentEpochStartTs, nextEpochStartTs, epoch } =
+    await resolveEpochBoundaries(connection);
 
   const unique = [...new Set(bondPubkeys)];
   const pdas = unique.map((b) => deriveBondStakeAccount(new PublicKey(b)));
@@ -117,7 +146,7 @@ export async function resolveDepositStartTs(
 
   const out: Record<string, number> = {};
   unique.forEach((b, i) => {
-    out[b] = isBondStakeFullyActive(infos[i]?.data, epochInfo.epoch)
+    out[b] = isBondStakeFullyActive(infos[i]?.data, epoch)
       ? currentEpochStartTs
       : nextEpochStartTs;
   });
@@ -175,4 +204,25 @@ export function estimateRtFromStake({
   const remaining = Math.max(maturityTs - depositStartTs, 0);
   const gross = amountSol * (remaining / total);
   return gross * (1 - depositFeeBps / 10_000);
+}
+
+/**
+ * RT safe to sell: the mint estimate reduced by a term-scaled safety margin so
+ * the bundled Manifest swap never asks for more RT than the Bonds program mints
+ * ("Insufficient base in atoms"). The residual epoch-projection error is a
+ * larger fraction of RT as maturity nears, so the margin scales as
+ * SAFETY_SECONDS / remainingWindow. Only the amount BEYOND the flat 2 bps the
+ * swap builders already apply is subtracted, so long-dated bonds are unchanged.
+ */
+export function estimateRtToSell(params: EstimateRtFromStakeParams): number {
+  const rt = estimateRtFromStake(params);
+  const remainingWindow = params.maturityTs - params.depositStartTs;
+  if (remainingWindow <= 0 || rt <= 0) return 0;
+  // 30 min headroom, ~4x the observed ~8 min epoch-projection residual.
+  const SAFETY_SECONDS = 1800;
+  // Must match the flat 2 bps buffer the builders apply in execute-deposit-and-sell.ts.
+  const FLAT_BUFFER = 0.0002;
+  const termMargin = SAFETY_SECONDS / remainingWindow;
+  const extraBeyondFlat = Math.max(termMargin - FLAT_BUFFER, 0);
+  return rt * (1 - extraBeyondFlat);
 }

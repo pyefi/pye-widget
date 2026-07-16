@@ -8,7 +8,7 @@ function getSupabase() {
   return createClient(config.supabaseUrl, config.supabaseAnonKey);
 }
 
-export type CanonicalMaturity = "q12026" | "q22026" | "q32026" | "q42026";
+export type CanonicalMaturity = "q12026" | "q22026" | "q32026" | "q42026" | "q12027";
 
 /**
  * Row from `solo_validator_bonds`. The widget only ever surfaces bonds with
