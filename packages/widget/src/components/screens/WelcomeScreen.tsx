@@ -7,9 +7,13 @@ import {
   useLockupStore,
   useValidatorStore,
 } from "@pyefi/sdk/react";
-import { getPyeConfig, validatorAvailability } from "@pyefi/sdk";
+import {
+  getPyeConfig,
+  validatorAvailability,
+} from "@pyefi/sdk";
+import { useUninitializedLockups } from "../../hooks/useUninitializedLockups";
 import { Body, Spacer, SkeletonRow, StepTitle } from "../shared/Layout";
-import { c, font, formatSolAmount } from "../design-system";
+import { c, font, formatSolAmount, FEE_BUFFER_LAMPORTS } from "../design-system";
 
 const LAMPORTS_PER_SOL = 1_000_000_000;
 
@@ -128,6 +132,8 @@ export default function WelcomeScreen() {
   const bonds = useLockupStore((s) => s.bonds);
   const validators = useValidatorStore((s) => s.validators);
   const { disconnect } = useWallet();
+  const balanceLamports = useWalletStore((s) => s.balanceLamports);
+  const selectStakeAccount = useWidgetStore((s) => s.selectStakeAccount);
 
   // Look up the configured validator's display name (single-validator widgets only).
   const configuredVoteAccount = (() => {
@@ -136,6 +142,15 @@ export default function WelcomeScreen() {
   const validatorName = configuredVoteAccount
     ? validators[configuredVoteAccount]?.name
     : undefined;
+
+  const { hasUninitializedLockup, liquidMinLamports } = useUninitializedLockups();
+
+  const liquidThreshold = liquidMinLamports != null ? liquidMinLamports + FEE_BUFFER_LAMPORTS : null;
+  const liquidEligible =
+    hasUninitializedLockup &&
+    liquidThreshold != null &&
+    balanceLamports != null &&
+    balanceLamports >= liquidThreshold;
 
   // Sum of all ptSOL positions (matured + unmatured) and matured-only subtotal
   const { totalPtSol, maturedPtSol } = useMemo(() => {
@@ -193,7 +208,25 @@ export default function WelcomeScreen() {
   }, [userStakeAccounts, validators]);
 
   const canRedeem = totalPtSol > 0;
-  const canSell = activeStakeSol > 0;
+  const canSell = activeStakeSol > 0 || hasUninitializedLockup;
+
+  const handleSell = () => {
+    const noActiveStake = activeStakeSol === 0;
+    if (noActiveStake && liquidEligible && configuredVoteAccount) {
+      const v = validators[configuredVoteAccount];
+      selectStakeAccount(
+        "liquid-sol",
+        (balanceLamports ?? 0) / LAMPORTS_PER_SOL,
+        v?.name,
+        v?.pt_image_url,
+        configuredVoteAccount,
+        v?.alt_pubkey ?? null,
+      );
+      navigate("choose-amount");
+    } else {
+      navigate("select-position");
+    }
+  };
 
   // Show skeletons only on the very first fetch when we have nothing to display.
   // Once stake accounts or balances are known (even if zero), render real rows.
@@ -207,9 +240,12 @@ export default function WelcomeScreen() {
       ? `${formatSolAmount(maturedPtSol)} SOL ready to redeem`
       : `${formatSolAmount(totalPtSol)} SOL locked`;
 
-  const sellSub = canSell
-    ? `${formatSolAmount(activeStakeSol, 2)} SOL across active stake`
-    : "No active stake";
+  const sellSub =
+    canSell && activeStakeSol > 0
+      ? `${formatSolAmount(activeStakeSol, 2)} SOL across active stake`
+      : hasUninitializedLockup
+      ? "Open a new lockup with SOL"
+      : "No active stake";
 
   return (
     <Body style={{ borderRadius: "10px 10px 0 0" }}>
@@ -230,7 +266,7 @@ export default function WelcomeScreen() {
               label="Sell future rewards"
               sub={sellSub}
               disabled={!canSell}
-              onClick={() => navigate("select-position")}
+              onClick={handleSell}
             />
             <ChoiceRow
               icon={<IconRedeem />}

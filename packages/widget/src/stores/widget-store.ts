@@ -162,6 +162,7 @@ export function createWidgetStore() {
           s.selectedValidatorIcon = validatorIcon ?? null;
           s.selectedValidatorVoteAccount = validatorVoteAccount ?? null;
           s.selectedValidatorAltPubkey = validatorAltPubkey ?? null;
+          s.depositAmount = "";
         });
       },
 

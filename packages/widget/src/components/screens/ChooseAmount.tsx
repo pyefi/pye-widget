@@ -1,6 +1,17 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useConnection } from "@solana/wallet-adapter-react";
+import {
+  getStakeMinimumDelegationLamports,
+  getStakeRentExemptLamports,
+  solToLamports,
+  validateStakeDepositAmount,
+  validateSolDepositAmount,
+} from "@pyefi/sdk";
 import { useWidgetStore } from "../../stores/widget-store";
-import { c, font, formatSolAmount } from "../design-system";
+import {
+  c, font, formatSolAmount,
+  truncateAmount, exactAmountString, AMOUNT_DUST_LAMPORTS, FEE_BUFFER_LAMPORTS,
+} from "../design-system";
 import { StepTitle, CTA, InlineError, Spacer } from "../shared/Layout";
 
 const SLIDER_CSS = `
@@ -60,56 +71,125 @@ export default function ChooseAmount() {
   const selectedPubkey = useWidgetStore((s) => s.selectedStakeAccountPubkey);
   const validatorName = useWidgetStore((s) => s.selectedValidatorName);
 
+  const { connection } = useConnection();
+  const [stakeMinLamports, setStakeMinLamports] = useState<number | null>(null);
+  const [rentLamports, setRentLamports] = useState<number | null>(null);
+  const [minFetchFailed, setMinFetchFailed] = useState(false);
+
+  useEffect(() => {
+    setMinFetchFailed(false);
+    let cancelled = false;
+    Promise.all([
+      getStakeMinimumDelegationLamports(connection),
+      getStakeRentExemptLamports(connection),
+    ])
+      .then(([min, rent]) => {
+        if (cancelled) return;
+        setStakeMinLamports(min);
+        setRentLamports(rent);
+      })
+      .catch(() => {
+        if (!cancelled) setMinFetchFailed(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [connection]);
+
   const available = selectedBalance;
   const parsed = parseFloat(depositAmount) || 0;
   const pcts = [0.25, 0.5, 0.75, 1];
 
-  // Smoothly ramp the deposit amount from current → target (pill clicks only).
+  // Pill clicks commit the final amount to the store immediately and only
+  // animate a display override on top — so an unmount mid-ramp can never strand
+  // a truncated value as the deposit.
   const rafRef = useRef<number | null>(null);
+  const [displayOverride, setDisplayOverride] = useState<string | null>(null);
   useEffect(() => () => { if (rafRef.current != null) cancelAnimationFrame(rafRef.current); }, []);
 
-  const truncate4 = (v: number) => (Math.floor(v * 10000) / 10000).toFixed(4);
+  const cancelRamp = () => {
+    if (rafRef.current != null) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
+    setDisplayOverride(null);
+  };
 
-  const rampToAmount = (target: number) => {
+  // Display-only ramp toward `target`; clears the override on completion.
+  const rampDisplay = (target: number, from: number) => {
     if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
-    const start = parsed;
-    if (Math.abs(target - start) < 1e-9) return;
     const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-    if (reduced) { setDepositAmount(truncate4(target)); return; }
+    if (reduced || Math.abs(target - from) < 1e-9) { setDisplayOverride(null); return; }
 
     const duration = 500;
     const startTime = performance.now();
     const ease = (t: number) => 1 - Math.pow(1 - t, 3); // easeOutCubic
-    let lastWritten = "";
     const tick = (now: number) => {
       const t = Math.min(1, (now - startTime) / duration);
-      const v = start + (target - start) * ease(t);
-      const s = truncate4(v);
-      if (s !== lastWritten) {
-        lastWritten = s;
-        setDepositAmount(s);
+      if (t >= 1) {
+        rafRef.current = null;
+        setDisplayOverride(null);
+        return;
       }
-      if (t < 1) rafRef.current = requestAnimationFrame(tick);
-      else rafRef.current = null;
+      setDisplayOverride(truncateAmount(from + (target - from) * ease(t)));
+      rafRef.current = requestAnimationFrame(tick);
     };
     rafRef.current = requestAnimationFrame(tick);
   };
 
   const isLiquidSol = selectedPubkey === "liquid-sol";
-  const GAS_RESERVE = 0.01;
+
+  // Liquid-SOL ceiling = full balance minus rent and fee buffer; null when rent
+  // is unknown, in which case it falls back to the full balance below.
+  const maxLiquidLamports =
+    isLiquidSol && rentLamports != null
+      ? Math.max(0, solToLamports(available) - rentLamports - FEE_BUFFER_LAMPORTS)
+      : null;
+  const maxLiquidSol = maxLiquidLamports != null ? maxLiquidLamports / 1e9 : null;
 
   let error: string | null = null;
   let warning: string | null = null;
   if (depositAmount && parsed <= 0) error = "Amount must be greater than 0";
-  if (depositAmount && parsed > available) error = `Maximum available is ${available} SOL`;
-  if (!error && isLiquidSol && parsed > 0 && parsed >= available - GAS_RESERVE)
-    warning = "This leaves very little SOL for transaction fees";
+  const amountCeil = isLiquidSol && maxLiquidSol != null ? maxLiquidSol : available;
+  if (depositAmount && parsed > amountCeil) {
+    error = `Maximum available is ${formatSolAmount(amountCeil)} SOL`;
+  }
+  if (!error && isLiquidSol && parsed > 0 && stakeMinLamports != null) {
+    const v = validateSolDepositAmount({
+      amountLamports: solToLamports(parsed),
+      minDelegationLamports: stakeMinLamports,
+    });
+    if (!v.ok) error = v.message;
+  }
+  if (
+    !error &&
+    !isLiquidSol &&
+    parsed > 0 &&
+    stakeMinLamports != null
+  ) {
+    const v = validateStakeDepositAmount({
+      amountLamports: solToLamports(parsed),
+      delegatedLamports: solToLamports(available),
+      minDelegationLamports: stakeMinLamports,
+    });
+    if (!v.ok) error = v.message;
+  }
+  if (!error && !warning && minFetchFailed && parsed > 0) {
+    warning = "Couldn't verify Solana's staking minimums — your amount will be re-checked at signing.";
+  }
 
   const isValid = !!depositAmount && !error && parsed > 0;
 
-  const sliderMax = available > 0 ? available : 1;
-  const sliderValue = Math.min(parsed, sliderMax);
-  const sliderPct = available > 0 ? Math.min(100, (sliderValue / available) * 100) : 0;
+  // The input and slider render the display override while a ramp animates;
+  // validation and the CTA always use the committed store value above.
+  const displayedAmount = displayOverride ?? depositAmount;
+  const displayedParsed = parseFloat(displayedAmount) || 0;
+
+  const sliderMax = isLiquidSol && maxLiquidSol != null
+    ? (maxLiquidSol > 0 ? maxLiquidSol : 1)
+    : (available > 0 ? available : 1);
+  const sliderValue = Math.min(displayedParsed, sliderMax);
+  const sliderPct = sliderMax > 0 ? Math.min(100, (sliderValue / sliderMax) * 100) : 0;
 
   const stepSize = Math.max(0.0001, available / 1000);
 
@@ -143,8 +223,11 @@ export default function ChooseAmount() {
         }}>
           <input
             type="number"
-            value={depositAmount}
-            onChange={(e) => setDepositAmount(e.target.value)}
+            value={displayedAmount}
+            onChange={(e) => {
+              cancelRamp();
+              setDepositAmount(e.target.value);
+            }}
             min={0.0001}
             max={available}
             placeholder="0"
@@ -167,7 +250,16 @@ export default function ChooseAmount() {
           step={stepSize}
           value={sliderValue}
           onChange={(e) => {
-            const s = truncate4(parseFloat(e.target.value));
+            cancelRamp();
+            const raw = parseFloat(e.target.value);
+            // The range input quantizes to step multiples and can land one step
+            // short of the true max, so a position within AMOUNT_DUST_LAMPORTS of
+            // the top writes the EXACT full balance (no-split full deposit); any
+            // other position keeps the 4-decimal display.
+            const gapLamports = solToLamports(available) - solToLamports(raw);
+            const s = !isLiquidSol && gapLamports >= 0 && gapLamports < AMOUNT_DUST_LAMPORTS
+              ? exactAmountString(available)
+              : truncateAmount(raw);
             if (s !== depositAmount) setDepositAmount(s);
           }}
           style={{ "--pye-slider-pct": `${sliderPct}%` } as React.CSSProperties}
@@ -182,9 +274,14 @@ export default function ChooseAmount() {
               className="pye-pill"
               onClick={() => {
                 const target = p === 1
-                  ? (isLiquidSol ? Math.max(0, available - GAS_RESERVE) : available)
+                  ? (isLiquidSol ? (maxLiquidSol ?? Math.max(0, available - FEE_BUFFER_LAMPORTS / 1e9)) : available)
                   : available * p;
-                rampToAmount(target);
+                // 100% on a stake account commits the EXACT full balance (no-split
+                // full deposit); other pills keep 4-dp. Display-only ramp follows.
+                setDepositAmount(
+                  p === 1 && !isLiquidSol ? exactAmountString(available) : truncateAmount(target),
+                );
+                rampDisplay(target, displayedParsed);
               }}
               style={{
                 flex: 1, borderRadius: 8,

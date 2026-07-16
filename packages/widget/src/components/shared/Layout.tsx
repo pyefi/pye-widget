@@ -190,12 +190,13 @@ export function RowGroup({ children }: { children: ReactNode }) {
 }
 
 // Dan's SelectableRow — with inset shadow elevation, inverted on selected
-export function SelectableRow({ icon, label, sub, amount, selected, onClick }: {
+export function SelectableRow({ icon, label, sub, amount, selected, disabled, onClick }: {
   icon: ReactNode;
   label: string;
   sub: string;
   amount?: string;
   selected?: boolean;
+  disabled?: boolean;
   onClick?: () => void;
 }) {
   const bg = selected ? c.bg : c.raised;
@@ -204,13 +205,13 @@ export function SelectableRow({ icon, label, sub, amount, selected, onClick }: {
     : `inset 0 1px 0 ${c.highlight}, inset 0 -1px 0 ${c.shadow}`;
   return (
     <div
-      className={selected ? undefined : "pye-hoverable"}
-      onClick={onClick}
+      className={disabled || selected ? undefined : "pye-hoverable"}
+      onClick={disabled ? undefined : onClick}
       style={{
         display: "flex", alignItems: "center", justifyContent: "space-between",
         padding: 12, borderRadius: 8,
         background: bg, boxShadow: shadow,
-        cursor: "pointer", transition: "background 0.1s",
+        cursor: disabled ? "default" : "pointer", opacity: disabled ? 0.55 : 1, transition: "background 0.1s",
       }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         {icon}
