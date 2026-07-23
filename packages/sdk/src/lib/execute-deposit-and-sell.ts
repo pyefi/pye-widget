@@ -298,7 +298,9 @@ export async function buildDepositAndSellTx({
         { pubkey: ptMint,            isSigner: false, isWritable: true  },
         { pubkey: ytMint,            isSigner: false, isWritable: true  },
         { pubkey: globalSettingsPda, isSigner: false, isWritable: false },
-        { pubkey: protocolFeeWallet, isSigner: false, isWritable: false },
+        // Writable: the program withdraws post-merge excess rent to this wallet
+        // (audit round-2 — `protocol_fee_wallet` is `#[account(mut)]`).
+        { pubkey: protocolFeeWallet, isSigner: false, isWritable: true  },
         { pubkey: feeWalletPt,       isSigner: false, isWritable: true  },
         { pubkey: feeWalletYt,       isSigner: false, isWritable: true  },
         { pubkey: ASSOCIATED_TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
