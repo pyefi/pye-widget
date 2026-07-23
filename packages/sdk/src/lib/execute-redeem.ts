@@ -11,10 +11,7 @@ import {
   getAssociatedTokenAddressSync,
 } from "@solana/spl-token";
 import type { WalletContextState } from "@solana/wallet-adapter-react";
-
-const BONDS_PROGRAM_ID = new PublicKey(
-  "PYEQZ2qYHPQapnw8Ms8MSPMNzoq59NHHfNwAtuV26wx",
-);
+import { BONDS_PROGRAM_ID, deriveStakeAccount } from "./pdas";
 
 const HANDLE_MATURITY_DISC = new Uint8Array([127, 154, 109, 164, 119, 21, 34, 149]);
 const REDEEM_PT_STAKE_DISC = new Uint8Array([131, 241, 170, 225, 20, 53, 106, 95]);
@@ -42,14 +39,6 @@ export interface ExecuteRedeemResult {
 function deriveGlobalSettings(): PublicKey {
   const [pda] = PublicKey.findProgramAddressSync(
     [Buffer.from("global_settings")],
-    BONDS_PROGRAM_ID,
-  );
-  return pda;
-}
-
-function deriveStakeAccount(bond: PublicKey): PublicKey {
-  const [pda] = PublicKey.findProgramAddressSync(
-    [Buffer.from("stake"), bond.toBuffer()],
     BONDS_PROGRAM_ID,
   );
   return pda;

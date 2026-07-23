@@ -84,17 +84,40 @@ export type {
 } from "./lib/can-sell-yield";
 
 // Lib — RT estimation
-export { estimateRtFromStake, fetchEpochSyncedNowTs, fetchDepositStartTs, resolveDepositStartTs } from "./lib/estimate-rt";
+export { estimateRtFromStake, estimateRtToSell, fetchEpochSyncedNowTs, fetchDepositStartTs, resolveDepositStartTs } from "./lib/estimate-rt";
 export type { EstimateRtFromStakeParams } from "./lib/estimate-rt";
 
 // Lib — Transaction execution
 export { executeStakeDeposit, executeStakeAccountDeposit } from "./lib/execute-stake-deposit";
 export { executeDepositAndSell, simulateDepositAndSellNetSol, buildDepositAndSellTx } from "./lib/execute-deposit-and-sell";
 export type { ExecuteDepositAndSellParams, ExecuteDepositAndSellResult, BuildDepositAndSellParams } from "./lib/execute-deposit-and-sell";
+export { buildDepositSolAndSellTx, executeDepositSolAndSell, simulateDepositSolAndSellNetSol } from "./lib/execute-deposit-and-sell";
+export type { BuildDepositSolAndSellParams, BuiltDepositSolAndSellTx, ExecuteDepositSolAndSellParams, ExecuteDepositSolAndSellResult } from "./lib/execute-deposit-and-sell";
 export type {
   ExecuteStakeDepositParams, ExecuteStakeDepositResult,
   ExecuteStakeAccountDepositParams,
 } from "./lib/execute-stake-deposit";
+export {
+  validateStakeDepositAmount,
+  validateSolDepositAmount,
+  solToLamports,
+  DEPOSIT_VALIDATION_CODES,
+  DepositValidationError,
+  formatSol,
+  type ValidateStakeDepositAmountParams,
+  type StakeDepositAmountValidation,
+  type ValidateSolDepositAmountParams,
+  type SolDepositAmountValidation,
+  type DepositValidationCode,
+} from "./lib/deposit-validation";
+export {
+  getStakeMinimumDelegationLamports,
+  getStakeRentExemptLamports,
+  getFirstDepositRequirement,
+  getUninitializedLockups,
+  type FirstDepositRequirement,
+} from "./lib/stake-requirements";
+export { deriveStakeAccount, BONDS_PROGRAM_ID } from "./lib/pdas";
 export { executeSwap } from "./lib/execute-swap";
 export type { ExecuteSwapParams, ExecuteSwapResult } from "./lib/execute-swap";
 export { executeRtSell } from "./lib/execute-rt-sell";

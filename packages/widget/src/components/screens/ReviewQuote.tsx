@@ -4,9 +4,8 @@ import { useWidgetStore } from "../../stores/widget-store";
 import {
   maturities,
   canSellYield,
-  executeStakeDeposit,
-  executeRtSell,
   executeDepositAndSell,
+  executeDepositSolAndSell,
   checkSellLiquidity,
   fetchBalancesForMints,
   selectTrackedTokenMints,
@@ -14,11 +13,18 @@ import {
   writeCachedWalletBalances,
   PYE_TRADING_FEE_BPS,
   applyTradingFee,
-  estimateRtFromStake,
+  estimateRtToSell,
   fetchDepositStartTs,
   resolveDepositStartTs,
   simulateDepositAndSellNetSol,
+  simulateDepositSolAndSellNetSol,
+  getFirstDepositRequirement,
+  getStakeRentExemptLamports,
+  getUninitializedLockups,
+  solToLamports,
+  DepositValidationError,
   type CanonicalMaturity,
+  type FirstDepositRequirement,
 } from "@pyefi/sdk";
 import {
   useMarketStore,
@@ -27,7 +33,7 @@ import {
   useLockupStore,
   useValidatorStore,
 } from "@pyefi/sdk/react";
-import { c, font, pointsMap, formatSolAmount, POINTS_ENABLED } from "../design-system";
+import { c, font, pointsMap, formatSolAmount, AMOUNT_DUST_LAMPORTS, POINTS_ENABLED, FEE_BUFFER_LAMPORTS } from "../design-system";
 import { StepTitle, CTA, Tooltip, Spacer } from "../shared/Layout";
 import { Odometer } from "../shared/Odometer";
 import { OTC_REQUEST_OVERSIZED } from "./OtcForm";
@@ -129,6 +135,7 @@ export default function ReviewQuote() {
   // True while the simulation is in flight — drives the loading placeholder so
   // the Fees / Net rows don't pop in (and the card doesn't jump).
   const [simLoading, setSimLoading] = useState(false);
+  const [simValidationError, setSimValidationError] = useState<string | null>(null);
 
   const navigate = useWidgetStore((s) => s.navigate);
   const openOtcForm = useWidgetStore((s) => s.openOtcForm);
@@ -157,17 +164,35 @@ export default function ReviewQuote() {
   const setWalletBalances = useBalanceStore((s) => s.setWalletBalances);
   const setUserStakeAccounts = useBalanceStore((s) => s.setUserStakeAccounts);
   const setBalanceLamports = useWalletStore((s) => s.setBalanceLamports);
+  const balanceLamports = useWalletStore((s) => s.balanceLamports);
 
   const parsedAmount = parseFloat(depositAmount) || 0;
+
+  // Defensive snap: an amount within display-truncation dust below the full
+  // delegated balance snaps to the exact balance, so the SDK builds a no-split
+  // full deposit rather than a split leaving sub-min dust (which fails on-chain
+  // with InsufficientDelegation under SIMD-0490). A genuinely smaller amount is
+  // still validated.
+  const depositAmountSol = (() => {
+    if (selectedStakeAccountPubkey === "liquid-sol") return parsedAmount;
+    const gap =
+      solToLamports(selectedStakeAccountBalance) - solToLamports(parsedAmount);
+    if (gap > 0 && gap < AMOUNT_DUST_LAMPORTS) return selectedStakeAccountBalance;
+    return parsedAmount;
+  })();
+
   const maturity = selectedMaturityId ? maturities[selectedMaturityId] : null;
   const matures = maturity?.human_readable ?? "Sep 30, 2026";
 
-  // Find points label from maturity month
+  // Points label keyed by month — collapses same-month maturities across years
+  // (q12026 and q12027 both → "Q2"); key off maturity id if per-year points are
+  // ever needed. Currently inert (POINTS_ENABLED=false).
   const monthToQuarter: Record<string, string> = { JUN: "Q3", SEP: "Q4", DEC: "Q1", MAR: "Q2" };
   const quarterId = maturity ? (monthToQuarter[maturity.month] ?? null) : null;
   const points = POINTS_ENABLED && quarterId ? (pointsMap[quarterId] ?? null) : null;
 
-  // Find the validator vote account from stake accounts
+  const selectedValidatorVoteAccount = useWidgetStore((s) => s.selectedValidatorVoteAccount);
+
   const selectedStakeAccount = selectedStakeAccountPubkey !== "liquid-sol"
     ? userStakeAccounts.find((a) => a.pubkey === selectedStakeAccountPubkey)
     : null;
@@ -180,76 +205,70 @@ export default function ReviewQuote() {
     ? bonds[`${stakeVoteAccount}:${selectedMaturityId}`] ?? null
     : null;
 
+  const [firstDeposit, setFirstDeposit] = useState<FirstDepositRequirement | null>(null);
+  const [liquidRentLamports, setLiquidRentLamports] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (selectedStakeAccountPubkey !== "liquid-sol") return;
+    let cancelled = false;
+    getStakeRentExemptLamports(connection)
+      .then((rent) => { if (!cancelled) setLiquidRentLamports(rent); })
+      .catch(() => { /* null → gate fails open; on-chain/builder backstop */ });
+    return () => { cancelled = true; };
+  }, [connection, selectedStakeAccountPubkey]);
+
+  useEffect(() => {
+    // Clear first so a stale banner/gate can't linger during a bond switch.
+    setFirstDeposit(null);
+    if (!stakeBond) return;
+    let cancelled = false;
+
+    // Balance fetch runs in parallel so the insufficient-balance gate can fire
+    // before the first sign attempt.
+    if (wallet.publicKey) {
+      connection
+        .getBalance(wallet.publicKey, "confirmed")
+        .then((bal) => { if (!cancelled) setBalanceLamports(bal); })
+        .catch(() => {});
+    }
+
+    getFirstDepositRequirement(connection, stakeBond.pubkey)
+      .then((r) => {
+        if (cancelled) return;
+        setFirstDeposit(r);
+      })
+      .catch(() => {
+        // fail open: use a known-non-first-deposit value
+        if (!cancelled) setFirstDeposit({ isFirstDeposit: false, requiredExtraLamports: 0 });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [connection, stakeBond?.pubkey, wallet.publicKey, setBalanceLamports]);
+
+  const insufficientForInit =
+    firstDeposit?.isFirstDeposit === true &&
+    balanceLamports != null &&
+    balanceLamports < firstDeposit.requiredExtraLamports + FEE_BUFFER_LAMPORTS;
+
+  const liquidRequiredLamports =
+    selectedStakeAccountPubkey === "liquid-sol" && liquidRentLamports != null
+      ? solToLamports(parsedAmount) + liquidRentLamports + FEE_BUFFER_LAMPORTS
+      : null;
+  const insufficientForLiquid =
+    liquidRequiredLamports != null &&
+    balanceLamports != null &&
+    balanceLamports < liquidRequiredLamports;
+
   // RT market data — must match the stake account's validator (each validator has its own RT token)
   const rtMarketKey = selectedMaturityId
     ? (stakeBond && stakeVoteAccount
         ? `${stakeVoteAccount}-${selectedMaturityId}-RT`
-        : Object.keys(markets).find((k) => k.endsWith(`-${selectedMaturityId}-RT`)))
+        : selectedValidatorVoteAccount
+          ? `${selectedValidatorVoteAccount}-${selectedMaturityId}-RT`
+          : Object.keys(markets).find((k) => k.endsWith(`-${selectedMaturityId}-RT`)))
     : null;
   const rtMarket = rtMarketKey ? markets[rtMarketKey] ?? null : null;
-
-  // Bonds program mints RT proportional to remaining issuance window, not
-  // 1:1 with the deposit. Use the same formula the on-chain program does
-  // so the swap we build matches the user's actual post-deposit RT balance.
-  // PT, separately, *is* 1:1 with the stake — keep `parsedAmount` for PT rows.
-  const effectiveDepositStartTs = depositStartTs ?? Date.now() / 1000;
-  // Estimate RT against the *bond's own* on-chain issuance window (rolling per
-  // bond), not the shared maturities.ts constant — otherwise recently-created
-  // bonds (e.g. a just-listed validator) are off by multiples.
-  const rtAmount = stakeBond
-    ? estimateRtFromStake({
-        amountSol: parsedAmount,
-        issuanceTs: stakeBond.issuance_ts,
-        maturityTs: stakeBond.maturity_ts,
-        depositStartTs: effectiveDepositStartTs,
-      })
-    : 0;
-
-  // Real liquidity check against RT order book bids
-  const liquidityCheck = rtMarket?.bids?.length
-    ? checkSellLiquidity(rtMarket.bids, rtAmount)
-    : null;
-
-  const hasLiquidity = liquidityCheck?.isSufficientLiquidity ?? false;
-  const orderBookSlippageBps = liquidityCheck?.slippageBps ?? 0;
-
-  // Quote: expected gross SOL from selling RT on Manifest. When the book can't
-  // fill (no liquidity), the quote is zero and the Sign CTA is already disabled
-  // by `canSign` — better than showing a fabricated fallback price.
-  const grossSellAmount =
-    liquidityCheck?.expectedFillPrice != null
-      ? liquidityCheck.expectedFillPrice * rtAmount
-      : 0;
-
-  // Net-of-Pye payout — used at sign time and on the success screen.
-  const sellAmount = applyTradingFee(grossSellAmount);
-  const feePct = (PYE_TRADING_FEE_BPS / 100).toFixed(2);
-
-  // "You receive today" = the gross order-book quote (value of the rewards
-  // you're selling, before fees). The real wallet delta comes from simulating
-  // the actual transaction (`netSimSol`); "Fees" is just the gap between the
-  // two — so it captures the Pye fee, Solana network fee, token / Manifest
-  // market rent, and any slippage with zero per-cost modeling.
-  const netChangeTodaySol = netSimSol;
-  const feesSol = netSimSol != null ? grossSellAmount - netSimSol : null;
-  const fmtAmt = (x: number) =>
-    Math.abs(x) > 0 && Math.abs(x) < 0.0001 ? "< 0.0001" : formatSolAmount(x);
-  const feesTooltip = `The difference between the quoted rewards and what actually lands in your wallet. Includes the Solana network fee, Pye's ${feePct}% protocol fee, rent for your token accounts (and the Manifest market, where applicable), and any order-book slippage.`;
-
-  // Slippage tolerance from slider (0-5 float)
-  const slippage = slippageBps / 100;
-
-  const isLoading = txStatus === "loading";
-  const selectedStakeStillOwned =
-    selectedStakeAccountPubkey === "liquid-sol" ||
-    (selectedStakeAccountPubkey !== null &&
-      userStakeAccounts.some((a) => a.pubkey === selectedStakeAccountPubkey));
-  const canSign =
-    !!selectedStakeAccountPubkey &&
-    !!selectedMaturityId &&
-    !isLoading &&
-    hasLiquidity &&
-    selectedStakeStillOwned;
 
   // Resolve bond from the stake account's actual validator (not from market key)
   // Fall back to market-key-based resolution for liquid SOL (no stake account)
@@ -281,6 +300,89 @@ export default function ReviewQuote() {
         voteAccount: stakeVoteAccount!,
       }
     : marketBondParams;
+
+  // Bond object for RT estimation (issuance_ts, maturity_ts) — stakeBond on the
+  // stake path, else the same bond marketBondParams resolved for liquid SOL.
+  const effectiveBond: typeof stakeBond = stakeBond ?? (() => {
+    if (!bondParams) return null;
+    const key = `${bondParams.voteAccount}:${selectedMaturityId}`;
+    return bonds[key] ?? null;
+  })();
+
+  // Bonds program mints RT proportional to remaining issuance window, not
+  // 1:1 with the deposit. Use the same formula the on-chain program does
+  // so the swap we build matches the user's actual post-deposit RT balance.
+  // Amount-derived values use the snapped `depositAmountSol` for consistency.
+  const effectiveDepositStartTs = depositStartTs ?? Date.now() / 1000;
+  // Estimate RT against the *bond's own* on-chain issuance window (rolling per
+  // bond), not the shared maturities.ts constant — otherwise recently-created
+  // bonds (e.g. a just-listed validator) are off by multiples.
+  const rtAmount = effectiveBond
+    ? estimateRtToSell({
+        amountSol: depositAmountSol,
+        issuanceTs: effectiveBond.issuance_ts,
+        maturityTs: effectiveBond.maturity_ts,
+        depositStartTs: effectiveDepositStartTs,
+      })
+    : 0;
+
+  // Real liquidity check against RT order book bids
+  const liquidityCheck = rtMarket?.bids?.length
+    ? checkSellLiquidity(rtMarket.bids, rtAmount)
+    : null;
+
+  const hasLiquidity = liquidityCheck?.isSufficientLiquidity ?? false;
+  const orderBookSlippageBps = liquidityCheck?.slippageBps ?? 0;
+
+  // Quote: expected gross SOL from selling RT on Manifest. When the book can't
+  // fill (no liquidity), the quote is zero and the Sign CTA is already disabled
+  // by `canSign` — better than showing a fabricated fallback price.
+  const grossSellAmount =
+    liquidityCheck?.expectedFillPrice != null
+      ? liquidityCheck.expectedFillPrice * rtAmount
+      : 0;
+
+  // Net-of-Pye payout — used at sign time and on the success screen.
+  const sellAmount = applyTradingFee(grossSellAmount);
+  const feePct = (PYE_TRADING_FEE_BPS / 100).toFixed(2);
+
+  // "You receive today" = the gross order-book quote (value of the rewards
+  // you're selling, before fees). The real wallet delta comes from simulating
+  // the actual transaction (`netSimSol`); "Fees" is the remaining gap — the Pye
+  // fee, Solana network fee, token / Manifest market rent, and any slippage.
+  //
+  // On the liquid-SOL path the deposit principal leaves the wallet to become
+  // stake, landing in `netSimSol`. It's returned at maturity (shown as "Stake
+  // amount"), not a cost, so exclude it — else the whole ~1 SOL is mislabeled as
+  // a fee. On the stake path the principal was already staked, nothing to exclude.
+  const principalOutflowSol =
+    selectedStakeAccountPubkey === "liquid-sol" ? depositAmountSol : 0;
+  const netChangeTodaySol = netSimSol;
+  const feesSol =
+    netSimSol != null ? grossSellAmount - netSimSol - principalOutflowSol : null;
+  const fmtAmt = (x: number) =>
+    Math.abs(x) > 0 && Math.abs(x) < 0.0001 ? "< 0.0001" : formatSolAmount(x);
+  const feesTooltip = `The difference between the quoted rewards and what actually lands in your wallet. Includes the Solana network fee, Pye's ${feePct}% protocol fee, rent for your token accounts (and the Manifest market, where applicable), and any order-book slippage.`;
+
+  // Slippage tolerance from slider (0-5 float)
+  const slippage = slippageBps / 100;
+
+  const isLoading = txStatus === "loading";
+  const selectedStakeStillOwned =
+    selectedStakeAccountPubkey === "liquid-sol" ||
+    (selectedStakeAccountPubkey !== null &&
+      userStakeAccounts.some((a) => a.pubkey === selectedStakeAccountPubkey));
+  const canSign =
+    !!selectedStakeAccountPubkey &&
+    !!selectedMaturityId &&
+    !isLoading &&
+    !simLoading &&
+    hasLiquidity &&
+    selectedStakeStillOwned &&
+    !insufficientForInit &&
+    !insufficientForLiquid &&
+    !simValidationError &&
+    (stakeBond == null || firstDeposit != null);
 
   // Resolve the program's issuance-accrual start for *this* bond — current
   // epoch start if its stake is already active, next epoch start if fresh —
@@ -316,6 +418,7 @@ export default function ReviewQuote() {
   const ownerKey = owner?.toBase58() ?? null;
   useEffect(() => {
     let cancelled = false;
+    setSimValidationError(null);
     const altPubkey = selectedValidatorAltPubkey;
     if (
       !owner ||
@@ -341,7 +444,7 @@ export default function ReviewQuote() {
       yieldTokenMint: bondParams.yieldTokenMint,
       validatorVoteAccount: bondParams.voteAccount,
       stakeAccountPubkey: selectedStakeAccountPubkey,
-      amountSol: parsedAmount,
+      amountSol: depositAmountSol,
       stakeBalanceSol: selectedStakeAccountBalance,
       marketPubkey: rtMarket.marketPubkey,
       rtAmountToSell: rtAmount,
@@ -355,17 +458,77 @@ export default function ReviewQuote() {
           setSimLoading(false);
         }
       })
-      .catch(() => {
+      .catch((err: unknown) => {
         if (!cancelled) {
           setNetSimSol(null);
           setSimLoading(false);
+          if (err instanceof DepositValidationError) {
+            setSimValidationError(err.message);
+          }
         }
       });
     return () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [connection, ownerKey, resolveBondPubkey, rtMarket?.marketPubkey, selectedStakeAccountPubkey, parsedAmount, depositStartTs]);
+  }, [connection, ownerKey, resolveBondPubkey, rtMarket?.marketPubkey, selectedStakeAccountPubkey, selectedValidatorAltPubkey, depositAmountSol, depositStartTs]);
+
+  // Liquid-SOL wallet-delta preview — mirrors the stake simulation above.
+  useEffect(() => {
+    let cancelled = false;
+    setSimValidationError(null);
+    const altPubkey = selectedValidatorAltPubkey;
+    if (
+      !owner ||
+      !bondParams ||
+      !rtMarket ||
+      !altPubkey ||
+      selectedStakeAccountPubkey !== "liquid-sol" ||
+      !(rtAmount > 0) ||
+      !(grossSellAmount > 0)
+    ) {
+      if (selectedStakeAccountPubkey === "liquid-sol") {
+        setNetSimSol(null);
+        setSimLoading(false);
+      }
+      return;
+    }
+    setSimLoading(true);
+    const minReceive = Math.max(grossSellAmount * (1 - slippageBps / 10000), 0);
+    simulateDepositSolAndSellNetSol({
+      connection,
+      owner,
+      bondPubkey: bondParams.bondPubkey,
+      principalTokenMint: bondParams.principalTokenMint,
+      yieldTokenMint: bondParams.yieldTokenMint,
+      validatorVoteAccount: bondParams.voteAccount,
+      amountSol: depositAmountSol,
+      marketPubkey: rtMarket.marketPubkey,
+      rtAmountToSell: rtAmount,
+      minReceiveTokens: minReceive,
+      expectedSolOut: grossSellAmount,
+      altPubkey,
+    })
+      .then((net) => {
+        if (!cancelled) {
+          setNetSimSol(net);
+          setSimLoading(false);
+        }
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          setNetSimSol(null);
+          setSimLoading(false);
+          if (err instanceof DepositValidationError) {
+            setSimValidationError(err.message);
+          }
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connection, ownerKey, resolveBondPubkey, rtMarket?.marketPubkey, selectedStakeAccountPubkey, selectedValidatorAltPubkey, depositAmountSol, depositStartTs]);
 
   const handleSign = useCallback(async () => {
     if (!selectedStakeAccountPubkey || !selectedMaturityId) return;
@@ -378,7 +541,7 @@ export default function ReviewQuote() {
     const gate = canSellYield({
       validatorVoteAccount: bondParams.voteAccount,
       maturityId: selectedMaturityId,
-      amountSol: parsedAmount,
+      amountSol: depositAmountSol,
       depositStartTs: depositStartTs ?? Date.now() / 1000,
       validators,
       bonds,
@@ -407,40 +570,49 @@ export default function ReviewQuote() {
     ]).catch(() => null);
     const freshDepositStartTs =
       freshMap?.[bondParams.bondPubkey] ?? depositStartTs ?? Date.now() / 1000;
-    const freshRtAmount = stakeBond
-      ? estimateRtFromStake({
-          amountSol: parsedAmount,
-          issuanceTs: stakeBond.issuance_ts,
-          maturityTs: stakeBond.maturity_ts,
+    // The issuance/maturity window is static, so reuse render-time `effectiveBond`;
+    // only depositStartTs is refreshed above.
+    const freshRtAmount = effectiveBond
+      ? estimateRtToSell({
+          amountSol: depositAmountSol,
+          issuanceTs: effectiveBond.issuance_ts,
+          maturityTs: effectiveBond.maturity_ts,
           depositStartTs: freshDepositStartTs,
         })
       : 0;
 
     try {
       if (selectedStakeAccountPubkey === "liquid-sol") {
-        // Liquid SOL path — kept as two transactions (SIMD-185: disabled in UI)
-        await executeStakeDeposit({
+        // Re-check init status before signing to close the liquid→initialized
+        // race: if the lockup was initialized since ChooseDuration, abort with a
+        // clear error instead of letting the on-chain tx fail.
+        const bondPubkeyForCheck = bondParams.bondPubkey;
+        const freshUninit = await getUninitializedLockups(connection, [bondPubkeyForCheck]).catch(() => null);
+        if (freshUninit !== null && !freshUninit.has(bondPubkeyForCheck)) {
+          setTxStatus("error", null, "This lockup was just initialized — deposit staked SOL instead.");
+          return;
+        }
+
+        // Atomic liquid-SOL path in a single v0 tx. The builder's 2 bps buffer
+        // prevents "Insufficient base in atoms" reverts from quote→sign clock drift.
+        const altPubkey = selectedValidatorAltPubkey!;
+        const liquidResult = await executeDepositSolAndSell({
           connection,
           wallet,
           bondPubkey: bondParams.bondPubkey,
           principalTokenMint: bondParams.principalTokenMint,
           yieldTokenMint: bondParams.yieldTokenMint,
           validatorVoteAccount: bondParams.voteAccount,
-          amountSol: parsedAmount,
-        });
-        setTxStep("selling");
-        const rtSellResult = await executeRtSell({
-          connection,
-          wallet,
+          amountSol: depositAmountSol,
           marketPubkey: rtMarket.marketPubkey,
-          rtMint: bondParams.yieldTokenMint,
-          orderSizeTokens: freshRtAmount,
+          rtAmountToSell: freshRtAmount,
           minReceiveTokens: minReceive,
           expectedSolOut: grossSellAmount,
+          altPubkey,
         });
         setTxStep("complete");
         setSellAmountSol(sellAmount);
-        setTxStatus("success", rtSellResult.signature);
+        setTxStatus("success", liquidResult.signature);
         navigate("complete");
       } else {
         // Stake account path — single bundled v0 transaction.
@@ -455,7 +627,7 @@ export default function ReviewQuote() {
           yieldTokenMint: bondParams.yieldTokenMint,
           validatorVoteAccount: bondParams.voteAccount,
           stakeAccountPubkey: selectedStakeAccountPubkey,
-          amountSol: parsedAmount,
+          amountSol: depositAmountSol,
           rtAmountToSell: freshRtAmount,
           stakeBalanceSol: selectedStakeAccountBalance,
           marketPubkey: rtMarket.marketPubkey,
@@ -490,6 +662,7 @@ export default function ReviewQuote() {
     bondParams,
     stakeBond,
     bonds,
+    effectiveBond,
     validators,
     markets,
     depositStartTs,
@@ -499,7 +672,7 @@ export default function ReviewQuote() {
     selectedValidatorAltPubkey,
     connection,
     wallet,
-    parsedAmount,
+    depositAmountSol,
     maturity,
     selectedStakeAccountBalance,
     sellAmount,
@@ -541,7 +714,7 @@ export default function ReviewQuote() {
             left: <p style={font(14, c.secondary)}>Stake amount</p>,
             right: (
               <Odometer
-                value={`${parsedAmount} SOL`}
+                value={`${depositAmountSol} SOL`}
                 style={{ ...font(14, c.primary), whiteSpace: "nowrap", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}
               />
             ),
@@ -556,7 +729,7 @@ export default function ReviewQuote() {
             ),
             right: (
               <Odometer
-                value={`${parsedAmount} PT`}
+                value={`${depositAmountSol} PT`}
                 style={{ ...font(14, c.primary), whiteSpace: "nowrap", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}
               />
             ),
@@ -703,6 +876,39 @@ export default function ReviewQuote() {
           </div>
         </div>
       </div>
+
+      {/* First-depositor banner (info or blocking error) */}
+      {firstDeposit?.isFirstDeposit && (
+        <div style={{ padding: 12, borderRadius: 8, background: c.shadow, marginBottom: 8 }}>
+          <p style={{ ...font(13, insufficientForInit ? c.red : c.primary) }}>
+            {insufficientForInit
+              ? `Your wallet needs at least ${formatSolAmount(firstDeposit.requiredExtraLamports / 1e9)} SOL (plus fees) to initialize this lockup.`
+              : `You're the first depositor in this lockup. An extra ${formatSolAmount(firstDeposit.requiredExtraLamports / 1e9)} SOL will be taken from your wallet to initialize it — you receive it back as PT/YT, so it counts toward your deposit.`
+            }
+          </p>
+        </div>
+      )}
+
+      {/* Liquid SOL insufficient-balance banner */}
+      {insufficientForLiquid && liquidRequiredLamports != null && (
+        <div style={{ padding: 12, borderRadius: 8, background: c.shadow, marginBottom: 8 }}>
+          <p style={{ ...font(13, c.red) }}>
+            Your wallet needs at least {formatSolAmount(liquidRequiredLamports / 1e9)} SOL to
+            cover this deposit plus fees.
+          </p>
+        </div>
+      )}
+
+      {/* Simulation validation error */}
+      {simValidationError && (
+        <div style={{
+          ...font(14, c.red),
+          background: `${c.red}12`,
+          borderRadius: 6, padding: "8px 12px",
+        }}>
+          {simValidationError}
+        </div>
+      )}
 
       {/* Liquidity warning */}
       {!hasLiquidity && rtAmount > 0 && (

@@ -8,7 +8,7 @@ export interface Maturity {
 }
 
 // @dev: add new maturity ids here
-export type MaturityId = "q12026" | "q22026" | "q32026" | "q42026";
+export type MaturityId = "q12026" | "q22026" | "q32026" | "q42026" | "q12027";
 
 export const maturities: { [key in MaturityId]: Maturity } = {
   // @dev: add new maturities here
@@ -43,6 +43,14 @@ export const maturities: { [key in MaturityId]: Maturity } = {
     issuance_start_timestamp: "1770354000",
     issuance_close_timestamp: "1798588740",
     maturity_timestamp: "1798761540",
+  },
+  q12027: {
+    human_readable: "Mar 31, 2027",
+    month: "MAR",
+    year: "2027",
+    issuance_start_timestamp: "1770354000",
+    issuance_close_timestamp: "1806354000", // from Supabase solo_validator_bonds
+    maturity_timestamp: "1806526800", // from Supabase solo_validator_bonds
   },
 };
 

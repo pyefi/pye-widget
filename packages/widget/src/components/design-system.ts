@@ -185,8 +185,31 @@ export function formatSolAmount(value: number, minDecimals = 4): string {
   const digits = value < 1 ? Math.max(minDecimals, -Math.floor(Math.log10(Math.abs(value))) + 1) : minDecimals;
   return value.toFixed(digits);
 }
+
+/** Decimal places the amount input displays. AMOUNT_DUST_LAMPORTS derives from it. */
+export const AMOUNT_INPUT_DECIMALS = 4;
+/**
+ * Largest lamport gap the display floor can hide. An amount within this gap
+ * below the full balance is display-truncation dust, not intent — treat it as a
+ * full deposit so no SIMD-0490-invalid split is built.
+ */
+export const AMOUNT_DUST_LAMPORTS = 10 ** (9 - AMOUNT_INPUT_DECIMALS);
+/** Floor a SOL amount to the input's display precision. */
+export const truncateAmount = (v: number) =>
+  (Math.floor(v * 10 ** AMOUNT_INPUT_DECIMALS) / 10 ** AMOUNT_INPUT_DECIMALS)
+    .toFixed(AMOUNT_INPUT_DECIMALS);
+/**
+ * EXACT lamport-precision SOL string (trailing zeros stripped) — the value the
+ * SDK needs to recognize a no-split full deposit, never a display floor.
+ */
+export const exactAmountString = (v: number) =>
+  (Math.round(v * 1e9) / 1e9).toFixed(9).replace(/\.?0+$/, "");
+
 export const yieldMap: Record<string, number> = { Q2: 0.43, Q3: 0.85, Q4: 1.28, Q1: 1.70 };
 export const pointsMap: Record<string, string> = { Q3: "2x points multiplier", Q4: "3x points multiplier", Q1: "4x points multiplier" };
+
+/** Headroom for tx fees + ATA rent when computing liquid-SOL ceilings/floors. */
+export const FEE_BUFFER_LAMPORTS = 10_000_000; // 0.01 SOL
 
 // Feature flags
 export const POINTS_ENABLED = false;
