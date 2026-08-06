@@ -5,7 +5,7 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700", "800"] });
 
 export const metadata: Metadata = {
-  title: "Widget Demo — Powered by Pye",
+  title: "Speed Stake — Powered by Pye",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
